@@ -275,7 +275,7 @@ export function TaxCompliance() {
           </CardTitle>
           <CardDescription>From Settings › Tax Configuration for the active branch.</CardDescription>
         </div>
-        <Button variant="outline" size="sm" onClick={() => navigate('/settings?tab=tax')}>
+        <Button variant="outline" size="sm" onClick={() => navigate('/gymos?section=settings&tab=tax')}>
           <Settings className="mr-2 h-4 w-4" />
           Edit in Settings
         </Button>

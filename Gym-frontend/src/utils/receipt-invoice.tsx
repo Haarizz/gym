@@ -1,5 +1,5 @@
 import type { Receipt } from './supabase/receipts-service';
-import { getCompanyDetails, buildCompanyHeaderHtml, buildCompanyFooterHtml, buildQrCodeSvg, buildReceiptQrPayload, COMPANY_HEADER_CSS, companyLocalNameHtml, type CompanyDetails } from './company-details';
+import { getCompanyDetails, buildCompanyHeaderHtml, buildCompanyFooterHtml, buildQrCodeSvg, buildReceiptQrPayload, COMPANY_HEADER_CSS, companyLocalNameHtml, invoiceTitle, invoiceTitleArabic, type CompanyDetails } from './company-details';
 import { getVatRate, splitVatInclusive, vatRateFor, DEFAULT_VAT_RATE } from './tax';
 import { getReceiptColors, receiptColorsCss, DEFAULT_RECEIPT_COLORS, type ReceiptColors } from './receipt-colors';
 import { printHtml } from './print-html';
@@ -358,7 +358,7 @@ export function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDet
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Receipt - ${escapeHtml(data.receiptNo)}</title>
+    <title>${invoiceTitle(company)} - ${escapeHtml(data.receiptNo)}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
@@ -472,7 +472,7 @@ export function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDet
           amount: `${currencyCode} ${data.invoiceAmount.toFixed(2)}`,
           status: data.status,
         })}</div>
-        <div class="receipt-title">Tax Invoice &#1601;&#1575;&#1578;&#1608;&#1585;&#1577; &#1590;&#1585;&#1610;&#1576;&#1610;&#1577;</div>
+        <div class="receipt-title">${invoiceTitle(company)} ${escapeHtml(invoiceTitleArabic(company))}</div>
         <div class="receipt-info">
             <div class="info-block">
               <div class="info-label">Receipt Number</div>

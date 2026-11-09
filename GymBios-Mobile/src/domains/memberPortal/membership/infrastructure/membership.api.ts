@@ -114,6 +114,7 @@ export const membershipApi = {
       remarks: response.data.remarks,
       discountAmount: response.data.discount_amount,
       discountLabel: response.data.discount_label,
+      taxInvoice: response.data.tax_invoice === true,
     };
   },
   

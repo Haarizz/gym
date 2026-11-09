@@ -36,6 +36,8 @@ public class MobileReceiptDetailDTO {
     private String remarks;
     private BigDecimal discountAmount;
     private String discountLabel;
+    /** True when the receipt's branch has a TRN and is VAT registered — only then is it titled "Tax Invoice". */
+    private boolean taxInvoice;
 
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
@@ -93,4 +95,6 @@ public class MobileReceiptDetailDTO {
     public String getRemarks() { return remarks; }
     public BigDecimal getDiscountAmount() { return discountAmount; }
     public String getDiscountLabel() { return discountLabel; }
+    public boolean isTaxInvoice() { return taxInvoice; }
+    public void setTaxInvoice(boolean taxInvoice) { this.taxInvoice = taxInvoice; }
 }

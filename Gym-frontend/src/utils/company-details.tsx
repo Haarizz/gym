@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { financialSettingsService } from "./supabase/financial-settings-service";
 // @ts-ignore - qr.js ships no type declarations
 import QRCodeGenerator from "qr.js/lib/QRCode";
@@ -93,6 +94,53 @@ export async function getCompanyDetails(branchId?: number | null): Promise<Compa
 
 export function invalidateCompanyDetailsCache() {
   cached.clear();
+  // Tells mounted screens (e.g. "Tax Invoice" / "Invoice" buttons) to re-read the details.
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(COMPANY_DETAILS_CHANGED));
+}
+
+const COMPANY_DETAILS_CHANGED = "companyDetailsChanged";
+
+/**
+ * A document may only be titled "Tax Invoice" when it carries a TRN — i.e. the branch has a
+ * TRN and is VAT registered (getCompanyDetails blanks `trn` when Tax Configuration says it
+ * isn't). Otherwise it is a plain "Invoice".
+ */
+export function isTaxInvoice(company: Pick<CompanyDetails, "trn"> | null | undefined): boolean {
+  return !!company?.trn?.trim();
+}
+
+/** "Tax Invoice" when the branch has a TRN, else "Invoice". */
+export function invoiceTitle(company: Pick<CompanyDetails, "trn"> | null | undefined): string {
+  return isTaxInvoice(company) ? "Tax Invoice" : "Invoice";
+}
+
+/** Arabic counterpart of invoiceTitle(): فاتورة ضريبية (tax invoice) or فاتورة (invoice). */
+export function invoiceTitleArabic(company: Pick<CompanyDetails, "trn"> | null | undefined): string {
+  return isTaxInvoice(company) ? "فاتورة ضريبية" : "فاتورة";
+}
+
+/**
+ * The active branch's invoice title for on-screen labels ("Tax Invoice" / "Invoice"); follows
+ * branch switches and Settings saves. Reads "Invoice" until the details have loaded.
+ */
+export function useInvoiceTitle(): string {
+  const [title, setTitle] = useState(() => {
+    const hit = cached.get(activeBranchKey());
+    return hit ? invoiceTitle(hit) : "Invoice";
+  });
+  useEffect(() => {
+    let alive = true;
+    const read = () => { getCompanyDetails().then(c => { if (alive) setTitle(invoiceTitle(c)); }).catch(() => {}); };
+    read();
+    window.addEventListener("branchChanged", read);
+    window.addEventListener(COMPANY_DETAILS_CHANGED, read);
+    return () => {
+      alive = false;
+      window.removeEventListener("branchChanged", read);
+      window.removeEventListener(COMPANY_DETAILS_CHANGED, read);
+    };
+  }, []);
+  return title;
 }
 
 /**
@@ -160,7 +208,7 @@ export interface ReceiptQrDetails {
 // bill on the scanning phone with no server round-trip or public endpoint.
 export function buildReceiptQrPayload(company: CompanyDetails, receiptNo: string, details?: ReceiptQrDetails): string {
   const lines = [
-    `${company.name} - Tax Invoice`,
+    `${company.name} - ${invoiceTitle(company)}`,
     `Receipt No: ${receiptNo}`,
   ];
   if (details?.date) lines.push(`Date: ${details.date}`);

@@ -2,7 +2,7 @@
 // thermal HTML, raw ESC/POS bytes, A4 tax invoice) draws from these, so a receipt
 // reads the same however it is printed (BillBull's "single view-model" rule).
 
-import type { CompanyDetails } from "../../utils/company-details";
+import { isTaxInvoice, type CompanyDetails } from "../../utils/company-details";
 import type { CreditPayment, PaymentLeg, ReportSummary, Sale, SaleReturn, XReport, ZReport, CashMovement } from "../types";
 import { fmtDate, fmtDateTime, num, r2 } from "../pricing";
 import type { ReceiptTemplate } from "./receiptTemplate";
@@ -75,13 +75,19 @@ function qrPayload(company: CompanyDetails, title: string, number: string, date:
   ].filter(Boolean).join("\n");
 }
 
-const titleFor = (t: ReceiptTemplate, hasTax: boolean) =>
-  t.title === "auto" ? (hasTax ? "TAX INVOICE" : "RECEIPT") : t.title;
+// Only a branch with a TRN may title a document "Tax Invoice"; without one a template set to
+// TAX INVOICE / SIMPLIFIED TAX INVOICE prints a plain INVOICE.
+const titleFor = (t: ReceiptTemplate, hasTax: boolean, company: CompanyDetails) => {
+  const taxInvoice = isTaxInvoice(company);
+  if (t.title === "auto") return hasTax && taxInvoice ? "TAX INVOICE" : "RECEIPT";
+  if (!taxInvoice && /TAX INVOICE/.test(t.title)) return "INVOICE";
+  return t.title;
+};
 
 export function saleReceipt(sale: Sale, company: CompanyDetails, template: ReceiptTemplate, currency: string,
                             opts: { isReprint?: boolean } = {}): ReceiptModel {
   const hasTax = sale.taxAmount > 0;
-  const title = titleFor(template, hasTax);
+  const title = titleFor(template, hasTax, company);
   const legs = sale.paymentBreakdown && sale.paymentBreakdown.length > 0
     ? sale.paymentBreakdown
     : [{ method: sale.paymentSummary || sale.paymentMethod, amount: sale.totalAmount }];
@@ -136,7 +142,7 @@ export function saleReceipt(sale: Sale, company: CompanyDetails, template: Recei
 
 export function returnReceipt(ret: SaleReturn, company: CompanyDetails, template: ReceiptTemplate, currency: string): ReceiptModel {
   const hasTax = ret.taxAmount > 0;
-  const title = hasTax ? "TAX CREDIT NOTE" : "RETURN RECEIPT";
+  const title = hasTax && isTaxInvoice(company) ? "TAX CREDIT NOTE" : "RETURN RECEIPT";
   const legs = ret.refundBreakdown ?? [];
   const date = fmtDateTime(ret.createdAt);
   const taxable = r2(ret.totalAmount - ret.taxAmount);

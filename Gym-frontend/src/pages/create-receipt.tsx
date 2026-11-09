@@ -29,7 +29,7 @@ import {
   Printer
 } from 'lucide-react';
 import { toast } from "sonner";
-import { getCompanyDetails } from "../utils/company-details";
+import { getCompanyDetails, useInvoiceTitle } from "../utils/company-details";
 import { getVatRate, splitVatInclusive, vatRateFor } from "../utils/tax";
 import { buildFullReceiptHtml, buildPaymentReceiptHtml, type ReceiptPrintData } from "../utils/receipt-invoice";
 import { printHtml } from "../utils/print-html";
@@ -57,6 +57,7 @@ interface CreateReceiptProps {
 
 export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProps) {
   const { currencyCode, currencyPrefix } = useCurrency();
+  const invoiceLabel = useInvoiceTitle();
   const isModal = layout === "modal";
   const panelCardClass = "border-primary/10 shadow-md hover:shadow-lg transition-shadow bg-white";
   const location = useLocation();
@@ -812,7 +813,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <Button variant="outline" onClick={handlePrintInvoice} className="gap-2">
-                            <FileText className="h-4 w-4" />Tax Invoice
+                            <FileText className="h-4 w-4" />{invoiceLabel}
                           </Button>
                           <Button
                             variant="outline"
@@ -973,7 +974,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
           <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={() => setShowReceiptModal(false)}>Close</Button>
             <Button variant="outline" onClick={handlePrintInvoice} className="gap-2" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>
-              <FileText className="h-4 w-4" />Tax Invoice
+              <FileText className="h-4 w-4" />{invoiceLabel}
             </Button>
             <Button onClick={() => handlePrintReceipt()} style={{ backgroundColor: 'var(--primary)' }} className="text-white gap-2">
               <Printer className="h-4 w-4" />Print Receipt

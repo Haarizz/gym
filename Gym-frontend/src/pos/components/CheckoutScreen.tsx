@@ -7,6 +7,7 @@ import { PAYMENT_TYPES, type PaymentType } from "../../payments/paymentModel";
 import type { CreditCustomer } from "../../payments/modals/CreditModal";
 import { posApi } from "../api";
 import { usePos } from "../PosContext";
+import { isTaxInvoice } from "../../utils/company-details";
 import { Money, ReceiptPreview, type PickedMember } from "./Shared";
 import { fmtDateTime, money, r2, type CartTotals, type PromoRule } from "../pricing";
 import { legLabel, saleReceipt } from "../print/receiptModel";
@@ -182,7 +183,7 @@ export function CheckoutScreen({
       try { await printSale(sale, { format }); } finally { setPrinting(false); }
     };
     const shareText = [
-      `${company?.name ?? "GymBios"} — ${sale.taxAmount > 0 ? "Tax Invoice" : "Receipt"} ${sale.transactionNumber}`,
+      `${company?.name ?? "GymBios"} — ${sale.taxAmount > 0 && isTaxInvoice(company) ? "Tax Invoice" : "Receipt"} ${sale.transactionNumber}`,
       `Date: ${fmtDateTime(sale.createdAt)}`,
       ...sale.items.map((i) => `${i.quantity} x ${i.productName} — ${money(sale.taxInclusive ? i.lineTotal : i.taxableAmount, currencyCode)}`),
       `Total: ${money(sale.totalAmount, currencyCode)}`,

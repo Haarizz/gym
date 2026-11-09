@@ -6,7 +6,7 @@
 //   NETWORK  → raw ESC/POS relayed by the backend to the printer's LAN IP
 //   A4       → the Sales Invoice print template (Sales & Purchases › Print Templates)
 
-import type { CompanyDetails } from "../../utils/company-details";
+import { isTaxInvoice, type CompanyDetails } from "../../utils/company-details";
 import type { CurrencyCode } from "../../utils/currency";
 import { loadDefaultSettings, printDocumentHtml, printHtml } from "../../components/print-templates/purchasePrint";
 import type { PrintDocument } from "../../components/print-templates/documentTemplate";
@@ -199,14 +199,14 @@ export async function testPrinter(printer: PosPrinter): Promise<PrintOutcome> {
   return outcome;
 }
 
-// ── A4 tax invoice ──────────────────────────────────────────────────────────
+// ── A4 invoice (Tax Invoice when the branch has a TRN) ──────────────────────────────────────────────────────────
 
 export function saleA4Document(sale: Sale, company: CompanyDetails, currencyCode: CurrencyCode, isReprint = false,
   catalog: Map<number, CatalogInfo> = new Map()): PrintDocument {
   const date = new Date(sale.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
   return {
     docType: "sales-invoice",
-    title: `${sale.taxAmount > 0 ? "Tax Invoice" : "Sales Invoice"}${isReprint ? " (Copy)" : ""}`,
+    title: `${sale.taxAmount > 0 && isTaxInvoice(company) ? "Tax Invoice" : "Sales Invoice"}${isReprint ? " (Copy)" : ""}`,
     number: sale.transactionNumber,
     date,
     company,

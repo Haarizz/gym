@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { addDays, format, isValid, parseISO, startOfDay, subDays, subMonths } from "date-fns";
+import { useInvoiceTitle } from "../../utils/company-details";
 import {
   AlertCircle,
   ArrowUpDown,
@@ -223,6 +224,7 @@ export function MembershipLifecycleReport({
   autoGenerateKey?: number;
 }) {
   const { currencyCode } = useCurrency();
+  const invoiceLabel = useInvoiceTitle();
   const isFuture = reportType === "expiring";
   const [range, setRange] = useState<RangeKey>(defaultRangeFor(reportType));
   const [custom, setCustom] = useState({ from: "", to: "" });
@@ -530,7 +532,7 @@ export function MembershipLifecycleReport({
                                   <Printer className="h-4 w-4 mr-1" />
                                   Receipt
                                 </Button>
-                                <Button variant="outline" size="sm" title="Print tax invoice" onClick={() => downloadReceiptInvoice(r, currencyCode)}>
+                                <Button variant="outline" size="sm" title={`Print ${invoiceLabel.toLowerCase()}`} onClick={() => downloadReceiptInvoice(r, currencyCode)}>
                                   Invoice
                                 </Button>
                               </div>

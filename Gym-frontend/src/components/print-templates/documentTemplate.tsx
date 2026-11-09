@@ -1,5 +1,5 @@
 import React from 'react';
-import { ARABIC_SCRIPT, LOCAL_NAME_FONT_STACK, buildQrCodeSvg, type CompanyDetails } from '../../utils/company-details';
+import { ARABIC_SCRIPT, LOCAL_NAME_FONT_STACK, buildQrCodeSvg, isTaxInvoice, type CompanyDetails } from '../../utils/company-details';
 import { CURRENCIES, type CurrencyCode } from '../../utils/currency';
 import aedSymbolUrl from '../../assets/currency/aed-symbol.webp';
 
@@ -17,7 +17,7 @@ export const DOC_FONT = "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', 'Seg
 export type DocType = 'sales-invoice' | 'purchase-order' | 'purchase-invoice';
 
 export const DOC_TYPES: { id: DocType; category: 'SALES_INVOICE' | 'PURCHASE_ORDER' | 'PURCHASE_INVOICE'; label: string; code: string; description: string }[] = [
-  { id: 'sales-invoice', category: 'SALES_INVOICE', label: 'Sales Invoice', code: 'SI', description: 'Tax invoice issued to members and walk-in customers' },
+  { id: 'sales-invoice', category: 'SALES_INVOICE', label: 'Sales Invoice', code: 'SI', description: 'Invoice issued to members and walk-in customers (Tax Invoice when the branch has a TRN)' },
   { id: 'purchase-order', category: 'PURCHASE_ORDER', label: 'Purchase Order', code: 'PO', description: 'Order issued to suppliers for goods and services' },
   { id: 'purchase-invoice', category: 'PURCHASE_INVOICE', label: 'Purchase Invoice', code: 'PI', description: 'Supplier invoice received for purchase accounting' },
 ];
@@ -763,7 +763,7 @@ export function sampleDocument(docType: DocType, company: CompanyDetails, curren
     const total = grandTotal + roundOff;
     return {
       docType,
-      title: 'Tax Invoice',
+      title: isTaxInvoice(company) ? 'Tax Invoice' : 'Sales Invoice',
       number: 'SI-00000128',
       date: '29 Sep 2026',
       company,

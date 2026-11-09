@@ -11,7 +11,8 @@ import { Switch } from "../components/ui/switch";
 import { branchApi, BranchDTO } from '../utils/supabase/branch-service';
 import { useBranch } from '../utils/branch-context';
 
-export function BranchManagement() {
+/** `embedded`: shown as GymOS › Branch Management, under GymOS's own page header. */
+export function BranchManagement({ embedded = false }: { embedded?: boolean } = {}) {
   const [branches, setBranches] = useState<BranchDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -117,11 +118,13 @@ export function BranchManagement() {
   if (loading) return <div className="p-8 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className={embedded ? "space-y-6" : "p-6 space-y-6"}>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Branch Management</h1>
-          <p className="text-muted-foreground">Manage gym locations and assignments</p>
+          {embedded
+            ? <h2 className="text-lg font-semibold">Branch Management</h2>
+            : <h1 className="text-3xl font-bold">Branch Management</h1>}
+          <p className={embedded ? "text-sm text-muted-foreground" : "text-muted-foreground"}>Manage gym locations and assignments</p>
         </div>
         <Button onClick={() => setShowAddModal(true)}>
           <Plus className="mr-2 h-4 w-4" />

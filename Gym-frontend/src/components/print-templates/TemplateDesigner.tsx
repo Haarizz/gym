@@ -227,7 +227,7 @@ export function TemplateDesigner({ docType, initial, initialDefault, company, cu
                 <span>
                   Logo, stamp, name, address, phone, email and TRN are read from <b>Settings › Company Details</b> of the branch each
                   document belongs to, so every branch prints its own header. The preview shows <b>{branchName}</b>.{' '}
-                  <button type="button" className={styles.linkBtn} onClick={() => leave(() => navigate('/settings'))}>Edit company details</button>
+                  <button type="button" className={styles.linkBtn} onClick={() => leave(() => navigate('/gymos?section=settings&tab=company'))}>Edit company details</button>
                 </span>
               </div>
               <Group icon={Building2} title="Company header">
@@ -360,7 +360,7 @@ export function TemplateDesigner({ docType, initial, initialDefault, company, cu
                     <Info size={16} />
                     <span>
                       Printing <b>{branchName}</b>’s stamp from Settings.{' '}
-                      <button type="button" className={styles.linkBtn} onClick={() => leave(() => navigate('/settings'))}>Change stamp</button>
+                      <button type="button" className={styles.linkBtn} onClick={() => leave(() => navigate('/gymos?section=settings&tab=company'))}>Change stamp</button>
                     </span>
                   </div>
                 )}
@@ -368,7 +368,7 @@ export function TemplateDesigner({ docType, initial, initialDefault, company, cu
                   <div className={styles.block}>
                     <label>
                       {branchName} has no stamp yet —{' '}
-                      <button type="button" className={styles.linkBtn} onClick={() => leave(() => navigate('/settings'))}>add it in Settings</button>
+                      <button type="button" className={styles.linkBtn} onClick={() => leave(() => navigate('/gymos?section=settings&tab=company'))}>add it in Settings</button>
                       , or upload a fallback used for any branch without one:
                     </label>
                     <div className={styles.upload}>

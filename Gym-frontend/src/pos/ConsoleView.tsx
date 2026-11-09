@@ -161,7 +161,7 @@ export function ConsoleView() {
                   <Label>Default receipt format</Label>
                   <Select value={draft.defaultPrintFormat} onValueChange={(v) => set("defaultPrintFormat", v as PaperSize)} disabled={!canEdit}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="80mm">80 mm thermal</SelectItem><SelectItem value="58mm">58 mm thermal</SelectItem><SelectItem value="A4">A4 tax invoice</SelectItem></SelectContent>
+                    <SelectContent><SelectItem value="80mm">80 mm thermal</SelectItem><SelectItem value="58mm">58 mm thermal</SelectItem><SelectItem value="A4">A4 invoice</SelectItem></SelectContent>
                   </Select>
                 </div>
                 <div className={s.field}>
@@ -425,7 +425,7 @@ function ReceiptTab({ draft, set, canEdit }: TabProps) {
                 <Select value={tpl.title} onValueChange={(v) => upd({ title: v as ReceiptTemplate["title"] })} disabled={!canEdit}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="auto">Automatic (Tax Invoice when VAT applies)</SelectItem>
+                    <SelectItem value="auto">Automatic (Tax Invoice when VAT applies and a TRN is set)</SelectItem>
                     <SelectItem value="TAX INVOICE">TAX INVOICE</SelectItem>
                     <SelectItem value="SIMPLIFIED TAX INVOICE">SIMPLIFIED TAX INVOICE</SelectItem>
                     <SelectItem value="SALES RECEIPT">SALES RECEIPT</SelectItem>

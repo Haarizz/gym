@@ -9,6 +9,7 @@ import { discountCodeService } from '../utils/supabase/reward-service';
 import { referralService, ReferralResponse } from '../utils/supabase/referral-service';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { useBranch } from '../utils/branch-context';
+import { branchApi, type BranchDTO } from '../utils/supabase/branch-service';
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -179,6 +180,30 @@ const emergencyContactMatchesMember = (f: {
   return null;
 };
 
+// Branch Access Type (Branch Settings › Ladies Only / Men Only / Mixed): who may join a branch
+// by gender — the same rule the backend enforces on save (BranchAccessPolicy).
+type BranchAccess = 'mixed' | 'ladies' | 'men';
+
+const branchAccessOf = (accessType?: string | null): BranchAccess => {
+  const a = (accessType || '').trim().toLowerCase();
+  // Female spellings first — "women" contains "men".
+  if (/ladies|lady|women|female/.test(a)) return 'ladies';
+  if (/men|male/.test(a)) return 'men';
+  return 'mixed';
+};
+
+const genderAllowedAt = (access: BranchAccess, gender: string): boolean =>
+  access === 'mixed' || (access === 'ladies' ? gender === 'female' : gender === 'male');
+
+const GENDER_OPTIONS: { value: string; label: string }[] = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'non-binary', label: 'Non-Binary' },
+  { value: 'transgender', label: 'Transgender' },
+  { value: 'prefer-not-to-say', label: 'Prefer Not to Say' },
+  { value: 'other', label: 'Other' },
+];
+
 export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const { memberId: routeMemberId } = useParams();
   const navigate = useNavigate();
@@ -186,6 +211,36 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const { isAllBranches } = useBranch();
   const isEditMode = Boolean(routeMemberId);
+
+  // The branch the member joins (edit mode: the member's own branch) and its Access Type.
+  const [memberBranchId, setMemberBranchId] = useState<number | null>(null);
+  const [branchAccess, setBranchAccess] = useState<{ access: BranchAccess; name: string }>({ access: 'mixed', name: '' });
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      const raw = sessionStorage.getItem('activeBranchId');
+      const id = memberBranchId ?? (raw && raw !== 'null' && raw !== 'undefined' ? Number(raw) : null);
+      if (id == null) { setBranchAccess({ access: 'mixed', name: '' }); return; }
+      branchApi.getMyBranches()
+        .then(list => {
+          const branch = list.find((b: BranchDTO) => b.id === id);
+          if (alive) setBranchAccess({ access: branchAccessOf(branch?.access_type), name: branch?.branch_name || 'This branch' });
+        })
+        .catch(() => { /* the backend still enforces the rule on save */ });
+    };
+    load();
+    window.addEventListener('branchChanged', load);
+    return () => { alive = false; window.removeEventListener('branchChanged', load); };
+  }, [memberBranchId]);
+  const accessOnlyLabel = branchAccess.access === 'ladies' ? 'Female' : 'Male';
+  const notifyGenderNotAllowed = (gender: string) => {
+    const label = GENDER_OPTIONS.find(o => o.value === gender)?.label ?? gender;
+    toast.error(`${branchAccess.name} is ${branchAccess.access === 'ladies' ? 'a ladies-only' : 'a men-only'} gym`, {
+      description: `Only ${accessOnlyLabel.toLowerCase()} members can join here, so "${label}" can't be selected. To register other members, change the branch's Access Type in Branch Settings.`,
+      duration: 6000,
+    });
+  };
+
   // Add-ons / facility access sold with a new membership (registration only).
   const [extras, setExtras] = useState<RegistrationExtra[]>([]);
 
@@ -662,6 +717,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
           }));
           setInternalId(member.id);
           setNoEmail(!member.email);
+          if ((member as any).branch_id != null) setMemberBranchId(Number((member as any).branch_id));
         }
       }).catch((err: any) => {
         console.error("Failed to load member for edit", err);
@@ -1019,9 +1075,20 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     // members saved before this can still be updated.
     if (!isEditMode && !formData.gender) {
       toast.error('Please select a gender', {
-        description: 'Gender is required — it decides which branches the member can join.',
+        description: branchAccess.access === 'mixed'
+          ? 'Gender is required — it decides which branches the member can join.'
+          : `${branchAccess.name} is ${branchAccess.access === 'ladies' ? 'ladies only' : 'men only'} — select ${accessOnlyLabel}.`,
         duration: 4000
       });
+      const el = document.getElementById('gender');
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el?.focus({ preventScroll: true });
+      return;
+    }
+    // A new member at a Ladies Only / Men Only branch must match it (the backend refuses
+    // otherwise) — say so plainly instead of surfacing the server error after payment entry.
+    if (!isEditMode && !genderAllowedAt(branchAccess.access, formData.gender)) {
+      notifyGenderNotAllowed(formData.gender);
       const el = document.getElementById('gender');
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       el?.focus({ preventScroll: true });
@@ -2019,17 +2086,34 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="gender" className="mb-1.5 block">Gender {!isEditMode && <span className="text-red-500">*</span>}</Label>
-                <Select value={formData.gender || undefined} onValueChange={(v) => setFormData({...formData, gender: v, genderOther: v !== 'other' ? '' : formData.genderOther})}>
+                {/* Always controlled ("" shows the placeholder): with `|| undefined` an emptied
+                    gender left the last pick on screen while the form held nothing. */}
+                <Select
+                  value={formData.gender}
+                  onValueChange={(v) => {
+                    // A gender a Ladies Only / Men Only branch doesn't take can't be picked.
+                    if (!genderAllowedAt(branchAccess.access, v) && v !== formData.gender) {
+                      notifyGenderNotAllowed(v);
+                      return;
+                    }
+                    setFormData(prev => ({ ...prev, gender: v, genderOther: v !== 'other' ? '' : prev.genderOther }));
+                  }}
+                >
                   <SelectTrigger id="gender"><SelectValue placeholder="Select Gender" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="female">Female</SelectItem>
-                    <SelectItem value="non-binary">Non-Binary</SelectItem>
-                    <SelectItem value="transgender">Transgender</SelectItem>
-                    <SelectItem value="prefer-not-to-say">Prefer Not to Say</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {GENDER_OPTIONS.map(o => (
+                      <SelectItem key={o.value} value={o.value}
+                        className={genderAllowedAt(branchAccess.access, o.value) ? undefined : 'opacity-50'}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {branchAccess.access !== 'mixed' && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    {branchAccess.name} is {branchAccess.access === 'ladies' ? 'a ladies-only' : 'a men-only'} gym — only {accessOnlyLabel} can be selected.
+                  </p>
+                )}
                 {formData.gender === 'other' && (
                   <Input className="mt-2" value={formData.genderOther} onChange={(e) => setFormData({...formData, genderOther: e.target.value})} placeholder="Please specify" />
                 )}
