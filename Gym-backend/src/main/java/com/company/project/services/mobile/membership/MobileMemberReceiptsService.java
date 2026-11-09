@@ -7,11 +7,14 @@ import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.ReceiptRepository;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.TaxPolicyService;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.AccessDeniedException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -28,11 +31,14 @@ public class MobileMemberReceiptsService {
 
     private final ReceiptRepository receiptRepository;
     private final MemberRepository memberRepository;
+    private final TaxPolicyService taxPolicyService;
 
     public MobileMemberReceiptsService(ReceiptRepository receiptRepository,
-                                       MemberRepository memberRepository) {
+                                       MemberRepository memberRepository,
+                                       TaxPolicyService taxPolicyService) {
         this.receiptRepository = receiptRepository;
         this.memberRepository = memberRepository;
+        this.taxPolicyService = taxPolicyService;
     }
 
     // ── Public API ──────────────────────────────────────────────────────────
@@ -47,8 +53,9 @@ public class MobileMemberReceiptsService {
 
         List<Receipt> receipts = receiptRepository.findByMemberDbIdOrderByTransactionDateDesc(member.getId());
 
+        Map<Long, Boolean> taxInvoiceByBranch = new HashMap<>();
         return receipts.stream()
-                .map(MobileReceiptDetailDTO::fromEntity)
+                .map(r -> toDto(r, taxInvoiceByBranch))
                 .collect(Collectors.toList());
     }
 
@@ -73,7 +80,20 @@ public class MobileMemberReceiptsService {
             throw new SecurityException("You do not have permission to view this receipt");
         }
 
-        return MobileReceiptDetailDTO.fromEntity(receipt);
+        return toDto(receipt, new HashMap<>());
+    }
+
+    /** The DTO plus whether its branch may title it "Tax Invoice" (TRN set and VAT registered). */
+    private MobileReceiptDetailDTO toDto(Receipt receipt, Map<Long, Boolean> taxInvoiceByBranch) {
+        MobileReceiptDetailDTO dto = MobileReceiptDetailDTO.fromEntity(receipt);
+        Long branchId = receipt.getBranchId();
+        if (branchId != null) {
+            dto.setTaxInvoice(taxInvoiceByBranch.computeIfAbsent(branchId, id -> {
+                TaxPolicyService.TaxDefaults tax = taxPolicyService.forBranch(id);
+                return tax.vatRegistered() && tax.trn() != null && !tax.trn().isBlank();
+            }));
+        }
+        return dto;
     }
 
     // ── Internal helpers ────────────────────────────────────────────────────

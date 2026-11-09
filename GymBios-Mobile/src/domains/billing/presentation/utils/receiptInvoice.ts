@@ -81,6 +81,10 @@ async function getCompanyDetails(): Promise<CompanyDetails> {
       if (s.setting_key === 'company_logo') details.logo = s.setting_value;
       if (s.setting_key === 'company_trn') details.trn = s.setting_value;
     });
+    // A branch switched to "not VAT registered" (Settings › Tax Configuration) prints no TRN.
+    const registered = (await getSettings('BRANCH_TAX').catch(() => []))
+      .find(s => s.setting_key === 'vat_registered')?.setting_value;
+    if (String(registered).toLowerCase() === 'false') details.trn = '';
     cachedCompany = details;
     return details;
   } catch (err) {
@@ -145,8 +149,18 @@ interface ReceiptQrDetails {
 }
 
 // Plain-text payload (GCC e-invoicing style) so scanning shows the bill with no server round-trip.
+/** Only a document carrying a TRN may be titled "Tax Invoice"; otherwise it is an "Invoice". */
+function invoiceTitle(company: CompanyDetails): string {
+  return company.trn?.trim() ? 'Tax Invoice' : 'Invoice';
+}
+
+/** Arabic counterpart: فاتورة ضريبية (tax invoice) or فاتورة (invoice). */
+function invoiceTitleArabic(company: CompanyDetails): string {
+  return company.trn?.trim() ? '&#1601;&#1575;&#1578;&#1608;&#1585;&#1577; &#1590;&#1585;&#1610;&#1576;&#1610;&#1577;' : '&#1601;&#1575;&#1578;&#1608;&#1585;&#1577;';
+}
+
 function buildReceiptQrPayload(company: CompanyDetails, receiptNo: string, details?: ReceiptQrDetails): string {
-  const lines = [`${company.name} - Tax Invoice`, `Receipt No: ${receiptNo}`];
+  const lines = [`${company.name} - ${invoiceTitle(company)}`, `Receipt No: ${receiptNo}`];
   if (details?.date) lines.push(`Date: ${details.date}`);
   if (details?.billTo) lines.push(`Bill To: ${details.billTo}`);
   if (details?.amount) lines.push(`Amount: ${details.amount}`);
@@ -250,7 +264,7 @@ function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDetails, a
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Receipt - ${escapeHtml(data.receiptNo)}</title>
+    <title>${invoiceTitle(company)} - ${escapeHtml(data.receiptNo)}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
@@ -359,7 +373,7 @@ function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDetails, a
           amount: formatCurrency(data.invoiceAmount, { code: currencyCode, decimals: 2 }),
           status: data.status,
         })}</div>
-        <div class="receipt-title">Tax Invoice &#1601;&#1575;&#1578;&#1608;&#1585;&#1577; &#1590;&#1585;&#1610;&#1576;&#1610;&#1577;</div>
+        <div class="receipt-title">${invoiceTitle(company)} ${invoiceTitleArabic(company)}</div>
         <div class="receipt-info">
             <div class="info-block">
               <div class="info-label">Receipt Number</div>

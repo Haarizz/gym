@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useInvoiceTitle } from "../utils/company-details";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -163,6 +164,7 @@ const toLocalIsoDate = (d: Date) =>
 
 export function Billing({ onNavigate }: BillingProps = {}) {
   const navigate = useNavigate();
+  const invoiceLabel = useInvoiceTitle();
   const { currencyCode, currencyPrefix, formatCurrency } = useCurrency();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -974,7 +976,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                                   <Eye className="h-4 w-4 mr-2 text-blue-600" /> View details
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleDownloadInvoice(receipt)}>
-                                  <FileText className="h-4 w-4 mr-2 text-purple-600" /> Tax invoice
+                                  <FileText className="h-4 w-4 mr-2 text-purple-600" /> {invoiceLabel}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleDownloadReceipt(receipt)}>
                                   <Printer className="h-4 w-4 mr-2 text-teal-600" /> Print receipt
@@ -1692,7 +1694,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => handleDownloadInvoice(selectedReceipt)}>
-                <FileText className="mr-2 h-4 w-4" />Tax Invoice
+                <FileText className="mr-2 h-4 w-4" />{invoiceLabel}
               </Button>
               <Button variant="outline" onClick={() => handleDownloadReceipt(selectedReceipt)}>
                 <Download className="mr-2 h-4 w-4" />Receipt

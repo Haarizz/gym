@@ -293,7 +293,7 @@ export function PrintTemplatesManager() {
               <p>Each document prints the company details of the branch it was created in — not the branch you are viewing.</p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => navigate('/settings')}><SettingsIcon className="h-4 w-4" /> Edit company details</Button>
+          <Button variant="outline" onClick={() => navigate('/gymos?section=settings&tab=company')}><SettingsIcon className="h-4 w-4" /> Edit company details</Button>
         </div>
         <div className={styles.sourceGrid}>
           <div className={styles.sourceItem}><ImageIcon size={16} /><div><strong>Logo & stamp</strong><span>Settings › Company Details › Company Logo / Company Stamp</span></div></div>

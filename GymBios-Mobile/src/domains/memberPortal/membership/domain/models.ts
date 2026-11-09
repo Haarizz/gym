@@ -127,6 +127,8 @@ export interface MobileReceiptDetail {
   remarks?: string;
   discountAmount?: number | null;
   discountLabel?: string | null;
+  /** The receipt's branch has a TRN and is VAT registered — only then is it titled "Tax Invoice". */
+  taxInvoice?: boolean;
 }
 
 export interface AddOn {

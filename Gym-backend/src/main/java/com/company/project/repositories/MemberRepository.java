@@ -178,10 +178,15 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
 
     String BIOS_END_DATE = "COALESCE(m.membershipEndDate, m.expiryDate)";
     String BIOS_JOIN_DATE = "COALESCE(m.joinDate, m.membershipStartDate, m.createdAt)";
-    String BIOS_EFFECTIVELY_ACTIVE = "(LOWER(m.membershipStatus) = 'active' AND (" + BIOS_END_DATE + " IS NULL OR "
-            + BIOS_END_DATE + " >= :asOf))";
-    String BIOS_EFFECTIVELY_EXPIRED = "(LOWER(m.membershipStatus) = 'expired' OR (LOWER(m.membershipStatus) NOT IN "
-            + "('pending_approval', 'frozen', 'suspended') AND " + BIOS_END_DATE + " < :asOf))";
+    // Suspending sets m.membershipSuspended and leaves membershipStatus as it was; that flag wins
+    // over every other status (MemberEffectiveStatus), so a suspended member is neither active
+    // nor expired here — otherwise the dashboard counted them Active while Members showed them
+    // under Suspended.
+    String BIOS_EFFECTIVELY_ACTIVE = "(m.membershipSuspended = false AND LOWER(m.membershipStatus) = 'active' AND ("
+            + BIOS_END_DATE + " IS NULL OR " + BIOS_END_DATE + " >= :asOf))";
+    String BIOS_EFFECTIVELY_EXPIRED = "(m.membershipSuspended = false AND (LOWER(m.membershipStatus) = 'expired' OR "
+            + "(LOWER(m.membershipStatus) NOT IN ('pending_approval', 'frozen', 'suspended') AND " + BIOS_END_DATE
+            + " < :asOf)))";
 
     @Query("SELECT COUNT(m) FROM Member m WHERE " + BIOS_EFFECTIVELY_ACTIVE)
     long countEffectivelyActive(@Param("asOf") LocalDateTime asOf);

@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import { useSearchParams } from 'react-router-dom';
+import { usePermission } from '../utils/permissions';
+import { AppSettings } from './settings';
+import { BranchManagement } from './branch-management';
 import { CurrencyGlyph } from '../utils/currency';
 import { moduleService, PlatformModuleResponse, ModuleAuditLogEntry } from '../utils/supabase/module-service';
 import { staffService, StaffTarget } from '../utils/supabase/staff-service';
@@ -84,7 +88,95 @@ interface GymOSProps {
   onNavigate?: (section: string) => void;
 }
 
-export function GymOS({ onNavigate }: GymOSProps = {}) {
+/** GymOS tabs, in order; the active one lives in the URL as ?section= (Settings uses ?tab= for its own tabs). */
+const GYMOS_TABS = ['overview', 'pos-mode', 'performance-metrics', 'configuration', 'settings', 'branches'] as const;
+type GymOSTab = typeof GYMOS_TABS[number];
+
+/**
+ * GymOS. Its system tabs need GYMOS_VIEW; the Settings tab (the former Settings page, moved
+ * here) needs SETTINGS_VIEW and the Branch Management tab (moved here too) needs
+ * BRANCH_MANAGEMENT_VIEW — a role with only those sees just those tabs.
+ */
+export function GymOS(props: GymOSProps = {}) {
+  const canGymOS = usePermission('GYMOS_VIEW');
+  const canSettings = usePermission('SETTINGS_VIEW');
+  const canBranches = usePermission('BRANCH_MANAGEMENT_VIEW');
+  if (canGymOS) return <GymOSWorkspace {...props} showSettings={canSettings} showBranches={canBranches} />;
+  if (canSettings || canBranches) return <GymOSAdminTabsOnly showSettings={canSettings} showBranches={canBranches} />;
+  return null;
+}
+
+const currentPeriod = () => new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+/**
+ * Marks a GymOS control whose setting is saved but not yet applied anywhere else in the app
+ * (or a feature not built yet), so nobody assumes it already takes effect.
+ */
+function ComingSoon({ className = '' }: { className?: string }) {
+  return <Badge className={`bg-amber-100 text-amber-800 border-0 ${className}`}>Coming soon</Badge>;
+}
+
+function GymOSHeader({ actions = true, onRefresh, refreshing = false }: { actions?: boolean; onRefresh?: () => void; refreshing?: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">GymOS</h1>
+        <p className="text-gray-600 mt-1">
+          Business Operating System - System Configuration & Management for {currentPeriod()}
+        </p>
+      </div>
+      {actions && (
+        <div className="flex space-x-3">
+          <Button variant="outline" size="sm" disabled title="Coming soon">
+            <Filter className="h-4 w-4 mr-2" />
+            Filter
+            <ComingSoon className="ml-2" />
+          </Button>
+          <Button variant="outline" size="sm" disabled title="Coming soon">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+            <ComingSoon className="ml-2" />
+          </Button>
+          <Button variant="outline" size="sm" onClick={onRefresh} disabled={!onRefresh || refreshing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** GymOS for a role that may open Settings and/or Branch Management but not the GymOS system tabs. */
+function GymOSAdminTabsOnly({ showSettings, showBranches }: { showSettings: boolean; showBranches: boolean }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const first = showSettings ? 'settings' : 'branches';
+  const section = searchParams.get('section');
+  const activeTab = (section === 'settings' && showSettings) || (section === 'branches' && showBranches) ? section : first;
+  return (
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+      <GymOSHeader actions={false} />
+      <Tabs value={activeTab} onValueChange={(tab) => setSearchParams({ section: tab }, { replace: true })} className="space-y-6">
+        <TabsList className={`grid w-full ${showSettings && showBranches ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {showSettings && <TabsTrigger value="settings">Settings</TabsTrigger>}
+          {showBranches && <TabsTrigger value="branches">Branch Management</TabsTrigger>}
+        </TabsList>
+        {showSettings && (
+          <TabsContent value="settings">
+            <AppSettings embedded />
+          </TabsContent>
+        )}
+        {showBranches && (
+          <TabsContent value="branches">
+            <BranchManagement embedded />
+          </TabsContent>
+        )}
+      </Tabs>
+    </div>
+  );
+}
+
+function GymOSWorkspace({ onNavigate, showSettings, showBranches }: GymOSProps & { showSettings: boolean; showBranches: boolean }) {
     const [catalogSections, setCatalogSections] = useState<CatalogDisplaySection[]>([]);
   const [catalogSectionsLoading, setCatalogSectionsLoading] = useState(true);
   const [catalogSectionsError, setCatalogSectionsError] = useState<string | null>(null);
@@ -92,7 +184,13 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
   const [posModeSavingId, setPosModeSavingId] = useState<string | null>(null);
   const [showCatalogConfig, setShowCatalogConfig] = useState(false);
   const [showPOSConfig, setShowPOSConfig] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sectionParam = searchParams.get('section') as GymOSTab | null;
+  const activeTab: GymOSTab = sectionParam && GYMOS_TABS.includes(sectionParam)
+    && (sectionParam !== 'settings' || showSettings) && (sectionParam !== 'branches' || showBranches)
+    ? sectionParam : 'overview';
+  // A fresh query string per tab, so Settings' own ?tab= doesn't linger on the other tabs.
+  const setActiveTab = (tab: string) => setSearchParams(tab === 'overview' ? {} : { section: tab }, { replace: true });
   const [modules, setModules] = useState<PlatformModuleResponse[]>([]);
   const [modulesLoading, setModulesLoading] = useState(true);
   const [modulesError, setModulesError] = useState<string | null>(null);
@@ -645,39 +743,34 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
 
   const getEnabledCatalogCount = () => catalogSections.filter(s => s.enabled).length;
 
+  // Header Refresh: reload every GymOS section at once.
+  const [refreshingAll, setRefreshingAll] = useState(false);
+  const refreshAll = async () => {
+    setRefreshingAll(true);
+    try {
+      await Promise.all([
+        loadModules(), loadRoles(), loadAuditLog(), loadIntegrations(), loadDevices(), loadNotifications(),
+        loadPerformanceTargets(), loadCatalogSections(), loadSystemConfig(), loadTransferPolicy(),
+        loadDeactivationPolicy(), loadDeactivationReasons(),
+      ]);
+    } finally {
+      setRefreshingAll(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">GymOS</h1>
-          <p className="text-gray-600 mt-1">
-            Business Operating System - System Configuration & Management for {getCurrentPeriod()}
-          </p>
-        </div>
-        <div className="flex space-x-3">
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      <GymOSHeader actions={activeTab !== 'settings' && activeTab !== 'branches'} onRefresh={refreshAll} refreshing={refreshingAll} />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className={`grid w-full ${['grid-cols-4', 'grid-cols-5', 'grid-cols-6'][Number(showSettings) + Number(showBranches)]}`}>
           <TabsTrigger value="overview">System Overview</TabsTrigger>
           <TabsTrigger value="pos-mode">POS Mode</TabsTrigger>
           <TabsTrigger value="performance-metrics">Performance Metrics</TabsTrigger>
           <TabsTrigger value="configuration">Configuration</TabsTrigger>
+          {showSettings && <TabsTrigger value="settings">Settings</TabsTrigger>}
+          {showBranches && <TabsTrigger value="branches">Branch Management</TabsTrigger>}
         </TabsList>
 
         {/* System Overview Tab */}
@@ -815,9 +908,10 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
 
             {/* Action Buttons */}
             <div className="flex justify-between pt-2">
-              <Button variant="ghost" size="sm" onClick={() => toast.info('Add Option is coming soon.')}>
+              <Button variant="ghost" size="sm" disabled title="Coming soon">
                 <Plus className="h-4 w-4 mr-1" />
                 Add Option
+                <ComingSoon className="ml-2" />
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setShowCatalogConfig(true)}>
                 <Eye className="h-4 w-4 mr-1" />
@@ -836,9 +930,9 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                   <Calculator className="h-5 w-5 text-purple-600" />
                 </div>
                 <div>
-                  <CardTitle>POS Mode Options</CardTitle>
+                  <CardTitle className="flex items-center gap-2">POS Mode Options <ComingSoon /></CardTitle>
                   <CardDescription>
-                    Assign POS access type to user roles
+                    Assign POS access type to user roles. Saved per role; the POS doesn't switch layouts by it yet.
                   </CardDescription>
                 </div>
               </div>
@@ -1117,6 +1211,7 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
               <div className="flex items-center space-x-2">
                 <Folder className="h-5 w-5 text-blue-600" />
                 <CardTitle>Module Management</CardTitle>
+                <ComingSoon />
               </div>
               <Button variant="outline" size="sm" onClick={loadModules} disabled={modulesLoading}>
                 <RefreshCw className={`h-4 w-4 mr-1 ${modulesLoading ? 'animate-spin' : ''}`} />
@@ -1207,6 +1302,7 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
               <div className="flex items-center space-x-2">
                 <Plug className="h-5 w-5 text-purple-600" />
                 <CardTitle>API Integration</CardTitle>
+                <ComingSoon />
               </div>
               <Button variant="outline" size="sm" onClick={loadIntegrations} disabled={integrationsLoading}>
                 <RefreshCw className={`h-4 w-4 mr-1 ${integrationsLoading ? 'animate-spin' : ''}`} />
@@ -1271,6 +1367,7 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
               <div className="flex items-center space-x-2">
                 <Smartphone className="h-5 w-5 text-cyan-600" />
                 <CardTitle>Access Control Devices</CardTitle>
+                <ComingSoon />
               </div>
               <Button variant="outline" size="sm" onClick={loadDevices} disabled={devicesLoading}>
                 <RefreshCw className={`h-4 w-4 mr-1 ${devicesLoading ? 'animate-spin' : ''}`} />
@@ -1335,6 +1432,7 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
               <div className="flex items-center space-x-2">
                 <Database className="h-5 w-5 text-gray-600" />
                 <CardTitle>System Configuration</CardTitle>
+                <ComingSoon />
               </div>
               <Dialog open={showSystemConfig} onOpenChange={setShowSystemConfig}>
                 <DialogTrigger asChild>
@@ -1569,8 +1667,9 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                   <CardTitle className="flex items-center space-x-2">
                     <Folder className="h-5 w-5 text-blue-600" />
                     <span>Module Status & Performance</span>
+                    <ComingSoon />
                   </CardTitle>
-                  <CardDescription>Real-time status of all system modules</CardDescription>
+                  <CardDescription>Turning a module off is saved, but doesn't hide or block that module yet</CardDescription>
                 </div>
                 <Button variant="outline" size="sm" onClick={loadModules} disabled={modulesLoading}>
                   <RefreshCw className="h-4 w-4 mr-2" />
@@ -1665,8 +1764,9 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                   <CardTitle className="flex items-center space-x-2">
                     <Plug className="h-5 w-5 text-purple-600" />
                     <span>API Integration Health</span>
+                    <ComingSoon />
                   </CardTitle>
-                  <CardDescription>Performance and status of all API connections</CardDescription>
+                  <CardDescription>A register of your integrations. Status is set by hand; live health checks are coming soon.</CardDescription>
                 </div>
                 <Dialog open={showAddIntegration} onOpenChange={setShowAddIntegration}>
                   <DialogTrigger asChild>
@@ -1817,8 +1917,9 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                   <CardTitle className="flex items-center space-x-2">
                     <Smartphone className="h-5 w-5 text-cyan-600" />
                     <span>Access Control Device Status</span>
+                    <ComingSoon />
                   </CardTitle>
-                  <CardDescription>Real-time status of all access control devices</CardDescription>
+                  <CardDescription>A register of your devices. Status is set by hand; live device status is coming soon.</CardDescription>
                 </div>
                 <Dialog open={showAddDevice} onOpenChange={setShowAddDevice}>
                   <DialogTrigger asChild>
@@ -2311,13 +2412,11 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                     <div>
                       <CardTitle>Transfer Policy</CardTitle>
                       <CardDescription>
-                        Configure rules for transferring memberships between members
+                        Configure rules for transferring memberships between members. Saved, but not applied to transfers yet.
                       </CardDescription>
                     </div>
                   </div>
-                  <Badge className={transferPolicyDraft.allow_transfer === 'true' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}>
-                    {transferPolicyDraft.allow_transfer === 'true' ? 'Active' : 'Disabled'}
-                  </Badge>
+                  <ComingSoon />
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -2422,13 +2521,11 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
                     <div>
                       <CardTitle>Member Deactivation Policy</CardTitle>
                       <CardDescription>
-                        Control conditions for membership deactivation and refunds
+                        Control conditions for membership deactivation and refunds. Saved, but not applied to deactivations yet.
                       </CardDescription>
                     </div>
                   </div>
-                  <Badge className={deactivationPolicyDraft.allow_deactivation === 'true' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}>
-                    {deactivationPolicyDraft.allow_deactivation === 'true' ? 'Active' : 'Disabled'}
-                  </Badge>
+                  <ComingSoon />
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -2552,6 +2649,19 @@ export function GymOS({ onNavigate }: GymOSProps = {}) {
           </div>
         </TabsContent>
 
+        {/* Settings Tab — the former Settings page (currency, company, tax, …), branch-scoped */}
+        {showSettings && (
+          <TabsContent value="settings">
+            <AppSettings embedded />
+          </TabsContent>
+        )}
+
+        {/* Branch Management Tab — the former Branch Management page */}
+        {showBranches && (
+          <TabsContent value="branches">
+            <BranchManagement embedded />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

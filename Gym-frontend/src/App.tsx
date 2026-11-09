@@ -62,7 +62,7 @@ import { PlansServicesCatalog } from "./pages/plans-services-catalog";
 import { CatalogResolver } from "./pages/catalog/resolver";
 import { StaffsTrainers } from "./pages/staffs-trainers";
 import { ManageAssets } from "./pages/manage-assets";
-import { BranchManagement } from "./pages/branch-management";
+
 import { GymManagement } from "./pages/gym-management";
 import { GymImport } from "./pages/gym-import";
 import { GymRatings } from "./pages/ratings";
@@ -114,7 +114,6 @@ import { SalaryAdvances } from "./pages/salary-advances";
 import { ShiftsSchedules } from "./pages/shifts-schedules";
 import { StaffAttendance } from "./pages/staff-attendance";
 import { MyProfile } from "./pages/my-profile";
-import { AppSettings } from "./pages/settings";
 import { MyPerformance } from "./pages/my-performance";
 import AttendanceReports from "./pages/attendance-reports";
 import { MemberHistoryAnalytics } from "./pages/member-history-analytics";
@@ -227,6 +226,13 @@ import { syncThemeForUser } from "./utils/theme";
  * matching a role check on the backend rather than a catalog permission key.
  */
 const GYM_OWNER_ONLY = "GYM_OWNER_ONLY";
+
+/**
+ * Pseudo permission for GymOS, which now also holds Settings and Branch Management (GymOS ›
+ * Settings / Branch Management): its system tabs need GYMOS_VIEW, the Settings tab
+ * SETTINGS_VIEW and the Branch Management tab BRANCH_MANAGEMENT_VIEW, so any one opens it.
+ */
+const GYMOS_OR_SETTINGS = "GYMOS_OR_SETTINGS";
 
 const menuItems = [
   {
@@ -708,7 +714,7 @@ const menuItems = [
     icon: Cog,
     id: "gymos",
     path: "/gymos",
-    permission: "GYMOS_VIEW",
+    permission: GYMOS_OR_SETTINGS,
   },
   {
     title: "BiOS",
@@ -717,13 +723,7 @@ const menuItems = [
     path: "/bios",
     permission: "BIOS_VIEW",
   },
-  {
-    title: "Branch Management",
-    icon: Building2,
-    id: "branch-management",
-    path: "/branch-management",
-    permission: "BRANCH_MANAGEMENT_VIEW",
-  },
+
   {
     title: "Gym Management",
     icon: Dumbbell,
@@ -768,13 +768,7 @@ const menuItems = [
     path: "/platform-follow-up",
     permission: "GYM_MANAGEMENT_VIEW",
   },
-  {
-    title: "Settings",
-    icon: Settings,
-    id: "settings",
-    path: "/settings",
-    permission: "SETTINGS_VIEW",
-  },
+
   {
     title: "My Profile",
     icon: UserIcon,
@@ -847,6 +841,20 @@ const routePermissionMap = buildRoutePermissionMap(menuItems);
 
 // Old Add Member URL. Forward router state so callers handing off data (e.g. a converted
 // lead's prefill) don't lose it in the redirect — a bare <Navigate> drops it.
+// Settings moved into GymOS (GymOS › Settings). Old /settings links — e.g. "Edit company
+// details", ?tab=company — land on the same Settings tab there.
+function SettingsRedirect() {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  params.set("section", "settings");
+  return <Navigate to={`/gymos?${params.toString()}`} replace />;
+}
+
+// Branch Management moved into GymOS (GymOS › Branch Management).
+function BranchManagementRedirect() {
+  return <Navigate to="/gymos?section=branches" replace />;
+}
+
 function AddMemberRedirect() {
   const location = useLocation();
   return <Navigate to="/members/add" replace state={location.state} />;
@@ -944,7 +952,12 @@ export default function App() {
   // The gym owner: what GYM_OWNER_ONLY pages require (ADMIN / SUPER_ADMIN on the backend).
   const isGymOwner = !isGymbiosAdmin && (canViewAllBranches
     || roles.some(r => r.toLowerCase().replace('role_', '') === 'super_admin'));
-  const canUse = (key: string) => (key === GYM_OWNER_ONLY ? isGymOwner : hasPermission(key));
+  const canUse = (key: string) => (
+    key === GYM_OWNER_ONLY ? isGymOwner
+      : key === GYMOS_OR_SETTINGS
+        ? hasPermission("GYMOS_VIEW") || hasPermission("SETTINGS_VIEW") || hasPermission("BRANCH_MANAGEMENT_VIEW")
+      : hasPermission(key)
+  );
   const visibleMenuItems = useMemo(
     () => filterMenuByPermission(menuItems, canUse).filter(
       (item) => isGymbiosAdmin ? gymbiosAdminMenuIds.includes(item.id) : true
@@ -1381,7 +1394,7 @@ export default function App() {
       <Route path="/my-performance" element={<MyPerformance onNavigate={handleNavClick} />} />
       <Route path="/profile-settings" element={<MyProfile onNavigate={handleNavClick} initialTab="settings" />} />
       <Route path="/my-profile" element={<MyProfile onNavigate={handleNavClick} />} />
-      <Route path="/settings" element={<AppSettings />} />
+      <Route path="/settings" element={<SettingsRedirect />} />
       <Route path="/trainings-classes" element={<TrainingsClasses onNavigate={handleNavClick} />} />
       <Route path="/bookings" element={<Bookings onNavigate={handleNavClick} />} />
       <Route path="/payroll" element={<Payroll onNavigate={handleNavClick} />} />
@@ -1406,7 +1419,7 @@ export default function App() {
 
       <Route path="/assets" element={<Assets />} />
       <Route path="/manage-assets" element={<ManageAssets />} />
-      <Route path="/branch-management" element={<BranchManagement />} />
+      <Route path="/branch-management" element={<BranchManagementRedirect />} />
       <Route path="/gym-management" element={<GymManagement />} />
       <Route path="/gym-import" element={<GymImport />} />
       <Route path="/platform-ratings" element={<PlatformRatings />} />

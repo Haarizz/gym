@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
+import { useInvoiceTitle } from "../utils/company-details";
 import {
   Search,
   Download,
@@ -81,6 +82,7 @@ const PAGE_SIZE = 25;
 // identical wherever a receipts list is shown.
 export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFilterChange, onStats }: MemberReceiptsProps) {
   const { currencyCode } = useCurrency();
+  const invoiceLabel = useInvoiceTitle();
 
   const [searchTerm, setSearchTerm] = useState("");
   useGlobalSearchPrefill(setSearchTerm);
@@ -397,7 +399,7 @@ export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFil
                           <Button
                             variant="outline" size="sm"
                             className="h-8 w-8 p-0 border-primary/20 hover:bg-amber-50"
-                            title="Print Tax Invoice"
+                            title={`Print ${invoiceLabel}`}
                             onClick={() => handleDownloadInvoice(receipt)}
                           >
                             <Printer className="h-4 w-4 text-amber-600" />
@@ -530,7 +532,7 @@ export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFil
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => handleDownloadInvoice(selectedReceipt)}>
-                <Printer className="mr-2 h-4 w-4" />Tax Invoice
+                <Printer className="mr-2 h-4 w-4" />{invoiceLabel}
               </Button>
               <Button variant="outline" onClick={() => handleDownloadReceipt(selectedReceipt)}>
                 <Download className="mr-2 h-4 w-4" />Receipt

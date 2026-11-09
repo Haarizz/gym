@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { format, isValid, parseISO } from "date-fns";
+import { useInvoiceTitle } from "../../utils/company-details";
 import {
   CheckCircle,
   Clock,
@@ -244,6 +245,7 @@ export function RenewalTransactionHistory({
   onStats?: (stats: RenewalHistoryStats) => void;
 }) {
   const { currencyCode } = useCurrency();
+  const invoiceLabel = useInvoiceTitle();
   const [renewals, setRenewals] = useState<Receipt[]>([]);
   const [planPurchases, setPlanPurchases] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -483,7 +485,7 @@ export function RenewalTransactionHistory({
                             <Printer className="h-4 w-4 mr-1" />
                             Receipt
                           </Button>
-                          <Button variant="outline" size="sm" title={`Print tax invoice for ${r.receipt_no}`}
+                          <Button variant="outline" size="sm" title={`Print ${invoiceLabel.toLowerCase()} for ${r.receipt_no}`}
                             onClick={() => downloadReceiptInvoice(r, currencyCode)}>
                             Invoice
                           </Button>

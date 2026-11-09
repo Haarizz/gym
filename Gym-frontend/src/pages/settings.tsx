@@ -31,7 +31,8 @@ const CURRENCY_USAGES = [
   { icon: BarChart3, label: "Reports" },
 ];
 
-export function AppSettings() {
+/** `embedded`: shown as GymOS › Settings, under GymOS's own page header. */
+export function AppSettings({ embedded = false }: { embedded?: boolean } = {}) {
   const { currencyCode, currency, setCurrencyCode, saving } = useCurrency();
   const { activeBranchId, activeBranchName, isAllBranches, accessibleBranches } = useBranch();
   const defaultBranch = accessibleBranches.find((b) => b.isDefault) ?? accessibleBranches[0];
@@ -45,7 +46,13 @@ export function AppSettings() {
   const tabParam = searchParams.get("tab");
   const activeTab: SettingsTab = SETTINGS_TABS.includes(tabParam as SettingsTab) ? (tabParam as SettingsTab) : "currency";
   const handleTabChange = (tab: string) => {
-    setSearchParams(tab === "currency" ? {} : { tab }, { replace: true });
+    // Keep the rest of the query (GymOS's ?section=settings).
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (tab === "currency") next.delete("tab");
+      else next.set("tab", tab);
+      return next;
+    }, { replace: true });
   };
   // On phones/tablets the tab list is a swipeable strip — keep the active tab in view
   // (e.g. a deep link to ?tab=terms, the last tab).
@@ -253,15 +260,17 @@ export function AppSettings() {
   const previewTax = previewAmount * 0.05;
 
   return (
-    <div className="sp-page">
+    <div className={embedded ? "sp-page sp-page--embedded" : "sp-page"}>
       <div className="sp-header">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
             <SettingsIcon className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Settings</h1>
-            <p className="text-gray-600 mt-1">
+            {embedded
+              ? <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
+              : <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Settings</h1>}
+            <p className={embedded ? "text-sm text-gray-600" : "text-gray-600 mt-1"}>
               Everything here applies to <strong>{settingsBranchName}</strong> only — switch branches from the sidebar to configure another.
             </p>
           </div>

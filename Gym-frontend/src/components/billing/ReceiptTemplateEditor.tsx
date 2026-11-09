@@ -7,7 +7,7 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { useBranch } from "../../utils/branch-context";
 import { useCurrency } from "../../utils/currency";
-import { getCompanyDetails, type CompanyDetails } from "../../utils/company-details";
+import { getCompanyDetails, useInvoiceTitle, type CompanyDetails } from "../../utils/company-details";
 import { buildFullReceiptHtml, buildPaymentReceiptHtml, type ReceiptPrintData } from "../../utils/receipt-invoice";
 import {
   DEFAULT_RECEIPT_COLORS,
@@ -67,6 +67,7 @@ function sampleData(currencyCode: string): ReceiptPrintData {
 export function ReceiptTemplateEditor({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { activeBranchName, isAllBranches } = useBranch();
   const { currencyCode } = useCurrency();
+  const invoiceLabel = useInvoiceTitle();
   const [colors, setColors] = useState<ReceiptColors>(DEFAULT_RECEIPT_COLORS);
   const [hexDraft, setHexDraft] = useState<ReceiptColors>(DEFAULT_RECEIPT_COLORS);
   const [company, setCompany] = useState<CompanyDetails | null>(null);
@@ -151,7 +152,7 @@ export function ReceiptTemplateEditor({ open, onOpenChange }: { open: boolean; o
               Edit Receipt Template
             </DialogTitle>
             <DialogDescription>
-              Colours for printed member receipts and tax invoices in <strong>{activeBranchName}</strong>. Each branch keeps its own colours.
+              Colours for printed member receipts and invoices in <strong>{activeBranchName}</strong>. Each branch keeps its own colours.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -230,7 +231,7 @@ export function ReceiptTemplateEditor({ open, onOpenChange }: { open: boolean; o
             <div className="flex items-center justify-between gap-2 mb-2">
               <p className="text-xs text-muted-foreground">Live preview (sample data)</p>
               <div className="inline-flex rounded-md border bg-white p-0.5" role="tablist" aria-label="Preview document">
-                {([["receipt", "Receipt"], ["invoice", "Tax Invoice"]] as const).map(([value, label]) => (
+                {([["receipt", "Receipt"], ["invoice", invoiceLabel]] as const).map(([value, label]) => (
                   <button key={value} type="button" role="tab" aria-selected={previewDoc === value}
                     onClick={() => setPreviewDoc(value)}
                     className="rounded px-3 py-1 text-xs font-medium"

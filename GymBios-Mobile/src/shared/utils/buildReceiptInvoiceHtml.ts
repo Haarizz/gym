@@ -72,7 +72,7 @@ export function buildReceiptInvoiceHtml(receipt: MobileReceiptDetail, accentColo
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Receipt - ${escapeHtml(receipt.receiptNo)}</title>
+    <title>${receipt.taxInvoice ? 'Tax Invoice' : 'Invoice'} - ${escapeHtml(receipt.receiptNo)}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
@@ -167,7 +167,7 @@ export function buildReceiptInvoiceHtml(receipt: MobileReceiptDetail, accentColo
 <body>
     <div class="receipt-container invoice">
         <div class="header">${headerHtml}</div>
-        <div class="receipt-title">Tax Invoice &#1601;&#1575;&#1578;&#1608;&#1585;&#1577; &#1590;&#1585;&#1610;&#1576;&#1610;&#1577;</div>
+        <div class="receipt-title">${receipt.taxInvoice ? 'Tax Invoice &#1601;&#1575;&#1578;&#1608;&#1585;&#1577; &#1590;&#1585;&#1610;&#1576;&#1610;&#1577;' : 'Invoice &#1601;&#1575;&#1578;&#1608;&#1585;&#1577;'}</div>
         <div class="receipt-info">
             <div class="info-block">
               <div class="info-label">Receipt Number</div>

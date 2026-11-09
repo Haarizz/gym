@@ -11,6 +11,7 @@ import type { Product } from "../../utils/supabase/products-service";
 import type { AccountHead } from "../../utils/supabase/account-heads-service";
 import { posApi } from "../api";
 import { usePos } from "../PosContext";
+import { isTaxInvoice } from "../../utils/company-details";
 import { useApproval } from "./Approval";
 import { Empty, Money, Pill, ReceiptPreview } from "./Shared";
 import { fmtDateTime, money, num, r2, todayIso } from "../pricing";
@@ -58,7 +59,7 @@ export function ReceiptDialog({ sale, open, onOpenChange, reprint = false, onNew
   };
 
   const shareText = [
-    `${company?.name ?? "GymBios"} — ${sale.taxAmount > 0 ? "Tax Invoice" : "Receipt"} ${sale.transactionNumber}`,
+    `${company?.name ?? "GymBios"} — ${sale.taxAmount > 0 && isTaxInvoice(company) ? "Tax Invoice" : "Receipt"} ${sale.transactionNumber}`,
     `Date: ${fmtDateTime(sale.createdAt)}`,
     ...sale.items.map((i) => `${i.quantity} x ${i.productName} — ${money(sale.taxInclusive ? i.lineTotal : i.taxableAmount, currencyCode)}`),
     sale.discountAmount > 0 ? `Discount: -${money(sale.discountAmount, currencyCode)}` : null,
@@ -111,7 +112,7 @@ export function ReceiptDialog({ sale, open, onOpenChange, reprint = false, onNew
               </div>
             </div>
             <Button className={primaryBtn} disabled={printing} onClick={() => print(width === 58 ? "58mm" : "80mm")}><Printer className="h-4 w-4 mr-2" />Print receipt</Button>
-            <Button variant="outline" disabled={printing} onClick={() => print("A4")}><Printer className="h-4 w-4 mr-2" />Print A4 tax invoice</Button>
+            <Button variant="outline" disabled={printing} onClick={() => print("A4")}><Printer className="h-4 w-4 mr-2" />Print A4 {isTaxInvoice(company) ? "tax invoice" : "invoice"}</Button>
             {settings.receiptShareEnabled && (
               <div className={s.rowWrap}>
                 <Button variant="outline" className="flex-1" onClick={() => share("whatsapp")}><MessageCircle className="h-4 w-4 mr-2" />WhatsApp</Button>

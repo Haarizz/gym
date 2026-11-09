@@ -1,4 +1,4 @@
-import type { CompanyDetails } from '../../utils/company-details';
+import { isTaxInvoice, type CompanyDetails } from '../../utils/company-details';
 import type { CurrencyCode } from '../../utils/currency';
 import type { SalesInvoice } from '../../utils/supabase/sales-invoice-service';
 import type { Product } from '../../utils/supabase/products-service';
@@ -22,8 +22,8 @@ export function buildSalesInvoiceDocument(
   const discount = inv.discountAmount + inv.footerDiscount;
   return {
     docType: 'sales-invoice',
-    // BillBull titles a taxed invoice "Tax Invoice".
-    title: inv.taxAmount > 0 ? 'Tax Invoice' : 'Sales Invoice',
+    // A taxed invoice is a "Tax Invoice" — but only when the branch has a TRN to print on it.
+    title: inv.taxAmount > 0 && isTaxInvoice(company) ? 'Tax Invoice' : 'Sales Invoice',
     number: inv.invoiceNumber || 'Draft',
     date: day(inv.invoiceDate) ?? '—',
     company,
