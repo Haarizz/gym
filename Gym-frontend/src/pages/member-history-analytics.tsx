@@ -99,6 +99,8 @@ import s from './member-history-analytics.module.css';
 import { MemberFreezeDialog } from "../components/members/MemberFreezeDialog";
 import { SubscriptionTimeline } from '../components/members/SubscriptionTimeline';
 import { ReportActions } from '../components/report-export';
+import { PhotoZoomViewer } from '../components/members/PhotoZoomViewer';
+import { resolveBackendImageUrl } from '../utils/resolve-image-url';
 import { buildMemberStatementReport } from '../utils/member-statement-print';
 
 interface MemberHistoryAnalyticsProps {
@@ -217,6 +219,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
   // ── Communication tab ──────────────────────────────────────────────────
   const [selectedMessage, setSelectedMessage] = useState<MessageHistoryApi | null>(null);
+  const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [channelFilter, setChannelFilter] = useState('all');
   const [communicationSearch, setCommunicationSearch] = useState('');
@@ -727,10 +730,27 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
       {/* Profile header: identity, contacts, membership actions and current term */}
       <section className={`${s.card} ${s.hero}`}>
         <div className={s.heroMain}>
-          <Avatar className={s.avatar}>
-            <AvatarImage src={member.photo_url} alt={member.name} />
-            <AvatarFallback className={s.avatarFallback}>{initialsOf(member.name)}</AvatarFallback>
-          </Avatar>
+          {/* Same enlarged, zoomable viewer as the Members list (only when there is a photo) */}
+          <button
+            type="button"
+            onClick={() => { if (member.photo_url) setPhotoViewerOpen(true); }}
+            disabled={!member.photo_url}
+            className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            style={{ cursor: member.photo_url ? "zoom-in" : "default", padding: 0, border: 0, background: "none" }}
+            title={member.photo_url ? "View photo" : "No photo uploaded"}
+            aria-label={member.photo_url ? `View ${member.name}'s photo` : undefined}
+          >
+            <Avatar className={s.avatar}>
+              <AvatarImage src={resolveBackendImageUrl(member.photo_url) as string | undefined} alt={member.name} />
+              <AvatarFallback className={s.avatarFallback}>{initialsOf(member.name)}</AvatarFallback>
+            </Avatar>
+          </button>
+          <PhotoZoomViewer
+            open={photoViewerOpen}
+            onOpenChange={setPhotoViewerOpen}
+            src={resolveBackendImageUrl(member.photo_url) as string | undefined}
+            name={member.name}
+          />
           <div className={s.identity}>
             <div className={s.nameRow}>
               <h1 className={s.name}>{member.name}</h1>

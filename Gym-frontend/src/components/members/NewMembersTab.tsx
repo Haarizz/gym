@@ -43,13 +43,15 @@ function presetRange(preset: Preset, customFrom: string, customTo: string): { fr
   switch (preset) {
     case "today": return { from: today, to: addDays(today, 1) };
     case "yesterday": return { from: addDays(today, -1), to: today };
-    case "this-week": return { from: weekStart, to: addDays(today, 1) };
+    // "This …" presets cover the whole calendar period (e.g. Mon–Sun), so the range label
+    // reads "09 Nov – 15 Nov 2026" even on its first day; no one can have joined in the future.
+    case "this-week": return { from: weekStart, to: addDays(weekStart, 7) };
     case "last-week": return { from: addDays(weekStart, -7), to: weekStart };
-    case "this-month": return { from: day(now.getFullYear(), now.getMonth(), 1), to: addDays(today, 1) };
+    case "this-month": return { from: day(now.getFullYear(), now.getMonth(), 1), to: day(now.getFullYear(), now.getMonth() + 1, 1) };
     case "last-month": return { from: day(now.getFullYear(), now.getMonth() - 1, 1), to: day(now.getFullYear(), now.getMonth(), 1) };
-    case "this-quarter": return { from: day(now.getFullYear(), q, 1), to: addDays(today, 1) };
+    case "this-quarter": return { from: day(now.getFullYear(), q, 1), to: day(now.getFullYear(), q + 3, 1) };
     case "last-quarter": return { from: day(now.getFullYear(), q - 3, 1), to: day(now.getFullYear(), q, 1) };
-    case "this-year": return { from: day(now.getFullYear(), 0, 1), to: addDays(today, 1) };
+    case "this-year": return { from: day(now.getFullYear(), 0, 1), to: day(now.getFullYear() + 1, 0, 1) };
     case "last-year": return { from: day(now.getFullYear() - 1, 0, 1), to: day(now.getFullYear(), 0, 1) };
     case "custom": {
       const parse = (v: string) => { const [y, m, d] = v.split("-").map(Number); return day(y, m - 1, d); };
