@@ -9,3 +9,6 @@
 # Runtime logs
 Gym-backend/backend.log
 *.log
+
+# Generated web build (built on the server during deploy)
+Gym-frontend/build/
