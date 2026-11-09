@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
+import { PhoneInput } from "../components/shared/PhoneInput";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import {
@@ -921,7 +922,7 @@ export function CheckIn() {
                     </div>
                     <div className="space-y-2">
                       <Label className="text-primary">Mobile Number <span className="text-red-500">*</span></Label>
-                      <Input type="tel" placeholder="+971 XX XXX XXXX" value={visitorMobile} onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setVisitorMobile(v); }} maxLength={15} className="border-primary/20 focus:border-primary" />
+                      <PhoneInput value={visitorMobile} onChange={setVisitorMobile} inputClassName="border-primary/20 focus:border-primary" />
                     </div>
                   </div>
 

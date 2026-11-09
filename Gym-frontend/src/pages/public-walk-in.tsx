@@ -251,7 +251,7 @@ export function PublicWalkInPage({ tenantSlug, branchId }: { tenantSlug: string;
                     aria-label={`Country code, ${phoneCountry.name} +${phoneCountry.dial}`}
                   >
                     {DIAL_COUNTRIES.map(c => (
-                      <option key={c.iso} value={c.iso}>{c.flag} {c.name} (+{c.dial})</option>
+                      <option key={c.iso} value={c.iso}>{c.name} (+{c.dial})</option>
                     ))}
                   </select>
                 </div>

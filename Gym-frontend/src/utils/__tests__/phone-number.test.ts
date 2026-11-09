@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_DIAL_COUNTRY, findDialCountry, formatNational, parsePhoneInput, toInternational, validatePhone,
+  DEFAULT_DIAL_COUNTRY, DIAL_COUNTRIES, findDialCountry, formatNational, joinPhone, parsePhoneInput, splitStoredPhone, toInternational, validatePhone,
 } from '../phone-number';
 
 const UAE = DEFAULT_DIAL_COUNTRY;
@@ -53,5 +53,32 @@ describe('validatePhone', () => {
 describe('toInternational', () => {
   it('produces the +{dial}{digits} shape the backend stores', () => {
     expect(toInternational(UAE, '50 123 4567')).toBe('+971501234567');
+  });
+});
+
+describe('country list', () => {
+
+  it('covers the world with unique ISO codes, the detailed countries first', () => {
+    expect(DIAL_COUNTRIES.length).toBeGreaterThan(200);
+    expect(new Set(DIAL_COUNTRIES.map(c => c.iso)).size).toBe(DIAL_COUNTRIES.length);
+    expect(DIAL_COUNTRIES[0].iso).toBe('AE');
+    expect(DIAL_COUNTRIES.every(c => /^\d{1,4}$/.test(c.dial) && c.flag.length > 0)).toBe(true);
+  });
+
+  it('reads stored numbers with or without a code', () => {
+    expect(splitStoredPhone('+91 9876543210', UAE)).toEqual({ country: IN, digits: '9876543210' });
+    expect(splitStoredPhone('0501234567', UAE)).toEqual({ country: UAE, digits: '501234567' });
+    expect(splitStoredPhone('', IN)).toEqual({ country: IN, digits: '' });
+    expect(splitStoredPhone('+7 9161234567', UAE).country.iso).toBe('RU');
+    expect(splitStoredPhone('+1 2015550123', UAE).country.iso).toBe('US');
+    expect(splitStoredPhone('+1876 5551234', UAE).country.iso).toBe('JM');
+    expect(splitStoredPhone('+44 7400123456', UAE).country.iso).toBe('GB');
+    // A saved number is never cut down to the country's usual length.
+    expect(splitStoredPhone('05294333346', UAE)).toEqual({ country: UAE, digits: '5294333346' });
+  });
+
+  it('stores "+{dial} {digits}"', () => {
+    expect(joinPhone(IN, '98765 43210')).toBe('+91 9876543210');
+    expect(joinPhone(UAE, '')).toBe('');
   });
 });

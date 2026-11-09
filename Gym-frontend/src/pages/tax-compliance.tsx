@@ -219,7 +219,8 @@ export function TaxCompliance() {
 
   const vatRegistered = taxDefaults?.vatRegistered ?? true;
   const salesRateLabel = taxDefaults?.vatRegistered && taxDefaults.salesRate != null ? ` (${formatRate(taxDefaults.salesRate)})` : '';
-  const purchaseRateLabel = taxDefaults?.vatRegistered && taxDefaults.purchaseRate != null ? ` (${formatRate(taxDefaults.purchaseRate)})` : '';
+  // Purchase Tax stands alone — it applies whether or not the branch has a TRN.
+  const purchaseRateLabel = taxDefaults?.purchaseRate != null ? ` (${formatRate(taxDefaults.purchaseRate)})` : '';
 
   const buildCorporateTaxReport = (): ReportDocument => {
     const s = annualTaxSummary;
@@ -313,7 +314,7 @@ export function TaxCompliance() {
               <Truck className="h-5 w-5 mt-0.5 shrink-0" style={{ color: 'var(--primary)' }} />
               <div>
                 <div className="text-sm text-muted-foreground">Purchase Tax</div>
-                <div className="text-xl font-bold">{taxDefaults.vatRegistered ? formatRate(taxDefaults.purchaseRate) : '0%'}</div>
+                <div className="text-xl font-bold">{formatRate(taxDefaults.purchaseRate)}</div>
                 <div className="text-xs text-muted-foreground">Input VAT on purchase orders and supplier bills</div>
               </div>
             </div>
@@ -321,7 +322,7 @@ export function TaxCompliance() {
         )}
         {taxDefaults && !taxDefaults.vatRegistered && (
           <p className="text-xs text-muted-foreground mt-4">
-            This branch is not VAT registered, so no VAT or purchase tax is charged on its sales or purchases.
+            This branch is not VAT registered, so no VAT is charged on its sales. Purchase Tax still applies to its purchases.
           </p>
         )}
       </CardContent>
@@ -813,7 +814,7 @@ export function TaxCompliance() {
                 <p className="text-xs text-gray-400">
                   {vatRegistered
                     ? 'Output VAT is collected on membership, add-on, POS and invoice sales; Input VAT is reclaimed on expenses and supplier bills. Rates are set in Settings › Tax Configuration.'
-                    : 'This branch is not VAT registered (Settings › Tax Configuration), so its sales and purchases carry no VAT.'}
+                    : 'This branch is not VAT registered (Settings › Tax Configuration), so its sales carry no VAT; Purchase Tax on supplier bills still applies.'}
                 </p>
                 <ReportActions report={buildVatReturnReport} disabled={taxSummaryLoading || !quarterlyTaxSummary} menuLabel="VAT return" className="w-full justify-center" />
               </CardContent>

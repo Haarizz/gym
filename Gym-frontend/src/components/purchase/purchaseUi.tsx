@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Input } from '../ui/input';
+import { PhoneInput } from '../shared/PhoneInput';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Switch } from '../ui/switch';
@@ -225,8 +226,7 @@ export function SupplierFormDialog({ open, supplier, initialName, onOpenChange, 
             </div>
             <div>
               <Label>Phone</Label>
-              <Input placeholder="+971-4-xxx-xxxx" value={form.phone ?? ''}
-                onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) set('phone', v); }} />
+              <PhoneInput value={form.phone ?? ''} onChange={v => set('phone', v)} />
             </div>
             <div className="md:col-span-2">
               <Label>Address</Label>

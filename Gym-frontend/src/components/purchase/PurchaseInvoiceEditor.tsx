@@ -205,7 +205,7 @@ export const PurchaseInvoiceEditor = forwardRef<PurchaseInvoiceEditorHandle, Pro
   // Branch tax policy (Settings › Tax Configuration): not VAT registered → no tax on purchases.
   const [taxDefaults, setTaxDefaults] = useState<TaxDefaults | null>(null);
   useEffect(() => { getTaxDefaults().then(setTaxDefaults).catch(() => setTaxDefaults(null)); }, []);
-  const noTax = taxDefaults ? !taxDefaults.vatRegistered : false;
+
   const totals = useMemo(() => billTotals(form.lines, form.shippingCost), [form.lines, form.shippingCost]);
   const amountPaid = bill?.amountPaid ?? 0;
 
@@ -664,7 +664,7 @@ export const PurchaseInvoiceEditor = forwardRef<PurchaseInvoiceEditorHandle, Pro
                           </td>
                           <td>
                             <input type="number" min={0} max={100} step="0.01" className={cx(styles.cellInput, styles.right)}
-                              value={noTax ? '' : (l.taxPercent === 0 ? '' : l.taxPercent)} placeholder="0" disabled={readOnly || noTax}
+                              value={l.taxPercent === 0 ? '' : l.taxPercent} placeholder="0" disabled={readOnly}
                               onChange={e => updateLine(l.key, { taxPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
                           </td>
                           <td className={styles.lineTotal}>

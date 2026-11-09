@@ -174,7 +174,7 @@ export const PurchaseOrderEditor = forwardRef<PurchaseOrderEditorHandle, Props>(
   // Branch tax policy (Settings › Tax Configuration): not VAT registered → no tax on purchases.
   const [taxDefaults, setTaxDefaults] = useState<TaxDefaults | null>(null);
   useEffect(() => { getTaxDefaults().then(setTaxDefaults).catch(() => setTaxDefaults(null)); }, []);
-  const noTax = taxDefaults ? !taxDefaults.vatRegistered : false;
+
   const totals = useMemo(() => billTotals(form.lines, form.shippingCost), [form.lines, form.shippingCost]);
 
   // Quantity already on other open orders (not yet received) per product.
@@ -503,7 +503,7 @@ export const PurchaseOrderEditor = forwardRef<PurchaseOrderEditorHandle, Props>(
                               onChange={e => updateLine(l.key, { discountPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
                           </td>
                           <td>
-                            <input type="number" min={0} max={100} step="0.01" className={cx(styles.cellInput, styles.right)} value={noTax ? '' : (l.taxPercent === 0 ? '' : l.taxPercent)} placeholder="0" disabled={readOnly || noTax}
+                            <input type="number" min={0} max={100} step="0.01" className={cx(styles.cellInput, styles.right)} value={l.taxPercent === 0 ? '' : l.taxPercent} placeholder="0" disabled={readOnly}
                               onChange={e => updateLine(l.key, { taxPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
                           </td>
                           <td className={styles.lineTotal}>

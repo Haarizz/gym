@@ -9,6 +9,7 @@ import { RewardQueue } from './reward-queue';
 import { RewardRules } from './reward-rules';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { PhoneInput } from "../components/shared/PhoneInput";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -1360,7 +1361,7 @@ export function Referrals() {
             </div>
             <div>
               <Label>Referee Phone</Label>
-              <Input className="mt-1" value={editReferral.refereePhone} onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setEditReferral(p => ({ ...p, refereePhone: v })); }} />
+              <PhoneInput className="mt-1" value={editReferral.refereePhone} onChange={v => setEditReferral(p => ({ ...p, refereePhone: v }))} />
             </div>
             <div>
               <Label>Status</Label>
@@ -1464,7 +1465,7 @@ export function Referrals() {
             </div>
             <div>
               <Label>Referred Member Phone</Label>
-              <Input placeholder="+971 XX XXX XXXX" type="tel" className="mt-1" value={newReferral.refereePhone} onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setNewReferral(p => ({ ...p, refereePhone: v })); }} />
+              <PhoneInput className="mt-1" value={newReferral.refereePhone} onChange={v => setNewReferral(p => ({ ...p, refereePhone: v }))} />
             </div>
             <div>
               <Label>Referral Person Photo (For Access)</Label>

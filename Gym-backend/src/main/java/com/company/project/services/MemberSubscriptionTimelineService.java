@@ -288,7 +288,7 @@ public class MemberSubscriptionTimelineService {
         summary.put("expiry_date", day(firstNonNull(member.getExpiryDate(), member.getMembershipEndDate())));
         summary.put("projected_expiry_date", frozen ? day(MembershipFreezeService.projectedExpiry(member, now)) : null);
         summary.put("freeze_start_date", frozen ? day(member.getFreezeStartDate()) : null);
-        summary.put("freeze_end_date", frozen ? lastFrozenDay(member.getFreezeStartDate(), member.getFreezeEndDate()) : null);
+        summary.put("freeze_end_date", frozen ? day(member.getFreezeEndDate()) : null);
         summary.put("total_frozen_days", totalFrozenDays);
         summary.put("freeze_count", freezes.size());
         summary.put("renewal_count", Math.max(0, purchases.size() - 1));
@@ -309,8 +309,9 @@ public class MemberSubscriptionTimelineService {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", f.getId());
         m.put("start_date", day(f.getFreezeStart()));
-        m.put("planned_end_date", lastFrozenDay(f.getFreezeStart(), f.getPlannedEnd()));
-        m.put("ended_on", lastFrozenDay(f.getFreezeStart(), f.getEndedAt()));
+        // Old-GymBios style "To" dates: the day the member is active again (3 → 13 Nov = 10 days).
+        m.put("planned_end_date", day(f.getPlannedEnd()));
+        m.put("ended_on", day(f.getEndedAt()));
         m.put("unfrozen_on", day(f.getEndedAt()));
         m.put("days", days);
         m.put("requested_days", f.getRequestedDays());
@@ -372,11 +373,6 @@ public class MemberSubscriptionTimelineService {
     }
 
     /** The last day a freeze ending at `end` covers — the day before, if it ends at midnight. */
-    private static String lastFrozenDay(LocalDateTime start, LocalDateTime end) {
-        if (end == null) return null;
-        LocalDate d = end.minusNanos(1).toLocalDate();
-        return (start != null && d.isBefore(start.toLocalDate()) ? start.toLocalDate() : d).toString();
-    }
 
     @SafeVarargs
     private static <T> T firstNonNull(T... values) {

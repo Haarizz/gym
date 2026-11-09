@@ -12,6 +12,7 @@ import { useCurrency, CURRENCIES, CurrencyCode, CurrencyGlyph } from "../utils/c
 import { useBranch } from "../utils/branch-context";
 import { toast } from "sonner";
 import { Input } from "../components/ui/input";
+import { PhoneInput } from "../components/shared/PhoneInput";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -474,12 +475,10 @@ export function AppSettings({ embedded = false }: { embedded?: boolean } = {}) {
                         <Phone className="h-4 w-4 text-gray-500" />
                         Phone Number
                       </Label>
-                      <Input
+                      <PhoneInput
                         id="phone"
-                        type="tel"
-                        placeholder="+1 234 567 890"
                         value={companyDetails.phone}
-                        onChange={(e) => handlePhoneChange(e.target.value)}
+                        onChange={handlePhoneChange}
                       />
                     </div>
 

@@ -3,6 +3,7 @@ import { CurrencyGlyph } from '../../utils/currency';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { PhoneInput } from "./PhoneInput";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
@@ -231,16 +232,11 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, onSubmitDra
 
               <div>
                 <Label>Mobile Number *</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="tel"
-                    placeholder="+971 50 123 4567"
-                    value={formData.mobile}
-                    onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) handleChange('mobile', v); }}
-                    className={`pl-10 ${errors.mobile ? 'border-red-500' : ''}`}
-                  />
-                </div>
+                <PhoneInput
+                  value={formData.mobile}
+                  onChange={(v) => handleChange('mobile', v)}
+                  invalid={!!errors.mobile}
+                />
                 {errors.mobile && (
                   <p className="text-xs text-red-600 mt-1 flex items-center">
                     <AlertCircle className="h-3 w-3 mr-1" />
@@ -376,12 +372,11 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, onSubmitDra
 
                 <div>
                   <Label>Emergency Contact Number</Label>
-                  <Input
-                    type="tel"
-                    placeholder="+971 50 123 4567"
+                  <PhoneInput
                     value={formData.emergencyContactNumber}
-                    onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) handleChange('emergencyContactNumber', v); }}
-                    className={`bg-white ${errors.emergencyContactNumber ? 'border-red-500' : ''}`}
+                    onChange={(v) => handleChange('emergencyContactNumber', v)}
+                    invalid={!!errors.emergencyContactNumber}
+                    inputClassName="bg-white"
                   />
                   {errors.emergencyContactNumber && (
                     <p className="text-xs text-red-600 mt-1 flex items-center">

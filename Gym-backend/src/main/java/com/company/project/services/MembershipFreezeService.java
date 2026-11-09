@@ -203,8 +203,10 @@ public class MembershipFreezeService {
             m.put("id", f.getId());
             m.put("planName", f.getPlanName());
             m.put("freezeStart", f.getFreezeStart() != null ? f.getFreezeStart().toLocalDate().toString() : null);
-            m.put("plannedEnd", lastFrozenDay(f.getFreezeStart(), f.getPlannedEnd()));
-            m.put("endedAt", lastFrozenDay(f.getFreezeStart(), f.getEndedAt()));
+            // Old-GymBios style "To" dates: the day the member is active again (3 → 13 Nov is a
+            // 10-day freeze), not the last frozen day.
+            m.put("plannedEnd", f.getPlannedEnd() != null ? f.getPlannedEnd().toLocalDate().toString() : null);
+            m.put("endedAt", f.getEndedAt() != null ? f.getEndedAt().toLocalDate().toString() : null);
             m.put("days", daysUsed(f));
             m.put("freeDays", f.getFreeDaysApplied());
             m.put("chargedDays", f.getChargedDays());
@@ -525,12 +527,6 @@ public class MembershipFreezeService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /** The last day a freeze ending at `end` covers — the day before, if it ends at midnight. */
-    private static String lastFrozenDay(LocalDateTime start, LocalDateTime end) {
-        if (end == null) return null;
-        java.time.LocalDate day = end.minusNanos(1).toLocalDate();
-        return (start != null && day.isBefore(start.toLocalDate()) ? start.toLocalDate() : day).toString();
-    }
 
     public MembershipPlan findPlan(Member member) {
         return member.getMembershipPlan() != null

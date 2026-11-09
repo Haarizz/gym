@@ -4,6 +4,7 @@ import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
+import { PhoneInput } from "../components/shared/PhoneInput";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -742,11 +743,10 @@ export function Bookings({ onNavigate }: BookingsProps) {
                       </div>
                       <div className={bd.field}>
                         <Label htmlFor="guest-phone">WhatsApp number *</Label>
-                        <Input
+                        <PhoneInput
                           id="guest-phone"
                           value={guestDetails.phone}
-                          onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setGuestDetails(prev => ({ ...prev, phone: v })); }}
-                          placeholder="+971-50-123-4567"
+                          onChange={(v) => setGuestDetails(prev => ({ ...prev, phone: v }))}
                         />
                       </div>
                       <p className={`${bd.fieldHint} ${bd.guestWide}`}>The QR pass is sent to this WhatsApp number and email.</p>

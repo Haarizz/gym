@@ -3011,7 +3011,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         </TabsContent>
 
         <TabsContent value="freeze" className="space-y-6">
-          <Card className="border-[#2B7A78]/20 shadow-md hover:shadow-lg transition-shadow">
+          <Card className="overflow-hidden border-[#2B7A78]/20 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="bg-gradient-to-r from-[#DFF5F4] to-white border-b border-[#2B7A78]/10">
               <div className="flex items-center justify-between">
                 <div>

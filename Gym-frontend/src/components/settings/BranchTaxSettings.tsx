@@ -59,7 +59,8 @@ export function BranchTaxSettings({ branchId, readOnly = false }: BranchTaxSetti
   const [rowIds, setRowIds] = useState<Partial<Record<TaxKey, number>>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  // TRN / VAT registration: only a registered branch charges VAT, sales tax and purchase tax.
+  // TRN / VAT registration: only a registered branch charges VAT on sales. Purchase Tax stands
+  // alone — it is set and applied whether or not the branch is registered.
   const [registered, setRegistered] = useState(true);
   const [savedRegistered, setSavedRegistered] = useState(true);
   const [trn, setTrn] = useState("");
@@ -106,10 +107,12 @@ export function BranchTaxSettings({ branchId, readOnly = false }: BranchTaxSetti
 
   const isDirty = registered !== savedRegistered || trn.trim() !== savedTrn
     || TAX_FIELDS.some(({ key }) => values[key] !== saved[key]);
-  const hasErrors = TAX_FIELDS.some(({ key }) => !isValidRate(values[key]));
+  // Default VAT only matters (and is only shown) for a registered branch; Purchase Tax always.
+  const visibleFields = TAX_FIELDS.filter(({ key }) => registered || key === "default_purchase_tax_rate");
+  const hasErrors = visibleFields.some(({ key }) => !isValidRate(values[key]));
 
   const handleSave = async () => {
-    if (registered && hasErrors) {
+    if (hasErrors) {
       toast.error("Tax rates must be between 0 and 100");
       return;
     }
@@ -124,7 +127,7 @@ export function BranchTaxSettings({ branchId, readOnly = false }: BranchTaxSetti
           settingKey: KEY_REGISTERED,
           settingValue: registered ? "true" : "false",
           category: CATEGORY,
-          description: "VAT registered (TRN) — off: no tax on sales or purchases",
+          description: "VAT registered (TRN) — off: no VAT on sales (Purchase Tax is separate)",
         });
       }
       if (registered && trn.trim() !== savedTrn) {
@@ -135,8 +138,8 @@ export function BranchTaxSettings({ branchId, readOnly = false }: BranchTaxSetti
           description: "Tax Registration Number",
         });
       }
-      if (registered) await Promise.all(
-        TAX_FIELDS.filter(({ key }) => values[key] !== saved[key]).map(({ key, title }) => {
+      await Promise.all(
+        visibleFields.filter(({ key }) => values[key] !== saved[key]).map(({ key, title }) => {
           const value = values[key].trim();
           if (value === "") {
             const id = rowIds[key];
@@ -181,8 +184,8 @@ export function BranchTaxSettings({ branchId, readOnly = false }: BranchTaxSetti
                 <div className="font-medium text-gray-900">VAT registered (TRN)</div>
                 <div className="text-sm text-gray-500">
                   {registered
-                    ? "The Default VAT applies to every POS sale and sales invoice; the Purchase Tax to every purchase order and supplier bill."
-                    : "Not registered: no VAT or purchase tax is charged on any sale or purchase, and receipts print without a TRN."}
+                    ? "The Default VAT applies to every POS sale and sales invoice, and receipts print the TRN."
+                    : "Not registered: no VAT is charged on any sale and receipts print without a TRN. Purchase Tax (below) is separate and still applies."}
                 </div>
               </div>
             </div>
@@ -198,9 +201,8 @@ export function BranchTaxSettings({ branchId, readOnly = false }: BranchTaxSetti
         </CardContent>
       </Card>
 
-      {registered && (<>
-      <div className="sp-grid sp-grid--1-1 sp-stretch">
-        {TAX_FIELDS.map(({ key, title, description, icon: Icon }) => {
+      <div className={visibleFields.length > 1 ? "sp-grid sp-grid--1-1 sp-stretch" : "sp-grid sp-stretch"}>
+        {visibleFields.map(({ key, title, description, icon: Icon }) => {
           const value = values[key];
           const valid = isValidRate(value);
           const rate = valid && value.trim() !== "" ? Number(value) : null;
@@ -268,11 +270,11 @@ export function BranchTaxSettings({ branchId, readOnly = false }: BranchTaxSetti
       <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 flex items-start gap-2 text-sm text-gray-700">
         <Info className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
         <span>
-          These rates apply to this branch only: the Default VAT on every sale and the Purchase Tax on every purchase;
-          a product set to its own tax rate overrides them. Leave a rate empty to clear it. Tax codes and filings are managed under Financials → Tax Compliance.
+          These rates apply to this branch only: the Default VAT on every sale (VAT registered branches only) and the
+          Purchase Tax on every purchase order and supplier bill, with or without a TRN. A product set to its own tax rate
+          overrides them. Leave a rate empty to clear it. Tax codes and filings are managed under Financials → Tax Compliance.
         </span>
       </div>
-      </>)}
 
       <SettingsSaveBar
         isDirty={isDirty}

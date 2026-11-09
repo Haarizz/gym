@@ -10,6 +10,7 @@ import { referralService, ReferralResponse } from '../utils/supabase/referral-se
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { useBranch } from '../utils/branch-context';
 import { branchApi, type BranchDTO } from '../utils/supabase/branch-service';
+import { PhoneInput } from '../components/shared/PhoneInput';
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -195,6 +196,22 @@ const branchAccessOf = (accessType?: string | null): BranchAccess => {
 const genderAllowedAt = (access: BranchAccess, gender: string): boolean =>
   access === 'mixed' || (access === 'ladies' ? gender === 'female' : gender === 'male');
 
+// Couple / family relationships and the gender each implies (Other: either).
+const FAMILY_RELATIONSHIPS: { value: string; gender: 'female' | 'male' | null }[] = [
+  { value: 'Wife', gender: 'female' },
+  { value: 'Husband', gender: 'male' },
+  { value: 'Son', gender: 'male' },
+  { value: 'Daughter', gender: 'female' },
+  { value: 'Father', gender: 'male' },
+  { value: 'Mother', gender: 'female' },
+  { value: 'Brother', gender: 'male' },
+  { value: 'Sister', gender: 'female' },
+  { value: 'Other', gender: null },
+];
+
+/** The only gender a Ladies Only / Men Only branch takes; '' for a mixed branch. */
+const branchOnlyGender = (access: BranchAccess): string => (access === 'ladies' ? 'female' : access === 'men' ? 'male' : '');
+
 const GENDER_OPTIONS: { value: string; label: string }[] = [
   { value: 'male', label: 'Male' },
   { value: 'female', label: 'Female' },
@@ -233,6 +250,9 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     return () => { alive = false; window.removeEventListener('branchChanged', load); };
   }, [memberBranchId]);
   const accessOnlyLabel = branchAccess.access === 'ladies' ? 'Female' : 'Male';
+  // At a Ladies Only / Men Only branch only that gender (and matching relationships) is listed.
+  const allowedGenderOptions = GENDER_OPTIONS.filter(o => genderAllowedAt(branchAccess.access, o.value));
+  const allowedRelationships = FAMILY_RELATIONSHIPS.filter(r => r.gender === null || genderAllowedAt(branchAccess.access, r.gender));
   const notifyGenderNotAllowed = (gender: string) => {
     const label = GENDER_OPTIONS.find(o => o.value === gender)?.label ?? gender;
     toast.error(`${branchAccess.name} is ${branchAccess.access === 'ladies' ? 'a ladies-only' : 'a men-only'} gym`, {
@@ -348,7 +368,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const addFamilyMember = () => {
     setFamilyMembers(prev => [...prev, {
       id: `family-${Date.now()}`,
-      name: '', relationship: '', isMinor: false,
+      // A Ladies Only / Men Only branch takes one gender — pre-set it.
+      name: '', relationship: '', gender: branchOnlyGender(branchAccess.access), isMinor: false,
       email: '', phone: '', dateOfBirth: '',
       membershipPlan: '', membershipFee: '',
       paymentMethod: 'cash', amountPaid: '', receivedVia: '',
@@ -374,6 +395,19 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       member.id === id ? { ...member, [field]: value } : member
     ));
   };
+
+  // A Ladies Only / Men Only branch takes one gender: pre-select it for the member and every
+  // couple / family member, and drop a relationship it doesn't take (e.g. Husband).
+  useEffect(() => {
+    const only = branchOnlyGender(branchAccess.access);
+    if (!only) return;
+    if (!isEditMode) setFormData(prev => (prev.gender ? prev : { ...prev, gender: only }));
+    setFamilyMembers(prev => prev.map(fm => {
+      const rel = FAMILY_RELATIONSHIPS.find(r => r.value === fm.relationship);
+      const relAllowed = !rel || rel.gender === null || rel.gender === only;
+      return fm.gender === only && relAllowed ? fm : { ...fm, gender: only, relationship: relAllowed ? fm.relationship : '' };
+    }));
+  }, [branchAccess.access]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-fills a family member's fee when they select a plan (offer-adjusted,
   // mirroring getMembershipDetails() for the primary member).
@@ -835,6 +869,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     id: string;
     name: string;
     relationship: string;
+    gender: string;
     isMinor: boolean;
     email: string;
     phone: string;
@@ -1630,6 +1665,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               return {
                 name: fm.name,
                 relationship: fm.relationship,
+                gender: fm.gender || undefined,
                 is_minor: Boolean(fm.isMinor),
                 date_of_birth: fm.dateOfBirth ? toIso(fm.dateOfBirth) : undefined,
                 minor_fee: minorFeeNum,
@@ -1667,6 +1703,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             return {
               name: fm.name,
               relationship: fm.relationship,
+              gender: fm.gender || undefined,
               is_minor: false,
               email: fm.email || undefined,
               phone: fm.phone || undefined,
@@ -2080,7 +2117,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               </div>
               <div>
                 <Label htmlFor="phone" className="mb-1.5 block">Phone <span className="text-red-500">*</span></Label>
-                <Input id="phone" value={formData.phone} onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setFormData({...formData, phone: v}); }} placeholder="+971 XX XXX XXXX" required />
+                <PhoneInput id="phone" value={formData.phone} onChange={(v) => setFormData(prev => ({ ...prev, phone: v }))} />
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2101,12 +2138,13 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 >
                   <SelectTrigger id="gender"><SelectValue placeholder="Select Gender" /></SelectTrigger>
                   <SelectContent>
-                    {GENDER_OPTIONS.map(o => (
-                      <SelectItem key={o.value} value={o.value}
-                        className={genderAllowedAt(branchAccess.access, o.value) ? undefined : 'opacity-50'}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
+                    {/* A Ladies Only / Men Only branch lists only its gender (plus an existing
+                        member's own, in edit mode, so it still shows). */}
+                    {GENDER_OPTIONS
+                      .filter(o => genderAllowedAt(branchAccess.access, o.value) || o.value === formData.gender)
+                      .map(o => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 {branchAccess.access !== 'mixed' && (
@@ -2266,21 +2304,38 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                             </Label>
                             <Select
                               value={member.relationship || undefined}
-                              onValueChange={(val) => updateFamilyMemberField(member.id, 'relationship', val)}
+                              onValueChange={(val) => {
+                                updateFamilyMemberField(member.id, 'relationship', val);
+                                // Wife → Female, Son → Male… unless a gender was already picked.
+                                const implied = FAMILY_RELATIONSHIPS.find(r => r.value === val)?.gender;
+                                if (implied && !member.gender) updateFamilyMemberField(member.id, 'gender', implied);
+                              }}
                             >
                               <SelectTrigger id={`family-rel-${member.id}`} className="border-primary/20">
                                 <SelectValue placeholder="Select relationship" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="Wife">Wife</SelectItem>
-                                <SelectItem value="Husband">Husband</SelectItem>
-                                <SelectItem value="Son">Son</SelectItem>
-                                <SelectItem value="Daughter">Daughter</SelectItem>
-                                <SelectItem value="Father">Father</SelectItem>
-                                <SelectItem value="Mother">Mother</SelectItem>
-                                <SelectItem value="Brother">Brother</SelectItem>
-                                <SelectItem value="Sister">Sister</SelectItem>
-                                <SelectItem value="Other">Other</SelectItem>
+                                {allowedRelationships.map(r => (
+                                  <SelectItem key={r.value} value={r.value}>{r.value}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label htmlFor={`family-gender-${member.id}`} className="text-sm text-gray-600 mb-1 block">
+                              Gender
+                            </Label>
+                            <Select
+                              value={member.gender}
+                              onValueChange={(val) => updateFamilyMemberField(member.id, 'gender', val)}
+                            >
+                              <SelectTrigger id={`family-gender-${member.id}`} className="border-primary/20">
+                                <SelectValue placeholder="Select gender" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {allowedGenderOptions.map(o => (
+                                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                           </div>
@@ -2369,10 +2424,10 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                               </div>
                               <div>
                                 <Label className="text-sm text-gray-600 mb-1 block">Phone (optional)</Label>
-                                <Input
+                                <PhoneInput
                                   value={member.phone}
-                                  onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) updateFamilyMemberField(member.id, 'phone', v); }}
-                                  className="border-primary/20"
+                                  onChange={(v) => updateFamilyMemberField(member.id, 'phone', v)}
+                                  inputClassName="border-primary/20"
                                 />
                               </div>
                             </div>
@@ -2866,12 +2921,11 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       <FaPhoneVolume className="h-4 w-4 text-red-600" />
                       <span>Emergency Contact Number *</span>
                     </Label>
-                    <Input
+                    <PhoneInput
                       id="emergencyContactPhone"
                       value={formData.emergencyContactPhone}
-                      onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setFormData({...formData, emergencyContactPhone: v}); }}
-                      placeholder="+971 XX XXX XXXX"
-                      className="bg-white border-red-200 focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                      onChange={(v) => setFormData(prev => ({ ...prev, emergencyContactPhone: v }))}
+                      inputClassName="bg-white border-red-200 focus:ring-2 focus:ring-red-500 focus:border-red-500"
                     />
                   </div>
                 </div>

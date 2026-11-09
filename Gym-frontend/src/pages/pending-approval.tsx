@@ -7,6 +7,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { PhoneInput } from "../components/shared/PhoneInput";
 import { Label } from '../components/ui/label';
 import {
   Dialog,
@@ -370,10 +371,10 @@ export function PendingApproval() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="pa-phone">Phone</Label>
-              <Input
+              <PhoneInput
                 id="pa-phone"
                 value={gymForm.phone}
-                onChange={(e) => setGymForm({ ...gymForm, phone: e.target.value })}
+                onChange={(v) => setGymForm(prev => ({ ...prev, phone: v }))}
               />
             </div>
             <div className="space-y-2">

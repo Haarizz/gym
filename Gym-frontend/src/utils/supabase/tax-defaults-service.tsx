@@ -66,9 +66,8 @@ export function salesTaxFor(p: TaxedProduct | null | undefined, d: TaxDefaults |
   return Number(p?.taxRate) || 0;
 }
 
-/** Default tax % for a purchase line. */
+/** Default tax % for a purchase line. Purchase Tax stands alone — it doesn't need a TRN (only sales do). */
 export function purchaseTaxFor(p: TaxedProduct | null | undefined, d: TaxDefaults | null): number {
-  if (d && !d.vatRegistered) return 0;
   if (p && p.useDefaultTax === false) return Number(p.taxRate) || 0;
   if (d?.purchaseRate != null) return d.purchaseRate;
   return Number(p?.taxRate) || 0;

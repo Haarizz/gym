@@ -3,6 +3,7 @@ import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { PhoneInput } from "../components/shared/PhoneInput";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -2022,11 +2023,10 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 <Phone className="h-4 w-4 text-gray-500" />
                 <span>Mobile Number *</span>
               </Label>
-              <Input
+              <PhoneInput
                 id="mobileNumber"
-                placeholder="+971 50 123 4567"
                 value={transferForm.mobileNumber}
-                onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setTransferForm({ ...transferForm, mobileNumber: v }); }}
+                onChange={(v) => setTransferForm(prev => ({ ...prev, mobileNumber: v }))}
               />
             </div>
 

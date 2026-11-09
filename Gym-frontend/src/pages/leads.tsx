@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCurrency } from '../utils/currency';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { PhoneInput } from "../components/shared/PhoneInput";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -1376,7 +1377,7 @@ export function Leads() {
             </div>
             <div>
               <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" placeholder="Enter phone number" value={newLead.phone} onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setNewLead(p => ({ ...p, phone: v })); }} />
+              <PhoneInput id="phone" value={newLead.phone} onChange={v => setNewLead(p => ({ ...p, phone: v }))} />
             </div>
             <div>
               <Label htmlFor="source">Lead Source</Label>
@@ -1481,7 +1482,7 @@ export function Leads() {
             </div>
             <div>
               <Label>Phone</Label>
-              <Input value={editLead.phone} onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setEditLead(p => ({ ...p, phone: v })); }} />
+              <PhoneInput value={editLead.phone} onChange={v => setEditLead(p => ({ ...p, phone: v }))} />
             </div>
             <div>
               <Label>Status</Label>

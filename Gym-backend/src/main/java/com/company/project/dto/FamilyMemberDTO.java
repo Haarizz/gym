@@ -17,6 +17,8 @@ public class FamilyMemberDTO {
 
     private String name;
     private String relationship;
+    // male / female / …; blank = implied by the relationship (Wife → female, Son → male, …).
+    private String gender;
     private Boolean isMinor;
     private String dateOfBirth; // "YYYY-MM-DD", optional, informational
 
@@ -51,6 +53,9 @@ public class FamilyMemberDTO {
 
     public String getRelationship() { return relationship; }
     public void setRelationship(String relationship) { this.relationship = relationship; }
+
+    public String getGender() { return gender; }
+    public void setGender(String gender) { this.gender = gender; }
 
     public Boolean getIsMinor() { return isMinor; }
     public void setIsMinor(Boolean isMinor) { this.isMinor = isMinor; }

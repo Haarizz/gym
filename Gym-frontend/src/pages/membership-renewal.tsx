@@ -56,8 +56,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { RewardDiscountPicker, selectionDiscount, selectionRequestFields, type RewardDiscountSelection } from '../components/shared/RewardDiscountPicker';
-import { StaffFreezeOptions, canSubmitStaffFreeze, staffFreezeDays, useFreezeAllowance } from '../components/members/StaffFreezeOptions';
-import { parseISO } from 'date-fns';
+import { StaffFreezeOptions, canSubmitStaffFreeze, staffFreezeDays, freezeUntilForApi, useFreezeAllowance } from '../components/members/StaffFreezeOptions';
+import { addDays, format, parseISO } from 'date-fns';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
@@ -443,7 +443,8 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           freezeStartDate: freezeForm.startDate || undefined,
-          freezeUntil: freezeForm.endDate,
+          // Old-GymBios "To" date → the last frozen day the API expects.
+          freezeUntil: freezeUntilForApi(parseISO(freezeForm.endDate)),
           reason: freezeForm.reason || "Member request",
           overrideLimits: freezeForm.overrideLimits || undefined,
           waiveCharge: freezeForm.waiveCharge || undefined,
@@ -1357,7 +1358,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                   value={freezeForm.endDate}
                   onChange={(e) => setFreezeForm({...freezeForm, endDate: e.target.value})}
                   className="mt-2"
-                  min={freezeForm.startDate}
+                  min={format(addDays(freezeForm.startDate ? parseISO(freezeForm.startDate) : new Date(), 1), 'yyyy-MM-dd')}
                 />
               </div>
               <div>

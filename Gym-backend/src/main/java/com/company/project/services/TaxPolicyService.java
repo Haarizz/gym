@@ -13,12 +13,12 @@ import java.util.Optional;
 /**
  * The tax a sale or purchase line carries, from Settings › Tax Configuration (branch scoped):
  * <ul>
- *   <li>Not VAT registered (TRN switch off) — no tax anywhere: 0% on POS sales, sales invoices,
- *       purchase orders and supplier bills.</li>
- *   <li>Registered — sales use the branch Sales Tax, purchases the Purchase Tax (each falling back
- *       to the branch Default VAT); a product set to its own rate ({@code useDefaultTax = false})
- *       overrides the branch default. With no branch rate configured the product's rate applies,
- *       as before.</li>
+ *   <li>Sales (VAT) need a TRN: not VAT registered (TRN switch off) — 0% on POS sales and sales
+ *       invoices. Registered — the branch Sales Tax.</li>
+ *   <li>Purchase Tax stands alone — it doesn't depend on the TRN: purchase orders and supplier
+ *       bills always use the branch Purchase Tax, registered or not.</li>
+ *   <li>Either way a product set to its own rate ({@code useDefaultTax = false}) overrides the
+ *       branch default, and with no branch rate configured the product's rate applies.</li>
  * </ul>
  * A branch with no TRN isn't VAT registered either (it can't charge VAT), whatever the switch says.
  * A branch that has a TRN but never set the switch keeps charging tax as before (counts as registered).
@@ -71,8 +71,8 @@ public class TaxPolicyService {
 
     /** Tax % for a purchase line, given the rate the user entered (null = the default). */
     public BigDecimal purchaseRate(Product product, BigDecimal entered) {
+        // Purchase Tax stands alone — not tied to the TRN / VAT registration (only sales are).
         TaxDefaults d = current();
-        if (!d.vatRegistered()) return BigDecimal.ZERO;
         if (entered != null) return entered.setScale(2, RoundingMode.HALF_UP);
         return resolve(d, product, false);
     }
@@ -87,7 +87,8 @@ public class TaxPolicyService {
     }
 
     static BigDecimal resolve(TaxDefaults d, Product product, boolean sales) {
-        if (!d.vatRegistered()) return BigDecimal.ZERO;
+        // Only sales (VAT) need a TRN; Purchase Tax applies whether or not the branch is registered.
+        if (sales && !d.vatRegistered()) return BigDecimal.ZERO;
         if (product != null && Boolean.FALSE.equals(product.getUseDefaultTax())) return nz(product.getTaxRate());
         BigDecimal branch = sales ? d.salesRate() : d.purchaseRate();
         if (branch != null) return branch;

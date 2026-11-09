@@ -165,6 +165,11 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
 }
 
+/** The active currency code, or null outside a CurrencyProvider (e.g. public pages). */
+export function useOptionalCurrencyCode(): CurrencyCode | null {
+  return useContext(CurrencyContext)?.currencyCode ?? null;
+}
+
 export function useCurrency(): CurrencyContextValue {
   const ctx = useContext(CurrencyContext);
   if (!ctx) {

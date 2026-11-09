@@ -12,7 +12,7 @@ import { Calendar as CalendarComponent } from '../ui/calendar';
 import { CurrencyGlyph } from '../../utils/currency';
 import { membersService, type FreezeAllowance, type Member } from '../../utils/supabase/members-service';
 import {
-  StaffFreezeOptions, canSubmitStaffFreeze, freezeAddonRuleText, staffFreezeDays, useFreezeAllowance,
+  StaffFreezeOptions, canSubmitStaffFreeze, freezeAddonRuleText, staffFreezeDays, freezeUntilForApi, useFreezeAllowance,
 } from './StaffFreezeOptions';
 import s from './MemberFreezeDialog.module.css';
 
@@ -93,12 +93,12 @@ export function MemberFreezeDialog({
         return;
       }
       if (fStart < today) { toast.error('Freeze start date cannot be in the past'); return; }
-      if (startOfDay(endDate) < fStart) { toast.error('Freeze end date cannot be before the start date'); return; }
+      if (startOfDay(endDate) <= fStart) { toast.error('Freeze end date must be after the start date'); return; }
     }
     setSaving(true);
     try {
       await membersService.freezeMember(String(memberDbId), {
-        freezeUntil: format(endDate, 'yyyy-MM-dd') + 'T00:00:00Z',
+        freezeUntil: freezeUntilForApi(endDate),
         freezeStartDate: startDate ? format(startDate, 'yyyy-MM-dd') + 'T00:00:00Z' : undefined,
         reason: reason.trim() || undefined,
         overrideLimits: overrideLimits || undefined,
@@ -181,10 +181,10 @@ export function MemberFreezeDialog({
                 <p className={s.fieldValue}>{fmtDay(member.freeze_start_date)}</p>
               </div>
               <div>
-                <p className={s.fieldLabel}>Last frozen day</p>
+                <p className={s.fieldLabel}>Frozen until</p>
                 <p className={s.fieldValue}>
                   {member.freeze_end_date
-                    ? fmtDay(new Date(new Date(member.freeze_end_date).getTime() - 1).toISOString())
+                    ? fmtDay(member.freeze_end_date)
                     : 'Until unfrozen'}
                 </p>
               </div>
@@ -242,11 +242,11 @@ export function MemberFreezeDialog({
                         selected={endDate}
                         onSelect={setEndDate}
                         defaultMonth={endDate ?? earliestEnd}
-                        disabled={(date) => date < earliestEnd}
+                        disabled={(date) => date <= earliestEnd}
                       />
                     </PopoverContent>
                   </Popover>
-                  <span className={s.hint}>The last day the membership is frozen</span>
+                  <span className={s.hint}>The day the membership is active again (e.g. 3 → 13 Nov = 10 days)</span>
                 </div>
               </div>
 

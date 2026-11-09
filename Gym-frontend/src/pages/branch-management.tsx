@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Badge } from "../components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
+import { PhoneInput } from "../components/shared/PhoneInput";
 import { Label } from "../components/ui/label";
 import { Switch } from "../components/ui/switch";
 import { branchApi, BranchDTO } from '../utils/supabase/branch-service';
@@ -294,11 +295,10 @@ export function BranchManagement({ embedded = false }: { embedded?: boolean } = 
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit_phone">Phone</Label>
-              <Input
+              <PhoneInput
                 id="edit_phone"
                 value={editFormData.phone}
-                onChange={e => setEditFormData({...editFormData, phone: e.target.value})}
-                placeholder="Contact phone"
+                onChange={v => setEditFormData(prev => ({ ...prev, phone: v }))}
               />
             </div>
             <div className="space-y-2">

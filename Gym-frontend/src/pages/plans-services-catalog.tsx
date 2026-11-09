@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
+import { PhoneInput } from "../components/shared/PhoneInput";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
@@ -473,11 +474,10 @@ export function PlansServicesCatalog() {
                   </div>
                   <div>
                     <Label htmlFor="phone">Phone Number *</Label>
-                    <Input
+                    <PhoneInput
                       id="phone"
                       value={inquiryData.phone}
-                      onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setInquiryData({...inquiryData, phone: v}); }}
-                      placeholder="+971 50 123 4567"
+                      onChange={(v) => setInquiryData(prev => ({ ...prev, phone: v }))}
                     />
                   </div>
                 </div>

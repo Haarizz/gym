@@ -228,6 +228,13 @@ import { syncThemeForUser } from "./utils/theme";
 const GYM_OWNER_ONLY = "GYM_OWNER_ONLY";
 
 /**
+ * Sidebar buttons are a fixed 32px (h-8) with overflow hidden, so a label that wraps
+ * ("Plans & Services Catalog", "Payroll & Employees") lost its second line's descenders —
+ * the "g" in Catalog. Let them grow; the tighter line height keeps one-line items at 32px.
+ */
+const SIDEBAR_ITEM_STYLE: React.CSSProperties = { height: 'auto', minHeight: 32, lineHeight: 1.15 };
+
+/**
  * Pseudo permission for GymOS, which now also holds Settings and Branch Management (GymOS ›
  * Settings / Branch Management): its system tabs need GYMOS_VIEW, the Settings tab
  * SETTINGS_VIEW and the Branch Management tab BRANCH_MANAGEMENT_VIEW, so any one opens it.
@@ -1582,6 +1589,7 @@ export default function App() {
                       }
                     }}
                     isActive={activeSectionPathId === item.id}
+                    style={SIDEBAR_ITEM_STYLE}
                     className={`w-full justify-start sidebar-item text-white hover:bg-white/10 transition-all duration-300 ${
                       activeSectionPathId === item.id ? 'sidebar-item-active' : ''
                     }`}
@@ -1629,6 +1637,7 @@ export default function App() {
                               isActive={
                                 activeSectionPathId === subItem.id
                               }
+                              style={SIDEBAR_ITEM_STYLE}
                               className={`w-full justify-start text-sm py-2 sidebar-item text-white/90 hover:bg-white/10 transition-all duration-300 ${
                                 activeSectionPathId === subItem.id ? 'sidebar-item-active' : ''
                               }`}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { membersService, Member, type FreezeAllowance, type FreezeHistoryEntry } from '../utils/supabase/members-service';
-import { StaffFreezeOptions, canSubmitStaffFreeze, staffFreezeDays } from '../components/members/StaffFreezeOptions';
+import { StaffFreezeOptions, canSubmitStaffFreeze, staffFreezeDays, freezeUntilForApi } from '../components/members/StaffFreezeOptions';
 import { CurrencyGlyph } from '../utils/currency';
 import { plansService } from '../utils/supabase/plans-service';
 import { authService } from '../utils/supabase/auth-service';
@@ -55,7 +55,7 @@ const initials = (name: string) => (name || '').split(' ').filter(Boolean).map((
 const fmt = (d?: string | Date | null) => (d ? format(new Date(d), 'dd MMM yyyy') : '—');
 // A stored freeze end is the moment the member is back (midnight after a staff-picked
 // last day), so the last day actually frozen is the moment before it.
-const lastFrozenDay = (end: string) => new Date(new Date(end).getTime() - 1);
+
 // A freeze can't start after the expiry: the member would be frozen until then for nothing.
 const expiryDay = (m: Member) => {
   if (!m.expiry_date) return null;
@@ -190,13 +190,14 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
       return;
     }
 
-    if (freezeStartDate > freezeEndDate) {
-      toast.error('End date cannot be before start date');
+    if (freezeEndDate <= freezeStartDate) {
+      toast.error('End date must be after the start date');
       return;
     }
     setIsSubmitting(true);
     try {
-      const freezeUntil = format(freezeEndDate, 'yyyy-MM-dd') + 'T00:00:00Z';
+      // The end date is old-GymBios "To" (the day the member is back); the API wants the last frozen day.
+      const freezeUntil = freezeUntilForApi(freezeEndDate);
       const freezeStart = format(freezeStartDate, 'yyyy-MM-dd') + 'T00:00:00Z';
       await membersService.freezeMember(String(selectedMember.id), {
         freezeUntil,
@@ -312,7 +313,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
         filteredMembers.map((m) => [
           m.name, m.member_id, m.phone, m.membership_plan,
           m.freeze_start_date ? format(new Date(m.freeze_start_date), 'yyyy-MM-dd') : '',
-          m.freeze_end_date ? format(lastFrozenDay(m.freeze_end_date), 'yyyy-MM-dd') : '',
+          m.freeze_end_date ? format(new Date(m.freeze_end_date), 'yyyy-MM-dd') : '',
           plannedFreezeDays(m), m.membership_status,
           autoUnfreezeFor(m) ? 'Yes' : 'No', m.freeze_reason || '',
         ]), { totals: true, wrap: [9], emptyText: 'No members are frozen.' }),
@@ -507,7 +508,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                             selected={freezeStartDate}
                             onSelect={(d) => {
                               setFreezeStartDate(d);
-                              if (d && freezeEndDate && freezeEndDate < d) setFreezeEndDate(undefined);
+                              if (d && freezeEndDate && freezeEndDate <= d) setFreezeEndDate(undefined);
                             }}
                             disabled={(date) => {
                               const expiry = expiryDay(selectedMember);
@@ -532,7 +533,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                             mode="single"
                             selected={freezeEndDate}
                             onSelect={setFreezeEndDate}
-                            disabled={(date) => !freezeStartDate || date < freezeStartDate}
+                            disabled={(date) => !freezeStartDate || date <= freezeStartDate}
                           />
                         </PopoverContent>
                       </Popover>
@@ -652,7 +653,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                             <TableCell className="font-mono text-sm">{member.member_id || member.id}</TableCell>
                             <TableCell>{member.membership_plan || '—'}</TableCell>
                             <TableCell>{fmt(member.freeze_start_date)}</TableCell>
-                            <TableCell>{member.freeze_end_date ? fmt(lastFrozenDay(member.freeze_end_date)) : '—'}</TableCell>
+                            <TableCell>{member.freeze_end_date ? fmt(new Date(member.freeze_end_date)) : '—'}</TableCell>
                             <TableCell>
                               <Badge className="bg-blue-100 text-blue-700">{plannedFreezeDays(member)} days</Badge>
                             </TableCell>

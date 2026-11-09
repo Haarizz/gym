@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../ui/button';
+import { PhoneInput } from '../shared/PhoneInput';
 import { CurrencyGlyph, CurrencyValue, useCurrency } from '../../utils/currency';
 import { membersService, type Member } from '../../utils/supabase/members-service';
 import type { SalesCustomerType, SalesInvoice, SalesInvoiceRequest } from '../../utils/supabase/sales-invoice-service';
@@ -613,8 +614,9 @@ export const SalesInvoiceEditor = forwardRef<SalesInvoiceEditorHandle, Props>(fu
                     {isMember && form.memberCode && <span className={cx(styles.tiny, styles.muted)}>Member ID {form.memberCode}</span>}
                   </div>
                   <div><span className={styles.eyebrow}>Phone</span>
-                    <input className={styles.cellInput} value={form.customerPhone} readOnly={readOnly} placeholder="—"
-                      onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) set('customerPhone', v); }} /></div>
+                    <PhoneInput value={form.customerPhone} readOnly={readOnly} placeholder="—"
+                      inputClassName={styles.cellInput} triggerClassName="h-8"
+                      onChange={v => set('customerPhone', v)} /></div>
                   <div><span className={styles.eyebrow}>Email</span>
                     <input className={styles.cellInput} value={form.customerEmail} readOnly={readOnly} placeholder="—" onChange={e => set('customerEmail', e.target.value)} /></div>
                   <div><span className={styles.eyebrow}>TRN / VAT No.</span>

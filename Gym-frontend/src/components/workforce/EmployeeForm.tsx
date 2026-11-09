@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { PhoneInput } from "../shared/PhoneInput";
 import { Textarea } from "../ui/textarea";
 import { Switch } from "../ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
@@ -392,7 +393,7 @@ export function EmployeeForm({ mode, employee, assignableRoles, branches, depart
               onChange={e => { clearError("email"); setCore(c => ({ ...c, email: e.target.value })); }} />
           </Field>
           <Field label="Mobile number">
-            <Input value={core.phone} placeholder="+971 50 123 4567" onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setCore(c => ({ ...c, phone: v })); }} />
+            <PhoneInput value={core.phone} onChange={v => setCore(c => ({ ...c, phone: v }))} />
           </Field>
           <Field label="Personal email"><Input type="email" value={profile.personal.personal_email} placeholder="Optional" onChange={e => set("personal", { personal_email: e.target.value })} /></Field>
         </div>
@@ -685,7 +686,7 @@ export function EmployeeForm({ mode, employee, assignableRoles, branches, depart
               <div className={s.grid2}>
                 <Field label="Full name"><Input value={c.name} placeholder="e.g. Ali Hassan" onChange={e => upd({ name: e.target.value })} /></Field>
                 <Field label="Relationship"><Input value={c.relationship} placeholder="e.g. Brother" onChange={e => upd({ relationship: e.target.value })} /></Field>
-                <Field label="Phone"><Input value={c.phone} placeholder="+971 XX XXX XXXX" onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) upd({ phone: v }); }} /></Field>
+                <Field label="Phone"><PhoneInput value={c.phone} onChange={v => upd({ phone: v })} /></Field>
                 <Field label="Email"><Input type="email" value={c.email} placeholder="Optional" onChange={e => upd({ email: e.target.value })} /></Field>
               </div>
             </div>

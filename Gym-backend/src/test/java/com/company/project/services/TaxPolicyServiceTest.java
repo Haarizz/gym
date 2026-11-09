@@ -22,10 +22,17 @@ class TaxPolicyServiceTest {
     }
 
     @Test
-    void notRegisteredChargesNoTax() {
+    void notRegisteredChargesNoSalesTax() {
         TaxPolicyService.TaxDefaults off = new TaxPolicyService.TaxDefaults(false, null, null, new BigDecimal("5.00"), new BigDecimal("5.00"));
         assertEquals(0, BigDecimal.ZERO.compareTo(TaxPolicyService.resolve(off, product("5.00", true), true)));
         assertEquals(0, BigDecimal.ZERO.compareTo(TaxPolicyService.resolve(off, product("5.00", false), true)));
+    }
+
+    @Test
+    void purchaseTaxStandsAloneWithoutATrn() {
+        TaxPolicyService.TaxDefaults off = new TaxPolicyService.TaxDefaults(false, null, null, new BigDecimal("5.00"), new BigDecimal("10.00"));
+        assertEquals(new BigDecimal("10.00"), TaxPolicyService.resolve(off, product("5.00", true), false));
+        assertEquals(new BigDecimal("15.00"), TaxPolicyService.resolve(off, product("15.00", false), false));
     }
 
     @Test

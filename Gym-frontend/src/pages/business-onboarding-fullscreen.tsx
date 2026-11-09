@@ -4,6 +4,7 @@ import { platformLeadService } from "../utils/supabase/platform-lead-service";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { PhoneInput } from "../components/shared/PhoneInput";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import {
@@ -248,8 +249,8 @@ export function BusinessOnboardingFullscreen({
   const [contactErrors, setContactErrors] = useState<Partial<Record<ContactField, string>>>({});
 
   const handlePhoneChange = (field: "contactPhone" | "contactWhatsApp", value: string) => {
-    const cleaned = value.replace(/[^\d+]/g, "").replace(/(?!^)\+/g, "");
-    handleChange(field, cleaned);
+    // PhoneInput gives "+971 501234567" (country code, one space, number).
+    handleChange(field, value);
     setContactErrors((prev) => ({ ...prev, [field]: undefined }));
   };
 
@@ -1003,17 +1004,16 @@ export function BusinessOnboardingFullscreen({
                               <Label className="text-sm font-medium text-slate-700">
                                 Phone number
                               </Label>
-                              <Input
+                              <PhoneInput
                                 id="ob-contactPhone"
-                                type="tel"
-                                inputMode="tel"
-                                maxLength={16}
-                                className={`mt-2 h-11 ob-input${contactErrors.contactPhone ? " ob-input-error" : ""}`}
+                                className="mt-2"
+                                triggerClassName="h-11"
+                                inputClassName={`h-11 ob-input${contactErrors.contactPhone ? " ob-input-error" : ""}`}
                                 placeholder="Primary contact number"
                                 value={data.contactPhone}
-                                aria-invalid={!!contactErrors.contactPhone || undefined}
+                                invalid={!!contactErrors.contactPhone}
                                 aria-describedby={contactErrors.contactPhone ? "ob-contactPhone-error" : undefined}
-                                onChange={(e) => handlePhoneChange("contactPhone", e.target.value)}
+                                onChange={(v) => handlePhoneChange("contactPhone", v)}
                               />
                               {contactErrors.contactPhone && (
                                 <p id="ob-contactPhone-error" className="mt-1 text-xs text-red-600">
@@ -1028,17 +1028,16 @@ export function BusinessOnboardingFullscreen({
                                   (optional)
                                 </span>
                               </Label>
-                              <Input
+                              <PhoneInput
                                 id="ob-contactWhatsApp"
-                                type="tel"
-                                inputMode="tel"
-                                maxLength={16}
-                                className={`mt-2 h-11 ob-input${contactErrors.contactWhatsApp ? " ob-input-error" : ""}`}
+                                className="mt-2"
+                                triggerClassName="h-11"
+                                inputClassName={`h-11 ob-input${contactErrors.contactWhatsApp ? " ob-input-error" : ""}`}
                                 placeholder="For faster coordination"
                                 value={data.contactWhatsApp}
-                                aria-invalid={!!contactErrors.contactWhatsApp || undefined}
+                                invalid={!!contactErrors.contactWhatsApp}
                                 aria-describedby={contactErrors.contactWhatsApp ? "ob-contactWhatsApp-error" : undefined}
-                                onChange={(e) => handlePhoneChange("contactWhatsApp", e.target.value)}
+                                onChange={(v) => handlePhoneChange("contactWhatsApp", v)}
                               />
                               {contactErrors.contactWhatsApp && (
                                 <p id="ob-contactWhatsApp-error" className="mt-1 text-xs text-red-600">

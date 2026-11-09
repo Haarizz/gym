@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { addDays, differenceInCalendarDays, format } from 'date-fns';
+import { addDays, differenceInCalendarDays, format, subDays } from 'date-fns';
 import { AlertTriangle, Info } from 'lucide-react';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
@@ -25,9 +25,20 @@ export function useFreezeAllowance(memberId: string | number | null | undefined)
   return { allowance, loading };
 }
 
-/** Days a staff freeze covers: the start date through the last frozen day, inclusive. */
-export function staffFreezeDays(start: Date | undefined, lastDay: Date | undefined): number {
-  return start && lastDay ? Math.max(0, differenceInCalendarDays(lastDay, start) + 1) : 0;
+/**
+ * Days a staff freeze covers, old-GymBios style: From → To, where To is the day the member is
+ * active again (3 → 13 Nov is 10 days).
+ */
+export function staffFreezeDays(start: Date | undefined, to: Date | undefined): number {
+  return start && to ? Math.max(0, differenceInCalendarDays(to, start)) : 0;
+}
+
+/**
+ * The freeze API takes the last frozen day (and stores the end as the next morning), so a
+ * freeze "To" date is sent as the day before it.
+ */
+export function freezeUntilForApi(to: Date): string {
+  return format(subDays(to, 1), 'yyyy-MM-dd') + 'T00:00:00Z';
 }
 
 /** Whether a freeze of this length goes past the plan's limits. */

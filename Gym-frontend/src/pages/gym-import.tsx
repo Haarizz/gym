@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { PageHead } from '../components/platform/platform-ui';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { PhoneInput } from "../components/shared/PhoneInput";
 import { Label } from '../components/ui/label';
 import {
   gymImportApi, gymImportErrorMessage, GymImportJob, ImportAppAccounts, ImportReport,
@@ -349,7 +350,7 @@ export function GymImport() {
                 <Input value={form.address} disabled={gymCreated} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
               </Field>
               <Field label="Gym phone">
-                <Input value={form.phone} disabled={gymCreated} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+                <PhoneInput value={form.phone} disabled={gymCreated} onChange={v => setForm(f => ({ ...f, phone: v }))} />
               </Field>
               <Field label="Gym email">
                 <Input type="email" value={form.email} disabled={gymCreated} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />

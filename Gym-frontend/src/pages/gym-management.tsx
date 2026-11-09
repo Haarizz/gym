@@ -7,6 +7,7 @@ import {
 } from '../components/platform/platform-ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
+import { PhoneInput } from "../components/shared/PhoneInput";
 import { Label } from "../components/ui/label";
 import { Switch } from "../components/ui/switch";
 import { LocationPicker } from "../components/shared/location-picker";
@@ -339,12 +340,10 @@ export function GymManagement() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
-              <Input
+              <PhoneInput
                 id="phone"
                 value={formData.phone}
-                onChange={e => setFormData({...formData, phone: e.target.value})}
-                placeholder="Contact phone"
-                maxLength={PHONE_MAX_LENGTH}
+                onChange={v => setFormData(prev => ({ ...prev, phone: v }))}
               />
             </div>
             <div className="space-y-2">
@@ -442,12 +441,10 @@ export function GymManagement() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-phone">Phone</Label>
-              <Input
+              <PhoneInput
                 id="edit-phone"
                 value={editFormData.phone}
-                onChange={e => setEditFormData({...editFormData, phone: e.target.value})}
-                placeholder="Contact phone"
-                maxLength={PHONE_MAX_LENGTH}
+                onChange={v => setEditFormData(prev => ({ ...prev, phone: v }))}
               />
             </div>
             <div className="space-y-2">

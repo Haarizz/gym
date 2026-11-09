@@ -1478,7 +1478,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                     </label>
                     {!vatRegistered && (
                       <p className="text-xs text-amber-700">
-                        This branch is not VAT registered, so no tax is charged on sales or purchases. Turn on VAT registered in Settings › Tax Configuration to apply it.
+                        This branch is not VAT registered, so no VAT is charged on sales (Purchase Tax still applies to purchases). Turn on VAT registered in Settings › Tax Configuration to charge VAT.
                       </p>
                     )}
                   </div>

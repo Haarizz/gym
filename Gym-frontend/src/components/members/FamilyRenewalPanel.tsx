@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { PhoneInput } from '../shared/PhoneInput';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { Checkbox } from '../ui/checkbox';
@@ -270,7 +271,7 @@ export function FamilyRenewalPanel({ head, planName, planType, discountAmount, r
                     </div>
                     <div>
                       <Label className="text-xs">Phone (optional)</Label>
-                      <Input value={r.phone} onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) updateRow(r.key, { phone: v }); }} />
+                      <PhoneInput value={r.phone} onChange={v => updateRow(r.key, { phone: v })} />
                     </div>
                     <div>
                       <Label className="text-xs">Email (optional)</Label>

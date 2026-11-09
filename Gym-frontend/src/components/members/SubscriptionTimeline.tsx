@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
+import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import {
   AlertCircle,
   CalendarCheck,
@@ -176,12 +176,11 @@ export function SubscriptionTimeline({ memberId, refreshKey }: SubscriptionTimel
             ...(by ? [`By ${by}`] : []),
           ],
         });
-        const back = f.unfrozen_on
-          || (f.ended_on ? format(addDays(toDate(f.ended_on)!, 1), "yyyy-MM-dd") : f.start_date || "");
+        const back = f.unfrozen_on || f.ended_on || f.start_date || "";
         events.push({
           day: back, rank: 4, tone: "teal", icon: <Play />, title: "Membership unfrozen",
           lines: [
-            `Frozen ${f.days} day(s): ${fmt(f.start_date)} – ${fmt(f.ended_on)}`,
+            `Frozen ${f.days} day(s): ${fmt(f.start_date)} → ${fmt(f.ended_on)}`,
             ...(f.expiry_before && f.expiry_after
               ? [<>Expiry moved <s>{fmt(f.expiry_before)}</s> → <b>{fmt(f.expiry_after)}</b> (+{f.days} days)</>] : []),
             ...([free, charge].filter(Boolean) as string[]),

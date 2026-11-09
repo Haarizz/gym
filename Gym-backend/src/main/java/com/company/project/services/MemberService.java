@@ -541,8 +541,12 @@ public class MemberService {
         member.setBranchId(branchId);
         
         applyRequest(request, member);
-        // Branch Access Type (Ladies Only / Men Only) — see BranchAccessPolicy.
+        // Branch Access Type (Ladies Only / Men Only) — see BranchAccessPolicy. Couple / family
+        // members join the same branch, so they're checked too, before anything is saved.
         branchService.assertGenderAllowed(branchId, member.getGender(), false);
+        if (request.getFamilyMembers() != null) {
+            for (FamilyMemberDTO fm : request.getFamilyMembers()) familyMemberGender(fm, branchId);
+        }
         if (member.getTotalVisits() == null) member.setTotalVisits(0);
         // Every new member has joined — a client that omits join_date (older mobile
         // builds) used to leave it NULL, hiding the member from join-date sorts/filters.
@@ -1122,6 +1126,27 @@ public class MemberService {
      * startDate: when their membership starts — null means the head's start date.
      * Public for FamilyPlanChangeService (staff renewals that add family members).
      */
+    /**
+     * A couple / family member's gender: as sent, else implied by the relationship (older app
+     * builds send none). Refused when the branch's Access Type (Ladies Only / Men Only) doesn't
+     * take it — e.g. a Husband at a ladies-only branch.
+     */
+    private String familyMemberGender(FamilyMemberDTO fm, Long branchId) {
+        String gender = fm.getGender() != null && !fm.getGender().isBlank()
+                ? fm.getGender().trim() : genderFromRelationship(fm.getRelationship());
+        if (gender != null) branchService.assertGenderAllowed(branchId, gender, false);
+        return gender;
+    }
+
+    static String genderFromRelationship(String relationship) {
+        if (relationship == null) return null;
+        return switch (relationship.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "wife", "daughter", "mother", "sister" -> "female";
+            case "husband", "son", "father", "brother" -> "male";
+            default -> null;
+        };
+    }
+
     public void registerFamilyAdult(FamilyMemberDTO fm, Member head, LocalDateTime startDate) {
         Member dep = new Member();
         dep.setName(fm.getName());
@@ -1142,6 +1167,7 @@ public class MemberService {
         dep.setIsFamilyHead(false);
         dep.setFamilyHeadId(head.getMemberId());
         dep.setRelationshipToHead(fm.getRelationship());
+        dep.setGender(familyMemberGender(fm, head.getBranchId()));
         dep.setIsMinor(false);
         dep.setBilledToHead(false);
         boolean awaitingApproval = applyHeadApprovalGate(dep, head);
@@ -1238,6 +1264,7 @@ public class MemberService {
         dep.setIsFamilyHead(false);
         dep.setFamilyHeadId(head.getMemberId());
         dep.setRelationshipToHead(fm.getRelationship());
+        dep.setGender(familyMemberGender(fm, head.getBranchId()));
         dep.setIsMinor(Boolean.TRUE.equals(fm.getIsMinor()));
         dep.setBilledToHead(true);
         applyHeadApprovalGate(dep, head);
