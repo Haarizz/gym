@@ -160,7 +160,9 @@ export const ARABIC_SCRIPT = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/;
 export function companyLocalNameHtml(company: CompanyDetails, className = "company-name-local"): string {
   if (!company.nameLocal) return "";
   const lang = ARABIC_SCRIPT.test(company.nameLocal) ? ` lang="ar"` : "";
-  return `<div class="${className}" dir="auto"${lang} style="font-family:${LOCAL_NAME_FONT_STACK};unicode-bidi:isolate">${escapeHtml(company.nameLocal)}</div>`;
+  // text-align:left keeps it directly under the company name — on its own, dir="auto" lines an
+  // Arabic name up on the right edge of the header (beside the QR) instead.
+  return `<div class="${className}" dir="auto"${lang} style="font-family:${LOCAL_NAME_FONT_STACK};unicode-bidi:isolate;text-align:left">${escapeHtml(company.nameLocal)}</div>`;
 }
 
 function escapeHtml(value: string): string {
