@@ -107,6 +107,12 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/public/walk-in/*/*").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/public/walk-in/*/*/submit").permitAll()
 
+                // Service Portfolios share link (/join/{tenant}/{branch}/{token}). Answers only
+                // for the branch's current share token; an application just queues the visitor
+                // for staff approval (PublicJoinController); rate-limited and honeypot-checked.
+                .requestMatchers(HttpMethod.GET, "/api/public/join/*/*/*").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/public/join/*/*/*/apply").permitAll()
+
                 // Referral link landing page (/ref/{code}). Returns only the gym name and the
                 // referrer's first name for a valid code; rate-limited (PublicReferralController).
                 .requestMatchers(HttpMethod.GET, "/api/public/referrals/*").permitAll()

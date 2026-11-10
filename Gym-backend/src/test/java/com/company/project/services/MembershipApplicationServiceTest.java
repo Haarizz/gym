@@ -1,0 +1,222 @@
+package com.company.project.services;
+
+import com.company.project.dto.MemberRequestDTO;
+import com.company.project.dto.MemberResponseDTO;
+import com.company.project.dto.MembershipApplicationDTOs.ApplicationView;
+import com.company.project.dto.PaymentSplitDTO;
+import com.company.project.entities.Member;
+import com.company.project.entities.MembershipApplication;
+import com.company.project.entities.MembershipPlan;
+import com.company.project.exceptions.BusinessRuleViolationException;
+import com.company.project.repositories.BranchRepository;
+import com.company.project.repositories.MembershipApplicationRepository;
+import com.company.project.repositories.MembershipPlanRepository;
+import com.company.project.security.BranchContextHolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class MembershipApplicationServiceTest {
+
+    @Mock private MembershipApplicationRepository applicationRepository;
+    @Mock private MembershipPlanRepository planRepository;
+    @Mock private BranchRepository branchRepository;
+    @Mock private BranchService branchService;
+    @Mock private MemberService memberService;
+    @Mock private PlatformTransactionManager transactionManager;
+
+    private MembershipApplicationService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new MembershipApplicationService(applicationRepository, planRepository, branchRepository,
+                branchService, memberService, transactionManager);
+        BranchContextHolder.setActiveBranchId(1L);
+    }
+
+    @AfterEach
+    void clear() {
+        BranchContextHolder.clear();
+    }
+
+    private MembershipApplication application(String method, String paymentStatus) {
+        MembershipApplication a = new MembershipApplication();
+        a.setId(10L);
+        a.setBranchId(1L);
+        a.setReference("APP-TEST1234");
+        a.setFullName("Sara Ahmed");
+        a.setPhone("+971501234567");
+        a.setEmail("sara@example.com");
+        a.setGender("Female");
+        a.setPlanId(5L);
+        a.setPlanName("Gold Monthly");
+        a.setListPrice(new BigDecimal("350"));
+        a.setAmount(new BigDecimal("300"));
+        a.setOfferLabel("Launch offer");
+        a.setPaymentMethod(method);
+        a.setPaymentStatus(paymentStatus);
+        if (MembershipApplication.PAYMENT_PAID.equals(paymentStatus)) {
+            a.setPaymentReference("pi_sim_abc");
+            a.setCardBrand("Visa");
+            a.setCardLast4("4242");
+            a.setPaidAt(LocalDateTime.now());
+        }
+        when(applicationRepository.findById(10L)).thenReturn(Optional.of(a));
+        when(applicationRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(a));
+        return a;
+    }
+
+    private void activePlanAndMember() {
+        MembershipPlan plan = new MembershipPlan();
+        plan.setId(5L);
+        plan.setName("Gold Monthly");
+        plan.setStatus("Active");
+        when(planRepository.findById(5L)).thenReturn(Optional.of(plan));
+        Member m = new Member();
+        m.setId(77L);
+        m.setMemberId("MBR-0000000077");
+        when(memberService.createMember(any())).thenReturn(MemberResponseDTO.fromEntity(m));
+        when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    void cashApplicationNeedsCashConfirmedBeforeApproval() {
+        MembershipApplication a = application(MembershipApplication.METHOD_CASH, MembershipApplication.PAYMENT_PENDING);
+
+        assertThrows(BusinessRuleViolationException.class, () -> service.approve(10L, false, "admin"));
+
+        verify(memberService, never()).createMember(any());
+        assertEquals(MembershipApplication.APPROVAL_PENDING, a.getApprovalStatus());
+    }
+
+    @Test
+    void approvingCashCreatesMemberPaidInCash() {
+        MembershipApplication a = application(MembershipApplication.METHOD_CASH, MembershipApplication.PAYMENT_PENDING);
+        activePlanAndMember();
+
+        ApplicationView view = service.approve(10L, true, "admin");
+
+        ArgumentCaptor<MemberRequestDTO> req = ArgumentCaptor.forClass(MemberRequestDTO.class);
+        verify(memberService).createMember(req.capture());
+        MemberRequestDTO r = req.getValue();
+        assertEquals("Sara Ahmed", r.getName());
+        assertEquals(5L, r.getMembershipPlanId());
+        assertEquals(0, new BigDecimal("300").compareTo(r.getMembershipFee()));
+        assertEquals(0, new BigDecimal("50").compareTo(r.getOfferDiscount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(r.getOutstandingBalance()));
+        assertEquals("Cash", r.getPaymentMethodUsed());
+        PaymentSplitDTO leg = r.getPaymentBreakdown().get(0);
+        assertEquals("Cash", leg.getMethod());
+        assertEquals(0, new BigDecimal("300").compareTo(leg.getAmount()));
+
+        assertEquals(MembershipApplication.PAYMENT_PAID, a.getPaymentStatus());
+        assertEquals("admin", a.getCashReceivedBy());
+        assertEquals(MembershipApplication.APPROVAL_APPROVED, view.approvalStatus());
+        assertEquals(77L, view.memberId());
+        assertEquals("MBR-0000000077", view.memberCode());
+    }
+
+    @Test
+    void approvingPaidOnlineApplicationRecordsCardLeg() {
+        application(MembershipApplication.METHOD_ONLINE, MembershipApplication.PAYMENT_PAID);
+        activePlanAndMember();
+
+        service.approve(10L, false, "admin");
+
+        ArgumentCaptor<MemberRequestDTO> req = ArgumentCaptor.forClass(MemberRequestDTO.class);
+        verify(memberService).createMember(req.capture());
+        PaymentSplitDTO leg = req.getValue().getPaymentBreakdown().get(0);
+        assertEquals("Card", leg.getMethod());
+        assertEquals("pi_sim_abc", leg.getReference());
+        assertNull(leg.getStripePaymentIntentId(), "simulated charges must never look like real Stripe intents");
+    }
+
+    @Test
+    void inactivePlanBlocksApproval() {
+        application(MembershipApplication.METHOD_ONLINE, MembershipApplication.PAYMENT_PAID);
+        MembershipPlan plan = new MembershipPlan();
+        plan.setStatus("Inactive");
+        when(planRepository.findById(5L)).thenReturn(Optional.of(plan));
+
+        assertThrows(BusinessRuleViolationException.class, () -> service.approve(10L, false, "admin"));
+        verify(memberService, never()).createMember(any());
+    }
+
+    @Test
+    void rejectingPaidApplicationMarksPaymentRefunded() {
+        MembershipApplication a = application(MembershipApplication.METHOD_ONLINE, MembershipApplication.PAYMENT_PAID);
+        when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ApplicationView view = service.reject(10L, "Duplicate application", "admin");
+
+        assertEquals(MembershipApplication.APPROVAL_REJECTED, view.approvalStatus());
+        assertEquals(MembershipApplication.PAYMENT_REFUNDED, a.getPaymentStatus());
+        assertEquals("Duplicate application", a.getRejectionReason());
+        verify(memberService, never()).createMember(any());
+    }
+
+    @Test
+    void timestampsAreSentAsUtc() throws Exception {
+        MembershipApplication a = application(MembershipApplication.METHOD_ONLINE, MembershipApplication.PAYMENT_PAID);
+        a.setPaidAt(LocalDateTime.of(2026, 11, 10, 9, 58, 0));
+        when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ApplicationView view = service.reject(10L, "test", "admin");
+        String json = new com.fasterxml.jackson.databind.ObjectMapper()
+                .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+                .writeValueAsString(view);
+
+        // A bare local time is read by browsers as their own time zone (showed "5h ago" in India).
+        assertTrue(json.contains("2026-11-10T09:58:00Z"), json);
+    }
+
+    @Test
+    void rejectNeedsReason() {
+        assertThrows(IllegalArgumentException.class, () -> service.reject(10L, "  ", "admin"));
+    }
+
+    @Test
+    void decidedApplicationCannotBeApprovedAgain() {
+        MembershipApplication a = application(MembershipApplication.METHOD_ONLINE, MembershipApplication.PAYMENT_PAID);
+        a.setApprovalStatus(MembershipApplication.APPROVAL_APPROVED);
+
+        assertThrows(BusinessRuleViolationException.class, () -> service.approve(10L, false, "admin"));
+        verify(memberService, never()).createMember(any());
+    }
+
+    @Test
+    void otherBranchApplicationIsRefusedWhileABranchIsActive() {
+        MembershipApplication a = new MembershipApplication();
+        a.setBranchId(2L);
+        when(applicationRepository.findById(10L)).thenReturn(Optional.of(a));
+
+        assertThrows(BusinessRuleViolationException.class, () -> service.approve(10L, false, "admin"));
+        assertEquals(1L, BranchContextHolder.getActiveBranchId());
+    }
+
+    @Test
+    void allBranchesModeChecksAccessAndRestoresContext() {
+        BranchContextHolder.clear();
+        application(MembershipApplication.METHOD_ONLINE, MembershipApplication.PAYMENT_PAID);
+        activePlanAndMember();
+
+        service.approve(10L, false, "admin");
+
+        verify(branchService).resolveBranchForCreate(1L);
+        assertNull(BranchContextHolder.getActiveBranchId());
+    }
+}

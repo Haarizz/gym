@@ -49,6 +49,12 @@ public class ReceiptService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.company.project.services.payments.StripePaymentService stripePaymentService;
 
+    /** Statement line type of a written-off due: lowers the balance, not counted as paid. */
+    public static final String STATEMENT_WRITE_OFF = "Write-off";
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.company.project.repositories.MemberDueWriteOffRepository writeOffRepository;
+
     public ReceiptService(ReceiptRepository receiptRepository,
                           MemberRepository memberRepository,
                           FinancialEventService financialEventService,
@@ -401,6 +407,35 @@ public class ReceiptService {
             }
         }
 
+        // A written-off bill: what was still owed is cleared by its own row, so the balance
+        // comes down without it counting as money paid (Billing › Pending Payments).
+        Map<Long, com.company.project.entities.MemberDueWriteOff> writeOffs = new java.util.HashMap<>();
+        if (writeOffRepository != null) {
+            List<Long> writtenOffIds = bills.stream()
+                    .filter(b -> b.getWrittenOffAmount() != null && b.getWrittenOffAmount().signum() > 0)
+                    .map(Receipt::getId).collect(Collectors.toList());
+            if (!writtenOffIds.isEmpty()) {
+                for (var w : writeOffRepository.findByReceiptIdIn(writtenOffIds)) writeOffs.put(w.getReceiptId(), w);
+            }
+        }
+        for (Receipt b : bills) {
+            if (b.getWrittenOffAmount() == null || b.getWrittenOffAmount().signum() <= 0) continue;
+            var w = writeOffs.get(b.getId());
+            LocalDateTime when = w != null ? w.getWrittenOffAt()
+                    : (b.getUpdatedAt() != null ? b.getUpdatedAt() : b.getTransactionDate());
+            com.company.project.dto.StatementLineDTO row = new com.company.project.dto.StatementLineDTO();
+            row.setId(b.getId());
+            row.setDate(when != null ? when.format(stampFmt) : null);
+            row.setReceiptNo(b.getReceiptNo());
+            row.setInvoiceNo(b.getInvoiceNo());
+            row.setType(STATEMENT_WRITE_OFF);
+            row.setDescription("Due written off" + (w != null ? " — " + PendingPaymentService.reasonLabel(w.getReason()) : ""));
+            row.setDebit(BigDecimal.ZERO);
+            row.setCredit(b.getWrittenOffAmount());
+            row.setStatus(b.getStatus());
+            allRows.add(row);
+        }
+
         allRows.addAll(salesRows);
 
         // Stable sort by date — ties (a bill's Invoice + initial-Payment row share the
@@ -428,7 +463,7 @@ public class ReceiptService {
 
             running = running.add(row.getDebit()).subtract(row.getCredit());
             totalBilled = totalBilled.add(row.getDebit());
-            totalPaid = totalPaid.add(row.getCredit());
+            if (!STATEMENT_WRITE_OFF.equals(row.getType())) totalPaid = totalPaid.add(row.getCredit());
             row.setBalance(running);
             lines.add(row);
         }

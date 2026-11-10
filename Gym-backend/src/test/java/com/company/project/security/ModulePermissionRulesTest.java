@@ -42,6 +42,21 @@ class ModulePermissionRulesTest {
     }
 
     @Test
+    void membershipApplicationsAndShareLinkAreGated() {
+        // Applicants' personal details: reading the queue needs Members access.
+        assertFalse(allowed("GET", "/api/members/applications", "DASHBOARD_VIEW"));
+        assertTrue(allowed("GET", "/api/members/applications", "MEMBERS_VIEW"));
+        assertTrue(allowed("POST", "/api/members/applications/4/approve", "MEMBERS_APPROVE"));
+        assertFalse(allowed("POST", "/api/members/applications/4/approve", "MEMBERS_EDIT"));
+        assertTrue(allowed("POST", "/api/members/applications/4/reject", "MEMBERS_APPROVE"));
+        // Resetting the public link is a plans change.
+        assertTrue(allowed("POST", "/api/plans/catalog-share-link/reset", "MEMBERSHIP_PLANS_EDIT"));
+        assertFalse(allowed("POST", "/api/plans/catalog-share-link/reset", "MEMBERS_EDIT"));
+        // The public page itself needs no login.
+        assertTrue(allowed("POST", "/api/public/join/gym/1/abcdEFGH2345/apply"));
+    }
+
+    @Test
     void lookupsStayReadableButSensitiveReadsAreGated() {
         assertTrue(allowed("GET", "/api/members", "DASHBOARD_VIEW"));
         assertTrue(allowed("GET", "/api/account-heads", "DASHBOARD_VIEW"));

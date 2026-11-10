@@ -19,6 +19,26 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Long>, JpaSpec
 
     Page<Receipt> findAll(Specification<Receipt> spec, Pageable pageable);
 
+    /**
+     * Open member bills (Billing › Pending Payments), matching {@code pattern} (lower-case
+     * LIKE, "%" for all) on the member's name / ID / phone / email, the receipt or invoice
+     * number, or the plan. Bills fully covered already are dropped by the caller.
+     */
+    @Query("SELECT r FROM Receipt r LEFT JOIN Member m ON m.id = r.memberDbId "
+            + "WHERE r.status IN ('Pending', 'Overdue', 'Partial') "
+            + "AND (r.transactionType IS NULL OR r.transactionType <> 'Payment') "
+            + "AND (r.approvalStatus IS NULL OR r.approvalStatus <> 'REJECTED') "
+            + "AND (LOWER(COALESCE(r.memberName, '')) LIKE :pattern OR LOWER(COALESCE(r.memberId, '')) LIKE :pattern "
+            + "  OR LOWER(COALESCE(r.memberPhone, '')) LIKE :pattern OR LOWER(COALESCE(m.phone, '')) LIKE :pattern "
+            + "  OR LOWER(COALESCE(m.email, '')) LIKE :pattern OR LOWER(COALESCE(r.receiptNo, '')) LIKE :pattern "
+            + "  OR LOWER(COALESCE(r.invoiceNo, '')) LIKE :pattern OR LOWER(COALESCE(r.planName, '')) LIKE :pattern)")
+    List<Receipt> findOpenBills(@Param("pattern") String pattern);
+
+    /** The bill row locked until the transaction ends, so two write-offs of it can't interleave. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM Receipt r WHERE r.id = :id")
+    java.util.Optional<Receipt> findByIdForUpdate(@Param("id") Long id);
+
     // Cash-basis monthly collection: sums each transaction's own paidAmount (what was
     // actually received in that specific receipt row), not the bill's full invoice
     // amount and not gated to status='Paid' — a Partial bill's initial payment is real

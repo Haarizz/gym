@@ -91,6 +91,8 @@ import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
 import { buildPaymentPayload } from '../payments/paymentPayload';
 import { PAYMENT_TYPES } from '../payments/paymentModel';
 import { RewardDiscountPicker, selectionDiscount, selectionRequestFields, type RewardDiscountSelection } from '../components/shared/RewardDiscountPicker';
+import { ReferralCodeField, referralDiscount, type AppliedReferral } from '../components/shared/ReferralCodeField';
+import { referralService } from '../utils/supabase/referral-service';
 import { FamilyRenewalPanel, type FamilyPanelState } from '../components/members/FamilyRenewalPanel';
 import { resolveBackendImageUrl } from '../utils/resolve-image-url';
 import type { CreditCustomer } from '../payments/modals/CreditModal';
@@ -387,6 +389,9 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   // Reward Pass or referral coupon applied to the renewal (replaces the old free-text
   // coupon field, which was never sent anywhere).
   const [renewalReward, setRenewalReward] = useState<RewardDiscountSelection>(null);
+  // Referral code applied to the renewal (as on Add Member). Its discount goes out with the
+  // staff discount, and the referral is marked successful once the renewal goes through.
+  const [renewalReferral, setRenewalReferral] = useState<AppliedReferral | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [planComparisonOpen, setPlanComparisonOpen] = useState(false);
 
@@ -1121,19 +1126,22 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     && (/^(couple|family)$/i.test(selectedNewPlan.planType || '') || !!selectedMemberForRenewal.is_family_head);
   useEffect(() => { setFamilyPanel(null); }, [selectedMemberForRenewal?.id, selectedNewPlan?.id]);
 
-  // Plan price minus the manual discount — what's sent as membership_fee; the backend
-  // takes any Reward Pass / coupon discount off this itself.
+  // Referral discount — on the plan price after the manual discount, like Add Member.
+  const calculateReferralDiscount = () => selectedNewPlan
+    ? referralDiscount(renewalReferral, Math.max(0, selectedNewPlan.price - (parseFloat(discountAmount) || 0)))
+    : 0;
+
+  // Manual + referral discount: both are taken off before the fee is sent (offer_discount /
+  // discount_amount), unlike a Reward Pass / coupon, which the backend applies itself.
+  const calculateFlatDiscount = () =>
+    Math.round(((parseFloat(discountAmount) || 0) + calculateReferralDiscount()) * 100) / 100;
+
+  // Plan price minus the manual + referral discount — what's sent as membership_fee; the
+  // backend takes any Reward Pass / coupon discount off this itself.
   const calculateFeeBeforeReward = () => {
     if (isFamilyFlow) return familyPanel?.quote ? Number(familyPanel.quote.subtotal) : 0;
     if (!selectedNewPlan) return 0;
-
-    let total = selectedNewPlan.price;
-
-    if (discountAmount) {
-      total -= parseFloat(discountAmount);
-    }
-
-    return Math.round(Math.max(0, total) * 100) / 100;
+    return Math.round(Math.max(0, selectedNewPlan.price - calculateFlatDiscount()) * 100) / 100;
   };
 
   // Family flow: the server's quote already prices the reward on the head's own fee.
@@ -1146,7 +1154,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     Math.round(Math.max(0, calculateFeeBeforeReward() - calculateRewardDiscount()) * 100) / 100;
 
   // A Reward Pass belongs to one member — drop the selection when the member changes.
-  useEffect(() => { setRenewalReward(null); }, [selectedMemberForRenewal?.id]);
+  useEffect(() => { setRenewalReward(null); setRenewalReferral(null); }, [selectedMemberForRenewal?.id]);
 
   const renewalPaymentManager = usePaymentManager({ invoiceTotal: calculateTotalAmount() });
 
@@ -1257,7 +1265,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         await membersService.applyFamilyPlanChange(String(memberId), {
           plan_name: selectedNewPlan.name,
           ...familyPanel.composition,
-          discount_amount: discountAmount && parseFloat(discountAmount) > 0 ? parseFloat(discountAmount) : undefined,
+          discount_amount: calculateFlatDiscount() > 0 ? calculateFlatDiscount() : undefined,
           ...selectionRequestFields(renewalReward),
           amount_received: amountReceived,
           payment_method: effectivePaymentMethod,
@@ -1287,8 +1295,14 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           membership_end_date: newEndDate,
           membership_fee: calculateFeeBeforeReward(),
           ...selectionRequestFields(renewalReward),
-          ...(parseFloat(discountAmount) > 0
-            ? { offer_discount: parseFloat(discountAmount), offer_label: 'Staff discount' }
+          ...(calculateFlatDiscount() > 0
+            ? {
+                offer_discount: calculateFlatDiscount(),
+                offer_label: [
+                  parseFloat(discountAmount) > 0 ? 'Staff discount' : null,
+                  calculateReferralDiscount() > 0 && renewalReferral ? `Referral ${renewalReferral.referral.referralCode}` : null,
+                ].filter(Boolean).join(' + '),
+              }
             : {}),
           payment_status: amountReceived >= totalAmount ? 'paid' : (amountReceived > 0 ? 'partial' : 'pending'),
           membership_type: selectedNewPlan.planType,
@@ -1300,6 +1314,19 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           bank_account_name: bankAccountName,
           processed_by_staff_id: renewalProcessedByStaffId ? Number(renewalProcessedByStaffId) : undefined,
         });
+      }
+      // Credit the referrer (reward engine), as Add Member does. Not gated on a discount —
+      // the referrer's reward only needs a valid code used on a paid membership.
+      if (renewalReferral && !isBilledToGuardian(selectedMemberForRenewal)) {
+        try {
+          await referralService.markSuccessful(renewalReferral.referral.id, {
+            purchaseAmount: totalAmount,
+            membershipPlanId: selectedNewPlan.id ? Number(selectedNewPlan.id) : undefined,
+            refereeMemberId: selectedMemberForRenewal.member_id || undefined,
+          });
+        } catch (e) {
+          console.error('Failed to mark referral as successful:', e);
+        }
       }
       // Refresh member list
       loadMembers();
@@ -1323,6 +1350,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       renewalPaymentManager.clearLines();
       setDiscountAmount("");
       setRenewalReward(null);
+      setRenewalReferral(null);
     }, 3000);
   };
 
@@ -2673,7 +2701,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
               head={selectedMemberForRenewal}
               planName={selectedNewPlan.name}
               planType={selectedNewPlan.planType}
-              discountAmount={discountAmount ? parseFloat(discountAmount) || 0 : 0}
+              discountAmount={calculateFlatDiscount()}
               reward={selectionRequestFields(renewalReward)}
               onStateChange={setFamilyPanel}
             />
@@ -2701,17 +2729,23 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     <span className="text-2xl font-bold text-primary">
                       <CurrencyGlyph /> {isFamilyFlow
                         ? (familyPanel?.quote
-                          ? (Number(familyPanel.quote.subtotal) + (discountAmount ? parseFloat(discountAmount) || 0 : 0)).toFixed(2)
+                          ? (Number(familyPanel.quote.subtotal) + calculateFlatDiscount()).toFixed(2)
                           : '—')
                         : selectedNewPlan.price}
                     </span>
                   </div>
-                  {((discountAmount && parseFloat(discountAmount) > 0) || calculateRewardDiscount() > 0) && (
+                  {((discountAmount && parseFloat(discountAmount) > 0) || calculateReferralDiscount() > 0 || calculateRewardDiscount() > 0) && (
                     <>
                       {discountAmount && parseFloat(discountAmount) > 0 && (
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-muted-foreground">Discount:</span>
                           <span className="text-lg font-semibold text-green-600">- <CurrencyGlyph /> {discountAmount}</span>
+                        </div>
+                      )}
+                      {calculateReferralDiscount() > 0 && (
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-muted-foreground">Referral:</span>
+                          <span className="text-lg font-semibold text-green-600">- <CurrencyGlyph /> {calculateReferralDiscount().toFixed(2)}</span>
                         </div>
                       )}
                       {calculateRewardDiscount() > 0 && (
@@ -2742,12 +2776,23 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     />
                   </div>
                   {selectedMemberForRenewal && !isBilledToGuardian(selectedMemberForRenewal) && (
-                    <RewardDiscountPicker
-                      memberId={selectedMemberForRenewal.id}
-                      value={renewalReward}
-                      onChange={setRenewalReward}
-                      currency={currencyPrefix}
-                    />
+                    <div className="space-y-4">
+                      <RewardDiscountPicker
+                        memberId={selectedMemberForRenewal.id}
+                        value={renewalReward}
+                        onChange={setRenewalReward}
+                        currency={currencyPrefix}
+                        disabled={!!renewalReferral}
+                        disabledHint="A referral code is applied — only one code can be used."
+                      />
+                      <ReferralCodeField
+                        value={renewalReferral}
+                        onChange={setRenewalReferral}
+                        currency={currencyPrefix}
+                        disabled={!!renewalReward}
+                        disabledHint="A promo code or Reward Pass is applied — only one code can be used."
+                      />
+                    </div>
                   )}
                 </div>
 

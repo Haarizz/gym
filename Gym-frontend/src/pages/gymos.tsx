@@ -779,7 +779,7 @@ function GymOSWorkspace({ onNavigate, showSettings, showBranches }: GymOSProps &
       {/* NEW: Configuration Cards Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Plans & Services Catalog Configuration Card */}
+        {/* Service Portfolios Configuration Card */}
         <Card className="bg-white border-0 shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -788,7 +788,7 @@ function GymOSWorkspace({ onNavigate, showSettings, showBranches }: GymOSProps &
                   <BookOpen className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
-                  <CardTitle>Plans & Services Catalog Configuration</CardTitle>
+                  <CardTitle>Service Portfolios Configuration</CardTitle>
                   <CardDescription>
                     Control what information is shown in the walk-in inquiry view
                   </CardDescription>
@@ -800,9 +800,9 @@ function GymOSWorkspace({ onNavigate, showSettings, showBranches }: GymOSProps &
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[600px]">
                   <DialogHeader>
-                    <DialogTitle>Plans & Services Catalog Configuration</DialogTitle>
+                    <DialogTitle>Service Portfolios Configuration</DialogTitle>
                     <DialogDescription>
-                      Select which sections will be displayed in the Plans & Services Catalog for walk-in inquiries.
+                      Select which sections will be displayed in Service Portfolios and on its public share link.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">

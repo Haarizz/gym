@@ -106,6 +106,8 @@ public final class ModulePermissionRules {
         skip("/api/pos/favorites/**");
 
         // Members & billing
+        // Online membership applications hold applicants' personal details — reads gated too.
+        gated("/api/members/applications/**", List.of("MEMBERS"), "MEMBERS");
         writes("/api/members/**", "MEMBERS");
         writes("/api/member-addons/**", "MEMBERS", "BILLING", "MEMBERSHIP_PLANS");
         writes("/api/addon-plans/**", "MEMBERSHIP_PLANS");

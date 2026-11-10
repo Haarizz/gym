@@ -27,6 +27,7 @@ import { Notifications } from "./pages/notifications";
 import { Members } from "./pages/members";
 import { MemberConnect } from "./pages/member-connect";
 import { Billing } from "./pages/billing";
+import { PendingPayments } from "./pages/pending-payments";
 import { TrainingStreams } from "./pages/training-streams";
 import { Attendance } from "./pages/attendance";
 import { CheckIn } from "./pages/check-in";
@@ -58,7 +59,7 @@ import { FollowUps } from "./pages/follow-ups";
 import { Messaging } from "./pages/messaging";
 import { Automations } from "./pages/automations";
 import { PostWorkoutCheckin } from "./pages/post-workout-checkin";
-import { PlansServicesCatalog } from "./pages/plans-services-catalog";
+import { ServicePortfolios } from "./pages/service-portfolios";
 import { CatalogResolver } from "./pages/catalog/resolver";
 import { StaffsTrainers } from "./pages/staffs-trainers";
 import { ManageAssets } from "./pages/manage-assets";
@@ -138,6 +139,7 @@ import { usePermissions, hasPermission } from "./utils/permissions";
 import { membersService } from "./utils/supabase/members-service";
 import { bookingService } from "./utils/supabase/booking-service";
 import { addonsService } from "./utils/supabase/addons-service";
+import { servicePortfolioService } from "./utils/supabase/service-portfolio-service";
 
 import ErrorBoundary from "./components/shared/error-boundary";
 import { ResponsiveEnhancer } from "./components/shared/ResponsiveEnhancer";
@@ -210,6 +212,7 @@ import {
   Star,
   Inbox,
   ShieldAlert,
+  Hourglass,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
@@ -287,6 +290,13 @@ const menuItems = [
         permission: "BILLING_VIEW",
       },
       {
+        title: "Pending Payments",
+        icon: Hourglass,
+        id: "pending-payments",
+        path: "/pending-payments",
+        permission: "BILLING_VIEW",
+      },
+      {
         title: "Manage Plans",
         icon: Settings,
         id: "manage-plans",
@@ -294,10 +304,10 @@ const menuItems = [
         permission: "MEMBERSHIP_PLANS_VIEW",
       },
       {
-        title: "Plans & Services Catalog",
+        title: "Service Portfolios",
         icon: BookOpen,
-        id: "plans-services-catalog",
-        path: "/plans-services-catalog",
+        id: "service-portfolios",
+        path: "/service-portfolios",
         permission: "MEMBERSHIP_PLANS_VIEW",
       },
       {
@@ -1006,13 +1016,14 @@ export default function App() {
     let cancelled = false;
     const check = async () => {
       try {
-        const [res, bookings, addons] = await Promise.all([
+        const [res, bookings, addons, applications] = await Promise.all([
           membersService.getPendingApprovals({ page: 1, limit: 1 }),
           bookingService.getPendingPaymentApprovals(),
           addonsService.getPendingPaymentApprovals(),
+          servicePortfolioService.countPending().catch(() => 0),
         ]);
         const pendingMembers = res.pagination?.total ?? res.members?.length ?? 0;
-        if (!cancelled) setHasPendingApprovals(pendingMembers + bookings.length + addons.length > 0);
+        if (!cancelled) setHasPendingApprovals(pendingMembers + bookings.length + addons.length + applications > 0);
       } catch {
         // Leave the last known state; a transient failure shouldn't flicker the dot.
       }
@@ -1331,6 +1342,8 @@ export default function App() {
       <Route path="/members/edit/:memberId" element={<AddMember onNavigate={handleNavClick} />} />
       <Route path="/add-member" element={<AddMemberRedirect />} />
       <Route path="/billing" element={<Billing onNavigate={handleNavClick} />} />
+      <Route path="/pending-payments" element={<PendingPayments />} />
+      <Route path="/write-off-history" element={<Navigate to="/pending-payments?tab=history" replace />} />
       <Route path="/create-receipt" element={<CreateReceipt onNavigate={handleNavClick} />} />
       <Route path="/manage-plans" element={<ManagePlans />} />
       <Route path="/attendance" element={<Attendance onNavigate={handleNavClick} />} />
@@ -1354,7 +1367,8 @@ export default function App() {
       <Route path="/messaging" element={<Messaging />} />
       <Route path="/automations" element={<Automations />} />
       <Route path="/post-workout-checkin" element={<PostWorkoutCheckin />} />
-      <Route path="/plans-services-catalog" element={<PlansServicesCatalog />} />
+      <Route path="/service-portfolios" element={<ServicePortfolios />} />
+      <Route path="/plans-services-catalog" element={<Navigate to="/service-portfolios" replace />} />
       <Route path="/catalog/t/:tenantSlug/b/:branchId" element={<CatalogResolver />} />
       <Route path="/member-connect-reports" element={<MemberConnectReports />} />
       <Route path="/member-connect-analytics" element={<MemberConnectAnalytics />} />

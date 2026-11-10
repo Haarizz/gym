@@ -46,13 +46,16 @@ interface Props {
   value: RewardDiscountSelection;
   onChange: (sel: RewardDiscountSelection) => void;
   currency?: string;
+  /** Blocks picking a pass or code, e.g. while a referral code is applied. */
+  disabled?: boolean;
+  disabledHint?: string;
 }
 
 /**
  * Renewal-time picker for a MEMBERSHIP_DISCOUNT Reward Pass, or a promotion / shareable
  * referral coupon code (a promotion's target audience is checked for this member).
  */
-export function RewardDiscountPicker({ memberId, value, onChange, currency = '' }: Props) {
+export function RewardDiscountPicker({ memberId, value, onChange, currency = '', disabled, disabledHint }: Props) {
   const [passes, setPasses] = useState<ReferralReward[]>([]);
   const [code, setCode] = useState('');
   const [checking, setChecking] = useState(false);
@@ -89,6 +92,7 @@ export function RewardDiscountPicker({ memberId, value, onChange, currency = '' 
           <Label>Reward Pass</Label>
           <Select
             value={value?.kind === 'pass' ? String(value.pass.id) : 'none'}
+            disabled={disabled}
             onValueChange={(v) => {
               const pass = passes.find((p) => String(p.id) === v);
               onChange(pass ? { kind: 'pass', pass } : null);
@@ -118,16 +122,19 @@ export function RewardDiscountPicker({ memberId, value, onChange, currency = '' 
             <Input
               placeholder="Promotion or referral coupon code"
               value={code}
-              disabled={value?.kind === 'pass'}
+              disabled={value?.kind === 'pass' || disabled}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
             />
-            <Button variant="outline" onClick={applyCode} disabled={checking || !code.trim() || value?.kind === 'pass'}>
+            <Button variant="outline" onClick={applyCode} disabled={checking || !code.trim() || value?.kind === 'pass' || disabled}>
               {checking ? 'Checking…' : 'Apply'}
             </Button>
           </div>
         )}
         {value?.kind === 'pass' && (
           <p className="mt-1 text-xs text-muted-foreground">A Reward Pass is selected — only one discount can be used.</p>
+        )}
+        {disabled && !value && disabledHint && (
+          <p className="mt-1 text-xs text-muted-foreground">{disabledHint}</p>
         )}
         {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
       </div>

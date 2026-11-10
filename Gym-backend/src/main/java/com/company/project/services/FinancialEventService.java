@@ -150,7 +150,7 @@ public class FinancialEventService {
     /**
      * Splits a VAT-inclusive amount into [net, vat] using the standard rate —
      * prices across this app (memberships, add-ons) are quoted VAT-inclusive
-     * (see plans-services-catalog.tsx: "All prices ... inclusive of VAT"), so
+     * (see service-portfolios.tsx: "All prices ... inclusive of VAT"), so
      * the member never pays more; this only determines how much of what they
      * already paid must be remitted to the FTA vs. recognized as revenue. vat
      * is computed as the remainder (amount - net) rather than independently

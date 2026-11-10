@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Backs GymOS's Plans & Services Catalog Configuration card: which sections
+ * Backs GymOS's Service Portfolios Configuration card: which sections
  * show in the walk-in inquiry catalog, replacing gymos.tsx's local-only
  * catalogOptions mock.
  */

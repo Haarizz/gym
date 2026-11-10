@@ -78,6 +78,11 @@ public class Branch extends BaseEntity {
     @Column(name = "walk_in_self_registration", columnDefinition = "boolean not null default false")
     private boolean walkInSelfRegistration = false;
 
+    // Random token in the public Service Portfolios share link (/join/{tenant}/{branch}/{token}).
+    // Resetting it revokes every link shared before.
+    @Column(name = "catalog_share_token", length = 40)
+    private String catalogShareToken;
+
     // What a membership freeze does to a member's add-ons and to their facility access:
     // pause with it (end dates move out by the frozen days on unfreeze) or keep running.
     @Column(name = "freeze_pauses_addons", columnDefinition = "boolean not null default true")
@@ -157,6 +162,9 @@ public class Branch extends BaseEntity {
 
     public boolean isWalkInSelfRegistration() { return walkInSelfRegistration; }
     public void setWalkInSelfRegistration(boolean walkInSelfRegistration) { this.walkInSelfRegistration = walkInSelfRegistration; }
+
+    public String getCatalogShareToken() { return catalogShareToken; }
+    public void setCatalogShareToken(String catalogShareToken) { this.catalogShareToken = catalogShareToken; }
 
     public boolean isBnplEnabled() { return bnplEnabled; }
     public void setBnplEnabled(boolean bnplEnabled) { this.bnplEnabled = bnplEnabled; }

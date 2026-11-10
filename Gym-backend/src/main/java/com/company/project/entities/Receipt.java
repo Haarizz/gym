@@ -138,6 +138,11 @@ public class Receipt extends BaseEntity implements BranchAware {
     @Column(name = "total_paid_to_date", precision = 10, scale = 2)
     private BigDecimal totalPaidToDate;
 
+    // What was still owed when staff wrote the bill off (status "Written Off"). Not money
+    // received: totalPaidToDate stays as it was. History lives in member_due_write_offs.
+    @Column(name = "written_off_amount", precision = 10, scale = 2)
+    private BigDecimal writtenOffAmount;
+
     // Snapshot of the member's overall outstanding balance immediately after this
     // transaction posted — captured once at creation and never touched again, so
     // every receipt/payment row carries its own immutable "remaining due after
@@ -258,6 +263,9 @@ public class Receipt extends BaseEntity implements BranchAware {
     public void setMinorCharges(List<MinorChargeDTO> minorCharges) { this.minorCharges = minorCharges; }
     public List<com.company.project.dto.ReceiptAddonItemDTO> getAddonItems() { return addonItems; }
     public void setAddonItems(List<com.company.project.dto.ReceiptAddonItemDTO> addonItems) { this.addonItems = addonItems; }
+
+    public BigDecimal getWrittenOffAmount() { return writtenOffAmount; }
+    public void setWrittenOffAmount(BigDecimal writtenOffAmount) { this.writtenOffAmount = writtenOffAmount; }
 
     public BigDecimal getTotalPaidToDate() { return totalPaidToDate; }
     public void setTotalPaidToDate(BigDecimal totalPaidToDate) { this.totalPaidToDate = totalPaidToDate; }

@@ -8,8 +8,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
- * Which sections show in the walk-in inquiry Plans & Services Catalog
- * (GymOS's Plans & Services Catalog Configuration card), replacing
+ * Which sections show in the walk-in inquiry Service Portfolios page
+ * (GymOS's Service Portfolios Configuration card), replacing
  * gymos.tsx's local-only catalogOptions mock. Gym-wide.
  */
 @Entity

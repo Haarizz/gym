@@ -21,6 +21,7 @@ import { trainingStreamsService, TrainingStreamApi } from "../utils/supabase/tra
 import { catalogDisplaySectionService } from "../utils/supabase/catalog-display-section-service";
 import { facilitiesService } from "../utils/supabase/facilities-service";
 import { leadService } from "../utils/supabase/lead-service";
+import { servicePortfolioService, apiErrorMessage, type ShareLink } from "../utils/supabase/service-portfolio-service";
 import { useBranch } from "../utils/branch-context";
 import {
   Search,
@@ -57,7 +58,10 @@ import {
   AlertCircle,
   Video,
   Radio,
-  ExternalLink
+  ExternalLink,
+  Link2,
+  Copy,
+  Share2,
 } from 'lucide-react';
 
 // Defaults used only until the real GymOS-configured sections load (and as a
@@ -83,11 +87,15 @@ const DEFAULT_CATALOG_CONFIG = {
 // Scheduled classes are loaded live from trainingService.getSessions({ type: 'class' })
 // (see fetchSessions below) — the hardcoded array that used to live here has been removed.
 
-export function PlansServicesCatalog() {
+export function ServicePortfolios() {
     const [isFullscreen, setIsFullscreen] = useState(false);
   const [showInquiryForm, setShowInquiryForm] = useState(false);
   const [showOnboardForm, setShowOnboardForm] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
+  const [showShareLink, setShowShareLink] = useState(false);
+  const [shareLink, setShareLink] = useState<ShareLink | null>(null);
+  const [shareLinkLoading, setShareLinkLoading] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [showPlanDetails, setShowPlanDetails] = useState(false);
   const [showChoosePlan, setShowChoosePlan] = useState(false);
@@ -317,6 +325,57 @@ export function PlansServicesCatalog() {
     setShowQRCode(true);
   };
 
+  // Public join link (/join/{tenant}/{branch}/{token}) — anyone with it can browse the
+  // plans and apply; applications wait in Approvals → Applications.
+  const shareUrl = shareLink ? `${window.location.origin}${shareLink.path}` : '';
+
+  const openShareLink = async () => {
+    setShowShareLink(true);
+    setConfirmReset(false);
+    if (shareLink) return;
+    setShareLinkLoading(true);
+    try {
+      setShareLink(await servicePortfolioService.getShareLink());
+    } catch (error) {
+      toast.error(apiErrorMessage(error, "Couldn't create the share link. Please try again."));
+      setShowShareLink(false);
+    } finally {
+      setShareLinkLoading(false);
+    }
+  };
+
+  const copyShareLink = async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success('Link copied — paste it into a message to share it.');
+    } catch {
+      toast.error("Couldn't copy automatically — select the link and copy it.");
+    }
+  };
+
+  const nativeShare = async () => {
+    if (!shareUrl || !navigator.share) return;
+    try {
+      await navigator.share({ title: 'Join us', text: 'See our membership plans and join online:', url: shareUrl });
+    } catch {
+      // Dismissed by the user — nothing to do.
+    }
+  };
+
+  const resetShareLink = async () => {
+    setShareLinkLoading(true);
+    try {
+      setShareLink(await servicePortfolioService.resetShareLink());
+      setConfirmReset(false);
+      toast.success('New link created. The old link no longer works.');
+    } catch (error) {
+      toast.error(apiErrorMessage(error, "Couldn't reset the link. Please try again."));
+    } finally {
+      setShareLinkLoading(false);
+    }
+  };
+
 
 
   // Deterministic color assignment for plan cards (purely visual — plans
@@ -378,7 +437,7 @@ export function PlansServicesCatalog() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`${isFullscreen ? 'text-4xl' : 'text-3xl'} font-bold text-gray-900`}>
-            Plans & Services Catalog
+            Service Portfolios
           </h1>
           <p className={`text-gray-600 mt-1 ${isFullscreen ? 'text-lg' : ''}`}>
             Discover our comprehensive fitness plans, training programs, and group classes
@@ -411,8 +470,16 @@ export function PlansServicesCatalog() {
             <QrCode className="h-4 w-4 mr-2" />
             QR Code
           </Button>
-          
-          
+
+          <Button
+            variant="outline"
+            size={isFullscreen ? "default" : "sm"}
+            onClick={openShareLink}
+          >
+            <Link2 className="h-4 w-4 mr-2" />
+            Share Link
+          </Button>
+
           <Button
             variant="outline"
             size={isFullscreen ? "default" : "sm"}
@@ -579,7 +646,7 @@ export function PlansServicesCatalog() {
         {!catalogConfig.membershipPlans && !catalogConfig.trainingStreams && !catalogConfig.classes && (
           <div className="flex flex-col items-center justify-center py-16 text-center text-gray-500">
             <AlertCircle className="h-8 w-8 mb-3" />
-            <p>No catalog sections are enabled. Enable sections in GymOS &rarr; Plans &amp; Services Catalog Configuration.</p>
+            <p>No catalog sections are enabled. Enable sections in GymOS &rarr; Service Portfolios Configuration.</p>
           </div>
         )}
 
@@ -1201,6 +1268,69 @@ export function PlansServicesCatalog() {
             </div>
             <p className="text-xs text-gray-500 break-all text-center">{catalogUrl}</p>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share Link Dialog */}
+      <Dialog open={showShareLink} onOpenChange={setShowShareLink}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Share Service Portfolios</DialogTitle>
+            <DialogDescription>
+              Send this link to people interested in joining. They can browse your plans, classes and
+              facilities without logging in, and apply for a membership. Applications wait in
+              Approvals &rarr; Applications until you approve them.
+            </DialogDescription>
+          </DialogHeader>
+          {shareLinkLoading && !shareLink ? (
+            <div className="flex items-center justify-center py-8 text-gray-500">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Creating link…
+            </div>
+          ) : shareLink ? (
+            <div className="space-y-4 py-2">
+              {shareLink.branch_name && (
+                <p className="text-sm text-gray-600">Branch: <span className="font-medium text-gray-900">{shareLink.branch_name}</span></p>
+              )}
+              <div className="flex gap-2">
+                <Input readOnly value={shareUrl} onFocus={(e) => e.currentTarget.select()} aria-label="Share link" className="font-mono text-xs" />
+                <Button onClick={copyShareLink} className="bg-[#2B7A78] hover:bg-[#236360] text-white shrink-0">
+                  <Copy className="h-4 w-4 mr-2" /> Copy
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => window.open(shareUrl, '_blank', 'noopener,noreferrer')}>
+                  <ExternalLink className="h-4 w-4 mr-2" /> Open link
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`See our membership plans and join online: ${shareUrl}`)}`, '_blank', 'noopener,noreferrer')}
+                >
+                  <Share2 className="h-4 w-4 mr-2" /> WhatsApp
+                </Button>
+                {typeof navigator !== 'undefined' && 'share' in navigator && (
+                  <Button variant="outline" size="sm" onClick={nativeShare}>
+                    <Share2 className="h-4 w-4 mr-2" /> More…
+                  </Button>
+                )}
+              </div>
+              <div className="border-t pt-3">
+                {confirmReset ? (
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-gray-700">Links you've already shared will stop working.</span>
+                    <Button variant="outline" size="sm" onClick={() => setConfirmReset(false)} disabled={shareLinkLoading}>Cancel</Button>
+                    <Button size="sm" variant="destructive" onClick={resetShareLink} disabled={shareLinkLoading}>
+                      {shareLinkLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Reset link'}
+                    </Button>
+                  </div>
+                ) : (
+                  <button type="button" className="text-sm text-gray-500 hover:text-gray-800 underline" onClick={() => setConfirmReset(true)}>
+                    Reset link (stop old links working)
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
 

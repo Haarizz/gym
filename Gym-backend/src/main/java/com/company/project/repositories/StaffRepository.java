@@ -45,6 +45,9 @@ public interface StaffRepository extends JpaRepository<Staff, Long>, JpaSpecific
     @Query(value = "SELECT name FROM employees WHERE id = :id", nativeQuery = true)
     List<String> findNameById(@Param("id") Long id);
 
+    @Query(value = "SELECT name FROM employees WHERE user_id = :userId", nativeQuery = true)
+    List<String> findNameByUserId(@Param("userId") Long userId);
+
     @Query(value = "SELECT COUNT(*) FROM employees WHERE walk_in_code = :code", nativeQuery = true)
     long countByWalkInCode(@Param("code") String code);
 

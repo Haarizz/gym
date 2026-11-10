@@ -1414,7 +1414,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline"
-                                className={`text-xs ${line.type.startsWith('Sales') ? 'border-purple-300 text-purple-700 bg-purple-50' : ''}`}>
+                                className={`text-xs ${line.type.startsWith('Sales') ? 'border-purple-300 text-purple-700 bg-purple-50'
+                                  : line.type === 'Write-off' ? 'border-amber-200 text-amber-800 bg-amber-50' : ''}`}>
                                 {line.type}
                               </Badge>
                             </TableCell>
@@ -1434,7 +1435,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                             <TableCell className="text-right font-medium">
                               {line.debit > 0 ? <><CurrencyGlyph /> {line.debit.toLocaleString()}</> : '-'}
                             </TableCell>
-                            <TableCell className="text-right font-medium text-green-600">
+                            <TableCell className={`text-right font-medium ${line.type === 'Write-off' ? 'text-slate-500' : 'text-green-600'}`}>
                               {line.credit > 0 ? <><CurrencyGlyph /> {line.credit.toLocaleString()}</> : '-'}
                             </TableCell>
                             <TableCell className={`text-right font-bold ${line.balance > 0 ? 'text-red-600' : ''}`}>

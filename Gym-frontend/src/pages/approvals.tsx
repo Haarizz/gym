@@ -7,10 +7,12 @@
 // too (BookingPaymentService) — the seat is held until reception decides — and so do
 // add-ons bought in the app (AddonPaymentService), which stay inactive until then.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { membersService, type Member } from '../utils/supabase/members-service';
 import { bookingService, type BookingApi } from '../utils/supabase/booking-service';
 import { addonsService, type MemberAddon } from '../utils/supabase/addons-service';
+import { servicePortfolioService, type MembershipApplication } from '../utils/supabase/service-portfolio-service';
+import { ApplicationsPanel } from '../components/approvals/ApplicationsPanel';
 import { useCurrency } from '../utils/currency';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
@@ -30,6 +32,7 @@ import {
   ChevronRight,
   Clock,
   CreditCard,
+  FileText,
   History,
   Hourglass,
   PackagePlus,
@@ -47,7 +50,7 @@ const PAGE_SIZE = 20;
 const LATE_HOURS = 24;
 
 type ActionType = 'approve' | 'reject';
-type Tab = 'members' | 'bookings' | 'addons';
+type Tab = 'members' | 'bookings' | 'addons' | 'applications';
 
 type ActionTarget =
   | { kind: 'member'; type: ActionType; member: Member }
@@ -109,8 +112,14 @@ export function Approvals() {
   const [addonApprovals, setAddonApprovals] = useState<MemberAddon[]>([]);
   const [loadingAddons, setLoadingAddons] = useState(false);
 
-  const [tab, setTab] = useState<Tab>('members');
-  const tabChosen = useRef(false);
+  const [applications, setApplications] = useState<MembershipApplication[]>([]);
+  const [loadingApplications, setLoadingApplications] = useState(false);
+
+  // ?tab=applications comes from the "New membership application" notification.
+  const [searchParams] = useSearchParams();
+  const linkedTab = searchParams.get('tab') === 'applications' ? 'applications' : null;
+  const [tab, setTab] = useState<Tab>(linkedTab ?? 'members');
+  const tabChosen = useRef(!!linkedTab);
 
   const [actionDialog, setActionDialog] = useState<ActionTarget | null>(null);
   const [reason, setReason] = useState('');
@@ -152,9 +161,24 @@ export function Approvals() {
     }
   }, []);
 
+  const loadApplications = useCallback(async () => {
+    setLoadingApplications(true);
+    try {
+      setApplications(await servicePortfolioService.listApplications('pending'));
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err.message || 'Failed to load membership applications');
+    } finally {
+      setLoadingApplications(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadMembers();
   }, [loadMembers]);
+
+  useEffect(() => {
+    loadApplications();
+  }, [loadApplications]);
 
   useEffect(() => {
     loadBookings();
@@ -164,15 +188,16 @@ export function Approvals() {
     loadAddons();
   }, [loadAddons]);
 
-  const anyLoading = loading || loadingBookings || loadingAddons;
+  const anyLoading = loading || loadingBookings || loadingAddons || loadingApplications;
 
   // Open on the first queue that has something in it, until the user picks a tab.
   useEffect(() => {
     if (anyLoading || tabChosen.current) return;
     if (totalItems > 0) setTab('members');
+    else if (applications.length > 0) setTab('applications');
     else if (bookingApprovals.length > 0) setTab('bookings');
     else if (addonApprovals.length > 0) setTab('addons');
-  }, [anyLoading, totalItems, bookingApprovals.length, addonApprovals.length]);
+  }, [anyLoading, totalItems, applications.length, bookingApprovals.length, addonApprovals.length]);
 
   const chooseTab = (t: Tab) => {
     tabChosen.current = true;
@@ -183,6 +208,12 @@ export function Approvals() {
     loadMembers();
     loadBookings();
     loadAddons();
+    loadApplications();
+  };
+
+  const onApplicationsChanged = () => {
+    loadApplications();
+    window.dispatchEvent(new Event('approvals_updated'));
   };
 
   const openAction = (type: ActionType, member: Member) => {
@@ -306,7 +337,7 @@ export function Approvals() {
   })), [addonApprovals]);
 
   const all = [...memberRequests, ...bookingRequests, ...addonRequests];
-  const waiting = totalItems + bookingApprovals.length + addonApprovals.length;
+  const waiting = totalItems + bookingApprovals.length + addonApprovals.length + applications.length;
   const received = all.reduce((s, r) => s + r.received, 0);
   const owed = all.reduce((s, r) => s + Math.max(0, r.total - r.received), 0);
   const oldest = all.map(r => ageOf(r.since)).filter(Boolean).sort((a, b) => b!.hours - a!.hours)[0];
@@ -315,6 +346,7 @@ export function Approvals() {
 
   const tabs: { id: Tab; label: string; icon: typeof UserCheck; count?: number }[] = [
     { id: 'members', label: 'Memberships', icon: UserCheck, count: totalItems },
+    { id: 'applications', label: 'Applications', icon: FileText, count: applications.length },
     { id: 'bookings', label: 'Bookings', icon: CalendarCheck, count: bookingApprovals.length },
     { id: 'addons', label: 'Add-ons', icon: PackagePlus, count: addonApprovals.length },
   ];
@@ -404,7 +436,7 @@ export function Approvals() {
         <div>
           <h1 className={styles.title}>Approvals</h1>
           <div className={styles.subtitle}>
-            App purchases paid by Cash, Credit or Mixed payment wait here until reception confirms the money
+            App purchases paid by Cash, Credit or Mixed payment, and membership applications from your share link, wait here until staff approve them
           </div>
         </div>
         <div className={styles.actions}>
@@ -423,6 +455,7 @@ export function Approvals() {
         <Kpi icon={Hourglass} tone={waiting ? 'amber' : 'green'} label="Waiting now" value={fmtInt(waiting)}
           hint={waiting ? (oldest ? `oldest ${oldest.text}${lateCount ? ` · ${lateCount} over a day` : ''}` : 'requests to review') : 'all caught up'} />
         <Kpi icon={UserCheck} tone="blue" label="Memberships" value={fmtInt(totalItems)} hint="app access locked until approved" onClick={() => chooseTab('members')} />
+        <Kpi icon={FileText} tone="blue" label="Applications" value={fmtInt(applications.length)} hint={`${fmtInt(applications.filter(a => a.payment_status === 'PAID').length)} paid online · from your share link`} onClick={() => chooseTab('applications')} />
         <Kpi icon={CalendarCheck} tone="violet" label="Bookings" value={fmtInt(bookingApprovals.length)} hint="seats held until approved" onClick={() => chooseTab('bookings')} />
         <Kpi icon={PackagePlus} tone="teal" label="Add-ons" value={fmtInt(addonApprovals.length)} hint="inactive until approved" onClick={() => chooseTab('addons')} />
         <Kpi icon={Wallet} tone="green" label="Received, to confirm" value={money(received)} hint={`cash and payments to verify${partialNote}`} />
@@ -449,6 +482,10 @@ export function Approvals() {
             </div>
           )}
         </Panel>
+      )}
+
+      {tab === 'applications' && (
+        <ApplicationsPanel applications={applications} loading={loadingApplications} onChanged={onApplicationsChanged} money={money} />
       )}
 
       {tab === 'bookings' && (
