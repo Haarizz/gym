@@ -97,17 +97,32 @@ type ReportPeriod = { key: string; label: string; start: Date; end: Date; total:
 const CATEGORY_COLORS: Record<string, string> = {
   Memberships: "#2a78d6",
   "Personal Training": "#eb6834",
+  "Add-ons & Facilities": "#1795a8",
+  "Day Passes": "#e2a22b",
   "Group Classes": "#1baf7a",
+  "Due Payments": "#c2477f",
   Merchandise: "#6250d6",
   "Other Services": "#a8a69f",
 };
 
+/** A PT add-on: "Personal Training", "PT 12 sessions", … */
+const isPersonalTraining = (s: string) => /personal|training|\bpt\b/.test(s);
+
+/**
+ * The service a receipt's money is for. Receipt types the backend writes: New, Renewal,
+ * Upgrade/Downgrade, Add-on, Class Booking, Daily Entry, Payment (a settlement of an earlier
+ * bill), Freeze Charge — the same buckets as the Analytics Dashboard's sources. "New" used to
+ * fall through to Other Services, so new memberships and day passes were reported as "other".
+ */
 function categorizeReceipt(r: Receipt): string {
   const t = (r.transaction_type || "").toLowerCase();
   const plan = (r.plan_name || "").toLowerCase();
-  if (t.includes("renew") || t.includes("upgrade") || t.includes("new member") || plan.includes("membership")) return "Memberships";
-  if (t.includes("training") || plan.includes("pt") || plan.includes("personal")) return "Personal Training";
-  if (t.includes("class") || plan.includes("class")) return "Group Classes";
+  if (t.startsWith("new") || t.includes("renew") || t.includes("upgrade") || t.includes("downgrade")) return "Memberships";
+  if (t.includes("add-on") || t.includes("addon")) return isPersonalTraining(plan) ? "Personal Training" : "Add-ons & Facilities";
+  if (t.includes("training") || isPersonalTraining(t)) return "Personal Training";
+  if (t.includes("class") || t.includes("booking")) return "Group Classes";
+  if (t.includes("daily") || t.includes("day pass") || t.includes("walk")) return "Day Passes";
+  if (t === "payment" || t.includes("settle")) return "Due Payments";
   if (t.includes("pos") || t.includes("product") || plan.includes("product")) return "Merchandise";
   return "Other Services";
 }

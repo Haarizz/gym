@@ -718,7 +718,8 @@ export function ManagePlans() {
     const matchesDuration = filterDuration === "all" || plan.durationType.toLowerCase() === filterDuration.toLowerCase();
     const matchesType = filterType === "all"
       || plan.planType.toLowerCase() === filterType.toLowerCase()
-      || (filterType === "family" && plan.planType.toLowerCase() === "couple");
+      // "group" = the Family & Couple card; "family" on its own means Family plans only
+      || (filterType === "group" && ["family", "couple"].includes(plan.planType.toLowerCase()));
     const matchesStatus = filterStatus === "all" || plan.status.toLowerCase() === filterStatus.toLowerCase();
 
     return matchesSearch && matchesDuration && matchesType && matchesStatus;
@@ -957,15 +958,15 @@ export function ManagePlans() {
 
               <Card
                 className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-                style={filterType === 'family' ? { boxShadow: '0 0 0 2px #9333ea' } : undefined}
+                style={filterType === 'group' ? { boxShadow: '0 0 0 2px #9333ea' } : undefined}
                 onClick={() => {
-                  setFilterType(filterType === 'family' ? 'all' : 'family');
+                  setFilterType(filterType === 'group' ? 'all' : 'group');
                   setFilterStatus('all');
                   setPriceSort('none');
                 }}
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Family Plans</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Family &amp; Couple Plans</CardTitle>
                   <div className="p-2 rounded-lg bg-purple-100">
                     <Users className="h-4 w-4 text-purple-600" />
                   </div>
@@ -1046,6 +1047,7 @@ export function ManagePlans() {
                   <SelectItem value="individual">Individual</SelectItem>
                   <SelectItem value="couple">Couple</SelectItem>
                   <SelectItem value="family">Family</SelectItem>
+                  <SelectItem value="group">Family &amp; Couple</SelectItem>
                   <SelectItem value="corporate">Corporate</SelectItem>
                   <SelectItem value="walk-in">Walk-In</SelectItem>
                 </SelectContent>

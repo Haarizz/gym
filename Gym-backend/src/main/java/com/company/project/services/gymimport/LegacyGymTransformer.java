@@ -38,8 +38,9 @@ import java.util.stream.Collectors;
  * - A refund is the original row flagged refunded plus a separate negative row →
  *   the bill becomes Cancelled and the refund a credit note.
  * - Split legs can exceed the bill by the change handed back; that comes off cash.
- * - The old system never auto-unfroze: freezes past their end are settled the way
- *   GymBios's auto-unfreeze would, adding the frozen days to the membership.
+ * - The old system never auto-unfroze, and a manual unfreeze added the days really
+ *   spent frozen. A member it shows frozen is imported frozen — also past the planned
+ *   end — with auto-unfreeze off on that freeze, so the counts match the old system.
  * - "expired" is not a stored status in GymBios; it follows from the end date.
  *
  * Every row is stamped created_by = "legacy-import" (LegacyImportLedgerService keys
@@ -139,7 +140,7 @@ public final class LegacyGymTransformer {
 
     private static final class Freeze {
         long id; Mem member; LocalDate start; LocalDate plannedEnd; LocalDate endedAt; String reason; String by;
-        LocalDateTime createdAt; int requested; int used;
+        LocalDateTime createdAt; int requested; int used; boolean manualUnfreeze;
     }
 
     private static final class Visit {
@@ -743,8 +744,19 @@ public final class LegacyGymTransformer {
                     for (int k = recs.size() - 1; k >= 0; k--) {
                         if (recs.get(k).start.equals(start) && recs.get(k).endedAt == null) { open = recs.get(k); break; }
                     }
+                    // The days an unfreeze really added are new end − old end. days_applied is
+                    // not reliable: later versions of the old app stored the days the membership
+                    // had left there (85 for a 26-day freeze), which put the end months ahead.
+                    LocalDate oldEnd = date(f.str("old_membership_end"));
+                    LocalDate newEnd = date(f.str("new_membership_end"));
                     Long applied = f.lng("days_applied");
-                    LocalDate ended = applied != null && applied > 0 ? start.plusDays(applied) : localDateOfUtc(ts(f.str("created_at")));
+                    LocalDate ended;
+                    if (oldEnd != null && newEnd != null) {
+                        ended = newEnd.isAfter(oldEnd) ? start.plusDays(daysBetween(oldEnd, newEnd)) : localDateOfUtc(ts(f.str("created_at")));
+                    } else {
+                        ended = applied != null && applied > 0 ? start.plusDays(applied) : localDateOfUtc(ts(f.str("created_at")));
+                    }
+                    if (ended == null || ended.isBefore(start)) ended = start;
                     if (open == null) {
                         open = freeze(m, start, end, f.text("reason"), staffName.apply(f.lng("created_by")), ts(f.str("created_at")));
                         recs.add(open);
@@ -763,20 +775,17 @@ public final class LegacyGymTransformer {
                     cur = freeze(m, m.freezeStart, m.freezeEnd, m.freezeReason, null, midnight(m.freezeStart));
                     recs.add(cur);
                 }
-                if (m.freezeEnd != null && m.freezeEnd.isAfter(today)) {
-                    status = "frozen";   // still frozen; GymBios auto-unfreezes it on its planned end
-                } else {
-                    // Settled the way GymBios's auto-unfreeze would have: unfrozen on the
-                    // planned end, with the days spent frozen added to the membership.
-                    LocalDate until = m.freezeEnd != null ? m.freezeEnd : today;
-                    int frozenDays = Math.max(0, daysBetween(m.freezeStart, until));
-                    cur.endedAt = until;
-                    end = end == null ? null : end.plusDays(frozenDays);
-                    Rcpt lastBill = null;
-                    for (Rcpt b : m.bills) if (!b.refunded && !"Payment".equals(b.type)) lastBill = b;
-                    if (lastBill != null) lastBill.validTill = midnight(end);
-                    warn("Lapsed freezes settled on import (end date extended)", m.memberNo + " " + m.name + ": frozen "
-                            + m.freezeStart + " → " + until + ", +" + frozenDays + " days, membership now ends " + end);
+                // Frozen in the old system = frozen here, whatever the planned end says: the
+                // old app only ever unfroze by hand, and then added the days really spent
+                // frozen. The freeze stays open with auto-unfreeze off, so staff unfreeze the
+                // member when they are back and the membership gets those days, as before.
+                status = "frozen";
+                cur.manualUnfreeze = true;
+                if (m.freezeEnd == null || !m.freezeEnd.isAfter(today)) {
+                    warn("Freezes past their end date, kept frozen (unfreeze the member when they return)",
+                            m.memberNo + " " + m.name + ": frozen since " + m.freezeStart
+                                    + (m.freezeEnd != null ? ", was due back " + m.freezeEnd : "")
+                                    + ", membership end " + end + " before the frozen days are added");
                 }
             }
             for (Freeze r : recs) {
@@ -1013,12 +1022,13 @@ public final class LegacyGymTransformer {
             freezeRows.add(new Object[] { f.id, f.member.id, f.member.plan, midnight(f.start), midnight(f.plannedEnd),
                     midnight(f.endedAt), f.requested, f.endedAt != null ? f.used : 0, 0, null, ZERO, null,
                     f.reason != null ? f.reason + " (imported)" : "Imported from previous system", "STAFF", false, false,
-                    f.by, f.createdAt != null ? f.createdAt : midnight(f.start) });
+                    f.by, f.createdAt != null ? f.createdAt : midnight(f.start),
+                    f.manualUnfreeze && f.endedAt == null ? Boolean.FALSE : null });
         }
         out.add(new TableRows("membership_freezes", List.of("id", "member_db_id", "plan_name", "freeze_start",
                 "planned_end", "ended_at", "requested_days", "free_days_applied", "charged_days", "charge_per_day",
                 "charge_amount", "charge_receipt_id", "reason", "source", "limits_overridden", "charge_waived",
-                "recorded_by", "created_at"), freezeRows));
+                "recorded_by", "created_at", "auto_unfreeze"), freezeRows));
 
         List<Object[]> visitRows = new ArrayList<>();
         for (Visit a : attendance) {
