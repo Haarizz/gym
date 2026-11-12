@@ -8,6 +8,7 @@ import com.company.project.entities.Member;
 import com.company.project.entities.MemberDueWriteOff;
 import com.company.project.entities.Receipt;
 import com.company.project.exceptions.BusinessRuleViolationException;
+import com.company.project.performance.PerformanceClock;
 import com.company.project.repositories.MemberDueWriteOffRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.ReceiptRepository;
@@ -42,12 +43,14 @@ class PendingPaymentServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private MemberDueWriteOffRepository writeOffRepository;
     @Mock private StaffRepository staffRepository;
+    @Mock private PerformanceClock clock;
 
     @InjectMocks private PendingPaymentService service;
 
     @BeforeEach
     void activeBranch() {
         BranchContextHolder.setActiveBranchId(1L);
+        lenient().when(clock.zone(any())).thenReturn(java.time.ZoneOffset.UTC);
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("manager@gym.test", null, List.of()));
     }

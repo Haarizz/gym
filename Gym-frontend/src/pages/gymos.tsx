@@ -27,6 +27,7 @@ import { Switch } from "../components/ui/switch";
 import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { SetTargets } from "./set-targets";
 import { TargetsOverview } from "./targets-overview";
+import { FaceDeviceConfiguration } from "../components/gymos/FaceDeviceConfiguration";
 import { 
   Cog,
   Folder,
@@ -89,7 +90,7 @@ interface GymOSProps {
 }
 
 /** GymOS tabs, in order; the active one lives in the URL as ?section= (Settings uses ?tab= for its own tabs). */
-const GYMOS_TABS = ['overview', 'pos-mode', 'performance-metrics', 'configuration', 'settings', 'branches'] as const;
+const GYMOS_TABS = ['overview', 'pos-mode', 'performance-metrics', 'configuration', 'face-devices', 'settings', 'branches'] as const;
 type GymOSTab = typeof GYMOS_TABS[number];
 
 /**
@@ -760,15 +761,16 @@ function GymOSWorkspace({ onNavigate, showSettings, showBranches }: GymOSProps &
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      <GymOSHeader actions={activeTab !== 'settings' && activeTab !== 'branches'} onRefresh={refreshAll} refreshing={refreshingAll} />
+      <GymOSHeader actions={activeTab !== 'settings' && activeTab !== 'branches' && activeTab !== 'face-devices'} onRefresh={refreshAll} refreshing={refreshingAll} />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className={`grid w-full ${['grid-cols-4', 'grid-cols-5', 'grid-cols-6'][Number(showSettings) + Number(showBranches)]}`}>
+        <TabsList className={`grid w-full ${['grid-cols-5', 'grid-cols-6', 'grid-cols-7'][Number(showSettings) + Number(showBranches)]}`}>
           <TabsTrigger value="overview">System Overview</TabsTrigger>
           <TabsTrigger value="pos-mode">POS Mode</TabsTrigger>
           <TabsTrigger value="performance-metrics">Performance Metrics</TabsTrigger>
           <TabsTrigger value="configuration">Configuration</TabsTrigger>
+          <TabsTrigger value="face-devices">Face Device Configuration</TabsTrigger>
           {showSettings && <TabsTrigger value="settings">Settings</TabsTrigger>}
           {showBranches && <TabsTrigger value="branches">Branch Management</TabsTrigger>}
         </TabsList>
@@ -2647,6 +2649,11 @@ function GymOSWorkspace({ onNavigate, showSettings, showBranches }: GymOSProps &
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Face Device Configuration — Heystar face terminals, members synced by the server */}
+        <TabsContent value="face-devices">
+          <FaceDeviceConfiguration />
         </TabsContent>
 
         {/* Settings Tab — the former Settings page (currency, company, tax, …), branch-scoped */}

@@ -1,0 +1,151 @@
+/* GymOS › Face Device Configuration. Tailwind here is a frozen snapshot, so layout lives in
+   this module on the theme tokens (light + .dark). Dialog content portals out of .root, so
+   the tones below are declared on [data-tone] globally within this module, not on .root. */
+
+[data-tone] { --tone: var(--primary); }
+[data-tone="teal"]   { --tone: var(--gb-primary, #0f766e); }
+[data-tone="green"]  { --tone: #15803d; }
+[data-tone="amber"]  { --tone: #b45309; }
+[data-tone="red"]    { --tone: #dc2626; }
+[data-tone="blue"]   { --tone: #2563eb; }
+[data-tone="violet"] { --tone: #7c3aed; }
+[data-tone="gray"]   { --tone: #64748b; }
+:global(.dark) [data-tone="teal"]   { --tone: #5eead4; }
+:global(.dark) [data-tone="green"]  { --tone: #4ade80; }
+:global(.dark) [data-tone="amber"]  { --tone: #fbbf24; }
+:global(.dark) [data-tone="red"]    { --tone: #f87171; }
+:global(.dark) [data-tone="blue"]   { --tone: #60a5fa; }
+:global(.dark) [data-tone="violet"] { --tone: #a78bfa; }
+:global(.dark) [data-tone="gray"]   { --tone: #94a3b8; }
+
+.root { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.title { display: flex; align-items: center; gap: 0.5rem; font-size: 1.375rem; font-weight: 700; color: var(--foreground); margin: 0; }
+.titleIcon { width: 1.5rem; height: 1.5rem; color: var(--primary); }
+.sub { color: var(--muted-foreground); font-size: 0.875rem; margin: 0.25rem 0 0; max-width: 48rem; line-height: 1.5; }
+.headActions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.errorBox {
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; border-radius: 0.75rem;
+  background: color-mix(in srgb, #dc2626 10%, transparent); color: #b91c1c; font-size: 0.875rem;
+}
+:global(.dark) .errorBox { color: #fca5a5; }
+
+.empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; text-align: center;
+  padding: 2.5rem 1rem; border-radius: 0.875rem; background: var(--card); color: var(--muted-foreground);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+}
+.emptyIcon { width: 2.5rem; height: 2.5rem; color: var(--primary); opacity: 0.8; }
+.emptyTitle { font-weight: 600; color: var(--foreground); }
+.emptyText { font-size: 0.875rem; max-width: 32rem; }
+
+/* ── Setup guide ────────────────────────────────────────────────────────── */
+.guide {
+  background: var(--card); color: var(--card-foreground); border-radius: 0.875rem; padding: 1.25rem 1.5rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+  border-left: 4px solid var(--primary); display: flex; flex-direction: column; gap: 1rem;
+}
+.guideTitle { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 1.05rem; color: var(--foreground); }
+.steps { margin: 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.875rem; line-height: 1.55; list-style: decimal; }
+.steps li::marker { color: var(--primary); font-weight: 700; }
+.steps code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8em; }
+.steps code { background: var(--muted); padding: 0.05rem 0.35rem; border-radius: 0.3rem; }
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.6rem; }
+.rule {
+  font-size: 0.8125rem; line-height: 1.45; padding: 0.65rem 0.8rem; border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--tone) 9%, transparent); border-left: 3px solid var(--tone);
+}
+
+/* ── Device card ────────────────────────────────────────────────────────── */
+.card {
+  background: var(--card); color: var(--card-foreground); border-radius: 0.875rem; padding: 1.25rem 1.5rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+  display: flex; flex-direction: column; gap: 1rem; min-width: 0;
+}
+.cardHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.cardTitleWrap { display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
+.cardTitle { font-size: 1.125rem; font-weight: 700; color: var(--foreground); }
+.cardActions, .footActions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.pills { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.pill {
+  display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.55rem; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600; white-space: nowrap; text-transform: capitalize;
+  color: var(--tone); background: color-mix(in srgb, var(--tone) 12%, transparent);
+}
+.pill + .pill { margin-left: 0.25rem; }
+.pills .pill + .pill { margin-left: 0; }
+.muted { color: var(--muted-foreground); font-size: 0.8125rem; }
+
+.details { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.75rem 1.25rem; }
+.detail { min-width: 0; }
+.detailLabel { font-size: 0.75rem; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; }
+.detailValue { font-size: 0.875rem; color: var(--foreground); overflow-wrap: anywhere; margin-top: 0.1rem; }
+
+.note {
+  display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8125rem; line-height: 1.45;
+  padding: 0.55rem 0.75rem; border-radius: 0.6rem; color: var(--foreground);
+  background: color-mix(in srgb, var(--tone) 9%, transparent);
+}
+.note svg { color: var(--tone); flex-shrink: 0; margin-top: 0.1rem; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; }
+.tile {
+  border-radius: 0.75rem; padding: 0.75rem 0.9rem;
+  background: color-mix(in srgb, var(--tone) 8%, transparent);
+}
+.tileValue { font-size: 1.5rem; font-weight: 700; color: var(--tone); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tileLabel { font-size: 0.8125rem; font-weight: 600; color: var(--foreground); margin-top: 0.2rem; }
+.tileSub { font-size: 0.75rem; color: var(--muted-foreground); }
+
+.cardFoot { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 0.75rem; }
+
+/* ── Members panel ──────────────────────────────────────────────────────── */
+.members { display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; }
+.membersBar { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.chips { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.chip {
+  border: 1px solid var(--border); background: transparent; color: var(--muted-foreground); cursor: pointer;
+  border-radius: 999px; padding: 0.25rem 0.7rem; font-size: 0.78rem; font-weight: 500;
+}
+.chip:hover { color: var(--foreground); }
+.chip[data-active] { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+.search { position: relative; width: 16rem; max-width: 100%; }
+.searchIcon { position: absolute; left: 0.6rem; top: 50%; transform: translateY(-50%); width: 1rem; height: 1rem; color: var(--muted-foreground); pointer-events: none; }
+.searchInput { padding-left: 2rem !important; }
+
+.tableWrap { overflow: auto; max-height: 34rem; border: 1px solid var(--border); border-radius: 0.75rem; }
+.table thead th { position: sticky; top: 0; z-index: 1; }
+.table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.table th {
+  text-align: left; font-weight: 600; color: var(--muted-foreground); font-size: 0.75rem; text-transform: uppercase;
+  letter-spacing: 0.03em; padding: 0.6rem 0.75rem; background: var(--muted); white-space: nowrap;
+}
+.table td { padding: 0.6rem 0.75rem; border-top: 1px solid var(--border); vertical-align: middle; color: var(--foreground); }
+.memberName { font-weight: 600; }
+.msgCell { min-width: 14rem; max-width: 28rem; line-height: 1.4; }
+.nowrap { white-space: nowrap; }
+.cellEmpty { text-align: center; color: var(--muted-foreground); padding: 1.5rem !important; }
+.okIcon { width: 1rem; height: 1rem; color: #15803d; }
+:global(.dark) .okIcon { color: #4ade80; }
+.btnText { margin-left: 0.3rem; }
+
+/* ── Form dialog ────────────────────────────────────────────────────────── */
+.dialog { max-width: 46rem !important; width: calc(100vw - 2rem); max-height: 90vh; overflow-y: auto; }
+.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem 1rem; }
+.field { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.fieldWide { grid-column: 1 / -1; }
+.hint { font-size: 0.75rem; color: var(--muted-foreground); line-height: 1.4; }
+.switchRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-radius: 0.6rem;
+}
+.switchLabel { font-size: 0.875rem; font-weight: 600; }
+@media (max-width: 640px) {
+  .card, .guide { padding: 1rem; }
+  .formGrid { grid-template-columns: 1fr; }
+  .search { width: 100%; }
+  .cardActions { width: 100%; }
+}

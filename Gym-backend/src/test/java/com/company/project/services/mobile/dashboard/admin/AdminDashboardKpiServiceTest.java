@@ -94,7 +94,7 @@ class AdminDashboardKpiServiceTest {
     void churnFigures_computesRateAgainstBaselineOfActivePlusChurned() {
         when(memberRepository.countByMembershipStatusAndExpiryDateBetween(eqStr("expired"), any(), any()))
                 .thenReturn(10L);
-        when(memberRepository.countByMembershipStatus("active")).thenReturn(90L);
+        when(memberRepository.countEffectivelyActive(any())).thenReturn(90L);
 
         AdminDashboardKpiService.ChurnFigures figures = kpiService.churnFigures(range.getStart(), range.getEnd());
 

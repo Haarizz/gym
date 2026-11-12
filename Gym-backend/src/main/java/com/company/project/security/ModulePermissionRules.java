@@ -197,6 +197,8 @@ public final class ModulePermissionRules {
         writes("/api/tax-defaults/**", "TAX_COMPLIANCE", "SETTINGS", "FINANCIALS", "PRODUCTS");
         writes("/api/company-tax-details/**", "TAX_COMPLIANCE", "SETTINGS", "FINANCIALS");
         writes("/api/financial-settings/**", "SETTINGS", "FINANCIALS");
+        // The gym's SMTP mailbox: even reading it needs Settings (the password is never returned).
+        gated("/api/email-settings/**", List.of("SETTINGS"), "SETTINGS");
         writes("/api/account-heads/**", "LEDGERS", "FINANCIALS");
         gated("/api/cost-centers/**", FINANCE, "LEDGERS", "FINANCIALS");
         gated("/api/ledger-transactions/**", FINANCE, "LEDGERS", "FINANCIALS");

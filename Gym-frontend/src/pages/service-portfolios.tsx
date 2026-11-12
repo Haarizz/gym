@@ -1283,16 +1283,14 @@ export function ServicePortfolios() {
 
       {/* Share Link Dialog */}
       <Dialog open={showShareLink} onOpenChange={setShowShareLink}>
-        {/* Width via inline style: the app ships a precompiled Tailwind build, so
-            arbitrary sizes like sm:max-w-[520px] aren't generated and the dialog
-            would otherwise stretch to the full screen width. */}
-        <DialogContent style={{ maxWidth: 'min(500px, calc(100% - 2rem))' }}>
+        {/* Width set inline: arbitrary max-w classes aren't in the precompiled CSS, and one that's missing
+            also strips the default width, which made this dialog span the whole screen. */}
+        <DialogContent style={{ maxWidth: 'min(440px, calc(100% - 2rem))', padding: 20, gap: 14 }}>
           <DialogHeader>
             <DialogTitle>Share Service Portfolios</DialogTitle>
             <DialogDescription>
-              Send this link to people interested in joining. They can browse your plans, classes and
-              facilities without logging in, and apply for a membership. Applications wait in
-              Approvals &rarr; Applications until you approve them.
+              Anyone with this link can browse your plans and apply to join, without logging in.
+              Applications wait in Approvals &rarr; Applications.
             </DialogDescription>
           </DialogHeader>
           {shareLinkLoading && !shareLink ? (
@@ -1300,45 +1298,63 @@ export function ServicePortfolios() {
               <Loader2 className="h-5 w-5 animate-spin mr-2" /> Creating link…
             </div>
           ) : shareLink ? (
-            <div className="space-y-4 py-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
               {shareLink.branch_name && (
-                <p className="text-sm text-gray-600">Branch: <span className="font-medium text-gray-900">{shareLink.branch_name}</span></p>
+                <span
+                  className="text-xs font-medium"
+                  style={{ alignSelf: 'flex-start', padding: '3px 10px', borderRadius: 999, background: 'var(--muted, #f3f4f6)', color: 'var(--muted-foreground, #4b5563)' }}
+                >
+                  {shareLink.branch_name}
+                </span>
               )}
-              <div className="flex gap-2">
-                <Input readOnly value={shareUrl} onFocus={(e) => e.currentTarget.select()} aria-label="Share link" className="font-mono text-xs min-w-0" />
-                <Button onClick={copyShareLink} className="bg-[#2B7A78] hover:bg-[#236360] text-white shrink-0">
+              {/* Link + Copy in one field */}
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, padding: 4, paddingLeft: 12, borderRadius: 10, border: '1px solid var(--border, #e5e7eb)', background: 'var(--muted, #f9fafb)' }}
+              >
+                <input
+                  readOnly
+                  value={shareUrl}
+                  onFocus={(e) => e.currentTarget.select()}
+                  aria-label="Share link"
+                  className="font-mono text-xs"
+                  style={{ flex: 1, minWidth: 0, border: 0, outline: 'none', background: 'transparent', color: 'inherit', textOverflow: 'ellipsis' }}
+                />
+                <Button size="sm" onClick={copyShareLink} className="shrink-0">
                   <Copy className="h-4 w-4 mr-2" /> Copy
                 </Button>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => window.open(shareUrl, '_blank', 'noopener,noreferrer')}>
-                  <ExternalLink className="h-4 w-4 mr-2" /> Open link
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button variant="outline" size="sm" style={{ flex: 1, minWidth: 0 }} onClick={() => window.open(shareUrl, '_blank', 'noopener,noreferrer')}>
+                  <ExternalLink className="h-4 w-4 mr-2" /> Open
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
+                  style={{ flex: 1, minWidth: 0 }}
                   onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`See our membership plans and join online: ${shareUrl}`)}`, '_blank', 'noopener,noreferrer')}
                 >
                   <Share2 className="h-4 w-4 mr-2" /> WhatsApp
                 </Button>
                 {typeof navigator !== 'undefined' && 'share' in navigator && (
-                  <Button variant="outline" size="sm" onClick={nativeShare}>
+                  <Button variant="outline" size="sm" style={{ flex: 1, minWidth: 0 }} onClick={nativeShare}>
                     <Share2 className="h-4 w-4 mr-2" /> More…
                   </Button>
                 )}
               </div>
-              <div className="border-t pt-3">
+              <div style={{ borderTop: '1px solid var(--border, #e5e7eb)', paddingTop: 10 }}>
                 {confirmReset ? (
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="text-gray-700">Links you've already shared will stop working.</span>
-                    <Button variant="outline" size="sm" onClick={() => setConfirmReset(false)} disabled={shareLinkLoading}>Cancel</Button>
-                    <Button size="sm" variant="destructive" onClick={resetShareLink} disabled={shareLinkLoading}>
-                      {shareLinkLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Reset link'}
-                    </Button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <span className="text-xs text-gray-700">Links you've already shared will stop working.</span>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                      <Button variant="outline" size="sm" onClick={() => setConfirmReset(false)} disabled={shareLinkLoading}>Cancel</Button>
+                      <Button size="sm" variant="destructive" onClick={resetShareLink} disabled={shareLinkLoading}>
+                        {shareLinkLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Reset link'}
+                      </Button>
+                    </div>
                   </div>
                 ) : (
-                  <button type="button" className="text-sm text-gray-500 hover:text-gray-800 underline" onClick={() => setConfirmReset(true)}>
-                    Reset link (stop old links working)
+                  <button type="button" className="text-xs text-gray-500 hover:text-gray-800 underline" onClick={() => setConfirmReset(true)}>
+                    Reset link (old links stop working)
                   </button>
                 )}
               </div>
