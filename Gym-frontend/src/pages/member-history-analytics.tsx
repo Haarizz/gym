@@ -151,7 +151,7 @@ function mergeTransactionLines(lines: StatementLine[]): DisplayLine[] {
   const groups = new Map<string, StatementLine[]>();
   const ungrouped: StatementLine[] = [];
   lines.forEach(l => {
-    if (l.id == null) { ungrouped.push(l); return; }
+    if (l.id == null || l.type === 'Refund') { ungrouped.push(l); return; }
     const key = String(l.id);
     const group = groups.get(key);
     if (group) group.push(l); else groups.set(key, [l]);
@@ -344,7 +344,10 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     }
     return acc;
   }, {} as Record<string, number>);
-  const paymentPieData = Object.entries(paymentBreakdown).map(([name, value]) => ({ name, value }));
+  const paymentPieData = Object.entries(paymentBreakdown)
+    .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
+    .filter(d => d.value > 0.004);
+  const refundTotal = statementLines.filter(l => l.type === 'Refund').reduce((n, l) => n - l.credit, 0);
 
   const totalAttendanceMinutes = attendance.reduce((s, a) => s + (a.total_minutes || 0), 0);
   const totalHours = Math.round((totalAttendanceMinutes / 60) * 10) / 10;
@@ -379,7 +382,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
   const monthlyRevenueMap: Record<string, number> = {};
   statementLines.forEach(l => {
-    if (l.credit > 0) {
+    if (l.credit > 0 || l.type === 'Refund') {
       const d = safeDate(l.date);
       if (!d) return;
       const key = format(d, 'MMM yyyy');
@@ -397,6 +400,12 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     const dateOnly = isDateOnly(l.date);
     if (l.type === 'Invoice') {
       timelineItems.push({ date: d, dateOnly, event: 'Invoice', detail: l.description, type: 'membership' });
+    } else if (l.type === 'Refund') {
+      timelineItems.push({
+        date: d, dateOnly, event: 'Refund',
+        detail: `${currencyPrefix}${Math.abs(l.credit).toLocaleString()} refunded${l.payment_method ? ` via ${l.payment_method}` : ''}`,
+        type: 'payment',
+      });
     } else if (l.credit > 0) {
       timelineItems.push({
         date: d, dateOnly, event: 'Payment',
@@ -441,7 +450,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     if (transactionTypeFilter !== 'all') {
       const desc = `${l.type} ${l.description}`.toLowerCase();
       if (transactionTypeFilter === 'membership' && !desc.includes('invoice') && !desc.includes('plan')) return false;
-      if (transactionTypeFilter === 'payment' && l.type !== 'Payment') return false;
+      if (transactionTypeFilter === 'payment' && l.type !== 'Payment' && l.type !== 'Refund') return false;
     }
     if (transactionSearch) {
       const q = transactionSearch.toLowerCase();
@@ -992,6 +1001,18 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             )}
             <div className={s.sumRows}>
               <div className={s.sumRow}><span>Transactions</span><strong>{totalTransactions}</strong></div>
+              {refundTotal > 0 && (
+                <>
+                  <div className={s.sumRow}>
+                    <span>Refunded</span>
+                    <strong data-alert="true">−<CurrencyGlyph /> {refundTotal.toLocaleString()}</strong>
+                  </div>
+                  <div className={s.sumRow}>
+                    <span>Net kept</span>
+                    <strong><CurrencyGlyph /> {(Math.round(totalPaid * 100) / 100).toLocaleString()}</strong>
+                  </div>
+                </>
+              )}
               <div className={s.sumRow}>
                 <span>Outstanding dues</span>
                 <strong data-alert={outstandingDues > 0} data-good={outstandingDues === 0}><CurrencyGlyph /> {outstandingDues.toLocaleString()}</strong>
@@ -1112,12 +1133,12 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                         {statementLines.map((line, index) => (
                           <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                             <td className="p-3 text-sm">{fmtDate(line.date)}</td>
-                            <td className="p-3 text-sm">{line.type}</td>
+                            <td className="p-3 text-sm">{line.type === 'Refund' ? <span className="text-red-600 font-semibold">Refund</span> : line.type}</td>
                             <td className="p-3 text-sm">
                               <Badge variant="outline" className="border-primary/30">{line.payment_method || '—'}</Badge>
                             </td>
-                            <td className={`p-3 text-sm text-right font-semibold ${line.credit > 0 ? 'text-green-600' : 'text-gray-700'}`}>
-                              <CurrencyGlyph /> {(line.credit > 0 ? line.credit : line.debit).toLocaleString()}
+                            <td className={`p-3 text-sm text-right font-semibold ${line.type === 'Refund' ? 'text-red-600' : line.credit > 0 ? 'text-green-600' : 'text-gray-700'}`}>
+                              {line.type === 'Refund' && '−'}<CurrencyGlyph /> {(line.type === 'Refund' ? Math.abs(line.credit) : line.credit > 0 ? line.credit : line.debit).toLocaleString()}
                             </td>
                             <td className="p-3 text-sm text-gray-600">{line.description}</td>
                           </tr>
@@ -1786,7 +1807,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                               <TableRow key={index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gradient-light transition-colors`}>
                                 <TableCell className="font-medium">{fmtDate(line.date)}</TableCell>
                                 <TableCell>
-                                  <Badge className={line.type === 'Invoice' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}>
+                                  <Badge className={line.type === 'Invoice' ? 'bg-purple-100 text-purple-700' : line.type === 'Refund' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}>
                                     {line.merged ? 'Invoice + Payment' : line.type}
                                   </Badge>
                                 </TableCell>
@@ -1801,8 +1822,8 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                                 <TableCell>
                                   <Badge className="bg-blue-100 text-blue-700">{line.payment_method || '—'}</Badge>
                                 </TableCell>
-                                <TableCell className={`text-right font-semibold ${line.credit > 0 ? 'text-green-600' : 'text-gray-700'}`}>
-                                  {(line.credit > 0 ? line.credit : line.debit).toLocaleString()}
+                                <TableCell className={`text-right font-semibold ${line.type === 'Refund' ? 'text-red-600' : line.credit > 0 ? 'text-green-600' : 'text-gray-700'}`}>
+                                  {line.type === 'Refund' ? `−${Math.abs(line.credit).toLocaleString()}` : (line.credit > 0 ? line.credit : line.debit).toLocaleString()}
                                 </TableCell>
                                 <TableCell className="text-gray-600">{line.description}</TableCell>
                                 <TableCell>
@@ -1811,7 +1832,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                                       variant="outline"
                                       size="sm"
                                       className="h-8"
-                                      disabled={!line.id || printing !== null}
+                                      disabled={!line.id || printing !== null || line.type === 'Refund'}
                                       title={`Print the payment receipt for ${line.receipt_no}`}
                                       onClick={() => handlePrintLine(line.id, 'receipt')}
                                     >
@@ -1822,7 +1843,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                                       variant="outline"
                                       size="sm"
                                       className="h-8"
-                                      disabled={!line.id || printing !== null}
+                                      disabled={!line.id || printing !== null || line.type === 'Refund'}
                                       title={`Print the ${invoiceLabel.toLowerCase()} for ${line.invoice_no || line.receipt_no}`}
                                       onClick={() => handlePrintLine(line.id, 'invoice')}
                                     >
@@ -1851,13 +1872,13 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                           <div>
                             <p className="text-sm text-gray-600 mb-1">Total Billed</p>
                             <p className="text-2xl font-bold text-purple-600">
-                              <CurrencyGlyph /> {filteredTransactionLines.filter(l => l.type === 'Invoice').reduce((s, l) => s + l.debit, 0).toLocaleString()}
+                              <CurrencyGlyph /> {(Math.round(filteredTransactionLines.filter(l => l.type === 'Invoice' || l.type === 'Refund').reduce((s, l) => s + l.debit, 0) * 100) / 100).toLocaleString()}
                             </p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-600 mb-1">Total Paid</p>
                             <p className="text-2xl font-bold text-green-600">
-                              <CurrencyGlyph /> {filteredTransactionLines.reduce((s, l) => s + l.credit, 0).toLocaleString()}
+                              <CurrencyGlyph /> {(Math.round(filteredTransactionLines.reduce((s, l) => s + l.credit, 0) * 100) / 100).toLocaleString()}
                             </p>
                           </div>
                         </div>

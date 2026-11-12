@@ -6,4 +6,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface CreditNoteRepository
         extends JpaRepository<CreditNote, Long>, JpaSpecificationExecutor<CreditNote> {
+
+    /** A member's refunds, oldest first (member statement / profile). */
+    java.util.List<CreditNote> findByMemberDbIdOrderByDateAscIdAsc(Long memberDbId);
 }

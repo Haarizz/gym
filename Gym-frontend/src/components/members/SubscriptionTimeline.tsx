@@ -58,6 +58,7 @@ const STATUS_TONE: Record<string, Tone> = {
   Completed: "gray",
   Upcoming: "violet",
   "Pending approval": "amber",
+  Cancelled: "red",
 };
 
 function kindLabel(kind: string): string {

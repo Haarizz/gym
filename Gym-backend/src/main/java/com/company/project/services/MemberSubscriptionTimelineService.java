@@ -332,6 +332,8 @@ public class MemberSubscriptionTimelineService {
     private static String periodStatus(Member member, Receipt r, LocalDateTime start, LocalDateTime end,
                                        boolean last, boolean frozen, LocalDateTime now) {
         if (r != null && "PENDING".equalsIgnoreCase(r.getApprovalStatus())) return "Pending approval";
+        // A cancelled (refunded) plan never ran its course — don't show it as completed.
+        if (r != null && "Cancelled".equalsIgnoreCase(r.getStatus())) return "Cancelled";
         boolean started = start == null || !start.isAfter(now);
         boolean ended = end != null && !end.isAfter(now);
         if (!started) return "Upcoming";
