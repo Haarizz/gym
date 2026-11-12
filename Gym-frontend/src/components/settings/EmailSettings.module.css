@@ -1,0 +1,74 @@
+/* Settings › Email. Tailwind here is a frozen snapshot, so the inner layout lives in this module. */
+
+[data-tone] { --tone: var(--primary); }
+[data-tone="green"] { --tone: #15803d; }
+[data-tone="blue"]  { --tone: #2563eb; }
+[data-tone="amber"] { --tone: #b45309; }
+[data-tone="red"]   { --tone: #dc2626; }
+:global(.dark) [data-tone="green"] { --tone: #4ade80; }
+:global(.dark) [data-tone="blue"]  { --tone: #60a5fa; }
+:global(.dark) [data-tone="amber"] { --tone: #fbbf24; }
+:global(.dark) [data-tone="red"]   { --tone: #f87171; }
+
+.loading { display: flex; align-items: center; gap: 0.5rem; color: var(--muted-foreground); padding: 2rem 0; }
+
+.status {
+  display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--tone) 9%, var(--card)); border-left: 4px solid var(--tone);
+}
+.status > svg { color: var(--tone); flex-shrink: 0; margin-top: 0.1rem; }
+.statusTitle { font-weight: 600; color: var(--foreground); font-size: 0.9rem; overflow-wrap: anywhere; }
+.statusSub { color: var(--muted-foreground); font-size: 0.8125rem; margin-top: 0.15rem; }
+
+.side { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }
+
+.grid3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; }
+.span2 { grid-column: span 2; }
+
+.iconInput { position: relative; }
+.iconInputIcon {
+  position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%); display: flex;
+  color: var(--muted-foreground); pointer-events: none;
+}
+.iconInputIcon svg { width: 1rem; height: 1rem; }
+.iconInputField { padding-left: 2.2rem !important; }
+
+.helpCard { border-left: 4px solid var(--primary) !important; }
+.field { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.fieldWide { grid-column: 1 / -1; }
+.hint { display: block; font-size: 0.75rem; color: var(--muted-foreground); line-height: 1.4; }
+
+.switchRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  padding: 0.65rem 0.8rem; border: 1px solid var(--border); border-radius: 0.6rem;
+}
+.switchLabel { display: flex; align-items: center; gap: 0.35rem; font-size: 0.875rem; font-weight: 600; color: var(--foreground); }
+.inlineIcon { width: 1rem; height: 1rem; color: var(--primary); }
+
+.presets { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.4rem 0 0.35rem; }
+.preset {
+  border: 1px solid var(--border); background: transparent; color: var(--foreground); cursor: pointer;
+  border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.8rem; font-weight: 500;
+}
+.preset:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.preset[data-active] { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+.preset:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.checkRow { display: flex; align-items: flex-start; gap: 0.6rem; cursor: pointer; }
+.checkRow > span { display: flex; flex-direction: column; gap: 0.15rem; }
+
+.note {
+  display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8125rem; line-height: 1.45;
+  padding: 0.6rem 0.75rem; border-radius: 0.6rem; color: var(--foreground);
+  background: color-mix(in srgb, var(--tone) 9%, transparent);
+}
+.note svg { color: var(--tone); flex-shrink: 0; margin-top: 0.1rem; }
+
+.steps { margin: 0; padding-left: 1.2rem; list-style: decimal; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem; line-height: 1.5; }
+.steps li::marker { color: var(--primary); font-weight: 700; }
+.steps code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.8em; background: var(--muted); padding: 0.05rem 0.3rem; border-radius: 0.3rem; }
+
+@media (max-width: 640px) {
+  .grid3 { grid-template-columns: 1fr; }
+  .span2 { grid-column: auto; }
+}

@@ -20,9 +20,10 @@ import { BranchSettingsTab, BRANCH_SETTINGS_TAB } from "./branch-settings";
 import { SettingsSaveBar } from "../components/settings/SettingsSaveBar";
 import { BranchTaxSettings } from "../components/settings/BranchTaxSettings";
 import { BranchTermsSettings } from "../components/settings/BranchTermsSettings";
+import { EmailSettings } from "../components/settings/EmailSettings";
 import "../styles/settings-page.css";
 
-const SETTINGS_TABS = ["currency", "company", BRANCH_SETTINGS_TAB, "tax", "terms"] as const;
+const SETTINGS_TABS = ["currency", "company", BRANCH_SETTINGS_TAB, "tax", "terms", "email"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 const CURRENCY_USAGES = [
@@ -254,6 +255,7 @@ export function AppSettings({ embedded = false }: { embedded?: boolean } = {}) {
     { value: BRANCH_SETTINGS_TAB, label: "Branch Settings", hint: "Profile, images & policies", icon: Building2 },
     { value: "tax", label: "Tax Configuration", hint: "Default VAT & purchase tax", icon: Percent },
     { value: "terms", label: "Terms & Conditions", hint: "Shown in the mobile app", icon: FileText },
+    { value: "email", label: "Email", hint: "SMTP for reports & emails", icon: Mail },
   ] as const;
   const activeTabIndex = Math.max(tabs.findIndex((t) => t.value === activeTab), 0);
 
@@ -615,6 +617,11 @@ export function AppSettings({ embedded = false }: { embedded?: boolean } = {}) {
         {/* Branch Terms & Conditions */}
         <TabsContent value="terms">
           {settingsBranchId != null && <BranchTermsSettings branchId={settingsBranchId} readOnly={isAllBranches} />}
+        </TabsContent>
+
+        {/* Email — the gym's SMTP mailbox (gym-wide, not per branch) */}
+        <TabsContent value="email">
+          <EmailSettings />
         </TabsContent>
       </Tabs>
     </div>
