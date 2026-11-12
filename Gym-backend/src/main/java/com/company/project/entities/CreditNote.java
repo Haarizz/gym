@@ -100,4 +100,47 @@ public class CreditNote extends BaseEntity implements BranchAware {
     public Long getBranchId() { return branchId; }
     public void setBranchId(Long branchId) { this.branchId = branchId; }
 
+    // ── Billing › Refunds (V136) ─────────────────────────────────────────────
+    /** "BILLING_REFUND" when made from the Refunds tab; null for Financials credit notes / imports. */
+    @Column(name = "source", length = 30)
+    private String source;
+
+    @Column(name = "reason_code", length = 40)
+    private String reasonCode;
+
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes;
+
+    @Column(name = "cancelled_plan", nullable = false)
+    private boolean cancelledPlan = false;
+
+    @Column(name = "due_cleared", precision = 12, scale = 2)
+    private BigDecimal dueCleared;
+
+    @Column(name = "bank_account_code", length = 50)
+    private String bankAccountCode;
+
+    @Column(name = "bank_account_name")
+    private String bankAccountName;
+
+    @Column(name = "refund_reference", length = 120)
+    private String refundReference;
+
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
+    public String getReasonCode() { return reasonCode; }
+    public void setReasonCode(String reasonCode) { this.reasonCode = reasonCode; }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+    public boolean isCancelledPlan() { return cancelledPlan; }
+    public void setCancelledPlan(boolean cancelledPlan) { this.cancelledPlan = cancelledPlan; }
+    public BigDecimal getDueCleared() { return dueCleared; }
+    public void setDueCleared(BigDecimal dueCleared) { this.dueCleared = dueCleared; }
+    public String getBankAccountCode() { return bankAccountCode; }
+    public void setBankAccountCode(String bankAccountCode) { this.bankAccountCode = bankAccountCode; }
+    public String getBankAccountName() { return bankAccountName; }
+    public void setBankAccountName(String bankAccountName) { this.bankAccountName = bankAccountName; }
+    public String getRefundReference() { return refundReference; }
+    public void setRefundReference(String refundReference) { this.refundReference = refundReference; }
+
 }

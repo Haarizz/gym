@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PendingPayments } from './pending-payments';
+import { Refunds } from './refunds';
 import { useInvoiceTitle } from "../utils/company-details";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -164,7 +165,7 @@ const RECEIPTS_PAGE_SIZE = 25;
 const toLocalIsoDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-const BILLING_TABS = ["receipts", "dues", "soa", "collection", "pending"] as const;
+const BILLING_TABS = ["receipts", "dues", "soa", "collection", "pending", "refunds"] as const;
 type BillingTab = typeof BILLING_TABS[number];
 
 export function Billing({ onNavigate }: BillingProps = {}) {
@@ -570,7 +571,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           <p className="text-muted-foreground">Manage member receipts, dues, and payment collections.</p>
         </div>
         <div className="flex space-x-2">
-          {billingTab !== 'pending' && !(billingTab === 'soa' && (!soaStatement || soaStatement.billed_to_head)) && (
+          {billingTab !== 'pending' && billingTab !== 'refunds' && !(billingTab === 'soa' && (!soaStatement || soaStatement.billed_to_head)) && (
             <ReportActions report={tabReport} size="default" menuLabel={billingTab === 'dues' ? 'Member dues' : billingTab === 'soa' ? 'Statement of account' : billingTab === 'collection' ? 'Total collection' : 'Member receipts'} />
           )}
           <Button variant="outline" onClick={() => setShowTemplateEditor(true)}>
@@ -728,6 +729,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           <TabsTrigger value="soa" className="flex-1">Member SOA</TabsTrigger>
           <TabsTrigger value="collection" className="flex-1">Total Collection</TabsTrigger>
           <TabsTrigger value="pending" className="flex-1">Pending Payments</TabsTrigger>
+          <TabsTrigger value="refunds" className="flex-1">Refunds</TabsTrigger>
         </TabsList>
 
         {/* ── Member Receipts Tab ── */}
@@ -1610,6 +1612,11 @@ export function Billing({ onNavigate }: BillingProps = {}) {
         {/* ── Pending Payments Tab (dues + write-offs) ── */}
         <TabsContent value="pending" className="space-y-6">
           {billingTab === 'pending' && <PendingPayments />}
+        </TabsContent>
+
+        {/* ── Refunds Tab (money back to members, optionally cancelling the plan) ── */}
+        <TabsContent value="refunds" className="space-y-6">
+          {billingTab === 'refunds' && <Refunds />}
         </TabsContent>
       </Tabs>
 

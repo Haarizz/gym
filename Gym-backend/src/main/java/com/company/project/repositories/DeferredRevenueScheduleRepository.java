@@ -8,4 +8,6 @@ import java.util.List;
 public interface DeferredRevenueScheduleRepository extends JpaRepository<DeferredRevenueSchedule, Long> {
 
     List<DeferredRevenueSchedule> findByStatusOrderByStartDateDesc(String status);
+
+    List<DeferredRevenueSchedule> findByReceiptIdAndStatus(Long receiptId, String status);
 }

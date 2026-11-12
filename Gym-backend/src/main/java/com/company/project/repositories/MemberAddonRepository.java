@@ -38,4 +38,7 @@ public interface MemberAddonRepository extends JpaRepository<MemberAddon, Long>,
     @Query("SELECT a.receiptId FROM MemberAddon a WHERE a.receiptId IN :receiptIds " +
            "AND LOWER(a.category) IN ('personal training', 'training')")
     List<Long> findPtReceiptIds(@Param("receiptIds") java.util.Collection<Long> receiptIds);
+
+    /** Add-ons paid by one receipt (a registration receipt can carry several). */
+    List<MemberAddon> findByReceiptId(Long receiptId);
 }

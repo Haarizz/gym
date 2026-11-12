@@ -1207,6 +1207,53 @@ public class FinancialEventService {
         registerSource("CreditNote", note.getId(), "BILLING", jv.getId());
     }
 
+    /** Net / VAT split of a VAT-inclusive member amount, as the original payment was posted. */
+    public BigDecimal[] vatSplit(BigDecimal grossAmount, Long branchId) {
+        return splitVatInclusive(safe(grossAmount), branchId);
+    }
+
+    /**
+     * BILLING › REFUNDS — money given back to a member against one of their bills.
+     * DR  Membership / Service Revenue   (net, less what comes out of deferred revenue)
+     * DR  Deferred Revenue               (the part of the bill not yet recognised)
+     * DR  Tax / GST Payable              (VAT portion)
+     * CR  Cash / Bank / Wallet liability (refund amount)
+     * and, when the plan is cancelled, whatever is still deferred becomes revenue now:
+     * DR  Deferred Revenue / CR Membership Revenue (recognizeNow)
+     */
+    public void onMemberRefund(CreditNote note, String revenueAccount, BigDecimal deferredDebit, BigDecimal recognizeNow) {
+        if (alreadyJournaled("CreditNote", note.getId())) return;
+        BigDecimal total = safe(note.getTotalAmount());
+        if (total.compareTo(BigDecimal.ZERO) <= 0) return;
+        BigDecimal tax = safe(note.getTaxAmount());
+        BigDecimal net = safe(note.getSubtotal());
+        BigDecimal fromDeferred = safe(deferredDebit).min(net);
+        BigDecimal fromRevenue = net.subtract(fromDeferred);
+        boolean service = ACC_SERVICE_REVENUE.equals(revenueAccount);
+        String revCode = service ? ACC_SERVICE_REVENUE : ACC_MEMBERSHIP_REVENUE;
+        String revName = service ? "Service / Add-on Revenue" : "Membership Revenue";
+        String who = note.getMemberName() == null ? "" : " — " + note.getMemberName();
+
+        List<JvLine> lines = new ArrayList<>();
+        if (fromRevenue.signum() > 0) lines.add(dr(revCode, revName, fromRevenue, "Refund" + who));
+        if (fromDeferred.signum() > 0) {
+            lines.add(dr(ACC_DEFERRED_REVENUE, "Deferred Revenue", fromDeferred, "Refund of unearned membership" + who));
+        }
+        if (tax.signum() > 0) lines.add(dr(ACC_TAX_PAYABLE, "Tax / GST Payable", tax, "Refund — VAT reversal"));
+        lines.addAll(buildMoneyLines(note.getRefundMethod(), null, note.getBankAccountCode(), note.getBankAccountName(),
+                total, false, "Refund paid — " + note.getVoucherNo()));
+        BigDecimal keep = safe(recognizeNow);
+        if (keep.signum() > 0) {
+            lines.add(dr(ACC_DEFERRED_REVENUE, "Deferred Revenue", keep, "Cancelled plan — rest of the fee kept"));
+            lines.add(cr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", keep, "Cancelled plan — revenue recognised now"));
+        }
+
+        JournalVoucher jv = createAndPost(
+                "Member Refund: " + note.getVoucherNo() + who,
+                note.getDate(), lines, "BILLING");
+        registerSource("CreditNote", note.getId(), "BILLING", jv.getId());
+    }
+
     /**
      * BOOKINGS — a cancelled class booking's payment refunded to the member's wallet.
      * Reverses the revenue onMemberPaymentReceived booked for it; the money stays

@@ -114,6 +114,8 @@ public final class ModulePermissionRules {
         writes("/api/plans/**", "MEMBERSHIP_PLANS");
         writes("/api/plan-groups/**", "MEMBERSHIP_PLANS");
         writes("/api/facilities/**", "MEMBERSHIP_PLANS", "SETTINGS");
+        // Refunds pay money out: making one needs Billing write access, not just Members.
+        gated("/api/billing/refunds/**", plus(FINANCE, "BILLING", "PAYMENTS", "MEMBERS", "REPORTS"), "BILLING");
         gated("/api/billing/**", plus(FINANCE, "BILLING", "PAYMENTS", "MEMBERS", "REPORTS"),
                 "BILLING", "PAYMENTS", "MEMBERS");
         writes("/api/invoices/**", "BILLING", "PAYMENTS", "MEMBERS", "RECEIPT_VOUCHER", "FINANCIALS", "POINT_OF_SALE");
