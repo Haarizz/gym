@@ -1,0 +1,65 @@
+/* Attendance Reports (redesign 2026-11-12) — on the shared analytics look; extra layout only. */
+
+.back {
+  display: inline-flex; align-items: center; gap: 0.35rem; border: 0; background: none; padding: 0; cursor: pointer;
+  font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); margin-bottom: 0.375rem;
+}
+.back:hover { color: var(--primary); }
+.back:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+
+.range { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.rangePick { width: 9.5rem; }
+.rangeSep { color: var(--muted-foreground); font-size: var(--text-xs); }
+
+.cols3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.cols21 { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1rem; }
+.chart { width: 100%; height: 300px; }
+.chartSm { width: 100%; height: 230px; }
+
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+.facts5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.75rem; }
+
+.slotList { display: flex; flex-direction: column; gap: 0.4rem; }
+.slot {
+  display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) auto; gap: 0.6rem; align-items: center;
+  padding: 0.5rem 0.75rem; border-radius: 0.625rem; background: var(--muted); font-size: var(--text-sm);
+}
+.rank { font-weight: 700; color: var(--muted-foreground); font-size: var(--text-xs); }
+.slotVal { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.newTag {
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; border-radius: 999px; padding: 0.1rem 0.45rem;
+  color: #15803d; background: color-mix(in srgb, #15803d 12%, transparent); margin-left: 0.4rem; vertical-align: middle;
+}
+:global(.dark) .newTag { color: #4ade80; background: color-mix(in srgb, #4ade80 14%, transparent); }
+.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.phone { color: var(--primary); text-decoration: none; white-space: nowrap; }
+.phone:hover { text-decoration: underline; }
+.dayLink { border: 0; background: none; padding: 0; cursor: pointer; color: var(--primary); font-weight: 600; font: inherit; }
+.dayLink:hover { text-decoration: underline; }
+.up { color: #15803d; font-weight: 600; }
+.down { color: #b42318; font-weight: 600; }
+:global(.dark) .up { color: #4ade80; }
+:global(.dark) .down { color: #f87171; }
+.pill {
+  display: inline-flex; font-size: var(--text-xs); font-weight: 600; padding: 0.1rem 0.5rem; border-radius: 999px;
+  background: var(--muted); color: var(--muted-foreground); white-space: nowrap;
+}
+
+/* Settings */
+.setting { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; padding: 1rem 0; }
+.setting + .setting { border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
+.settingText { flex: 1 1 18rem; min-width: 0; }
+.settingTitle { font-weight: 600; font-size: var(--text-sm); }
+.settingSub { font-size: var(--text-xs); color: var(--muted-foreground); margin-top: 0.2rem; }
+.settingControls { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.field {
+  height: 2.25rem; border-radius: 0.5rem; border: 0; padding: 0 0.75rem; font-size: var(--text-sm);
+  background: var(--muted); color: var(--foreground);
+}
+.field:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+@media (max-width: 1024px) {
+  .cols3, .cols21 { grid-template-columns: minmax(0, 1fr); }
+  .facts, .facts5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

@@ -191,6 +191,11 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
     @Query("SELECT COUNT(m) FROM Member m WHERE " + BIOS_EFFECTIVELY_ACTIVE)
     long countEffectivelyActive(@Param("asOf") LocalDateTime asOf);
 
+    /** Rows of [id, memberId, name, phone, photoUrl, membershipType, endDate] — Attendance Reports › not visiting. */
+    @Query("SELECT m.id, m.memberId, m.name, m.phone, m.photoUrl, m.membershipType, " + BIOS_END_DATE
+            + " FROM Member m WHERE " + BIOS_EFFECTIVELY_ACTIVE)
+    List<Object[]> findEffectivelyActiveBrief(@Param("asOf") LocalDateTime asOf);
+
     /** Rows of [membershipPlan, totalMembers, effectivelyActiveMembers] — the Manage Plans cards. */
     @Query("SELECT m.membershipPlan, COUNT(m), SUM(CASE WHEN " + BIOS_EFFECTIVELY_ACTIVE + " THEN 1 ELSE 0 END) "
             + "FROM Member m WHERE m.membershipPlan IS NOT NULL GROUP BY m.membershipPlan")

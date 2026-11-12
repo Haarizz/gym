@@ -35,6 +35,11 @@ public interface StaffAttendanceRepository extends JpaRepository<StaffAttendance
     @Query("SELECT sa FROM StaffAttendance sa WHERE sa.status = 'working' AND sa.clockInTime < :before")
     List<StaffAttendance> findActiveSessionsBefore(@Param("before") LocalDateTime before);
 
+    /** Staff still clocked in, whatever day they started (Attendance › Who's in now). */
+    @Query("SELECT sa FROM StaffAttendance sa JOIN FETCH sa.staff WHERE sa.status = 'working' AND sa.clockOutTime IS NULL " +
+           "ORDER BY sa.clockInTime DESC")
+    List<StaffAttendance> findOpenSessions();
+
     List<StaffAttendance> findByStaff_IdOrderByClockInTimeDesc(Long staffId);
 
     List<StaffAttendance> findByStaff_IdAndClockInTimeGreaterThanEqualAndClockInTimeLessThan(

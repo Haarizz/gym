@@ -86,6 +86,15 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     List<Attendance> findActiveSessionsBefore(@Param("before") LocalDateTime before);
 
     // Check-in timestamps in [start, end) — web dashboard "Attendance by Time Slot"
+    /** Rows of [memberId, first check-in, last check-in] for every member who ever visited (Attendance Reports). */
+    @Query("SELECT a.member.id, MIN(a.checkInTime), MAX(a.checkInTime) FROM Attendance a WHERE a.member IS NOT NULL GROUP BY a.member.id")
+    List<Object[]> findFirstAndLastVisitPerMember();
+
+    /** Everyone still checked in, whatever day they arrived (Attendance › Who's in now). */
+    @Query("SELECT a FROM Attendance a LEFT JOIN FETCH a.member WHERE a.status = 'active' AND a.checkOutTime IS NULL " +
+           "ORDER BY a.checkInTime DESC")
+    List<Attendance> findOpenSessions();
+
     @Query("SELECT a.checkInTime FROM Attendance a WHERE a.checkInTime >= :start AND a.checkInTime < :end")
     List<LocalDateTime> findCheckInTimesBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }
