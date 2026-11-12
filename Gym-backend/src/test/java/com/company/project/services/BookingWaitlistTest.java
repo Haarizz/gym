@@ -44,6 +44,8 @@ class BookingWaitlistTest {
     @Mock private BookingPaymentService bookingPaymentService;
     @Mock private SessionMemberNotifier sessionMemberNotifier;
     @Mock private com.company.project.services.pos.PosBusinessDayService businessDay;
+    @Mock private com.company.project.packages.PackageUsageService packageUsage;
+    @Mock private com.company.project.repositories.PackageEnrolmentRepository enrolmentRepository;
 
     private BookingService service;
     private TrainingSession session;
@@ -53,7 +55,8 @@ class BookingWaitlistTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new BookingService(bookingRepository, sessionRepository, memberRepository,
-                notificationService, qrCodeService, rewardRedemptionService, bookingPaymentService, sessionMemberNotifier, businessDay);
+                notificationService, qrCodeService, rewardRedemptionService, bookingPaymentService, sessionMemberNotifier, businessDay,
+                packageUsage, enrolmentRepository);
 
         session = new TrainingSession();
         session.setId(1L);

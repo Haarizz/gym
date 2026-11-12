@@ -6,6 +6,7 @@
 import { getPermissions, setPermissions } from "../permissions";
 import { isTokenExpired, clearExpiredSession, expireSessionAndReload, SESSION_EXPIRED_MESSAGE } from "../session-expiry";
 
+const CLIENT_TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return undefined; } })();
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
 export interface User {
@@ -352,6 +353,10 @@ class AuthService {
       ...options,
       headers: {
         "Content-Type": "application/json",
+        // The gym's local time zone, for any server-side "today" / month window or local
+        // wall-clock time (e.g. a session's start time on the Targets ledger) when the
+        // branch has no POS time zone set. Without it those fall back to UTC.
+        ...(CLIENT_TZ ? { "X-Client-Timezone": CLIENT_TZ } : {}),
         ...branchHeader,
         ...(options.headers as Record<string, string>),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),

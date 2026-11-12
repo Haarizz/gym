@@ -1,11 +1,15 @@
 package com.company.project.entities;
 
+import com.company.project.converters.ApplicationFamilyMembersConverter;
+import com.company.project.dto.MembershipApplicationDTOs.ApplicationFamilyMember;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A visitor's membership application from the public Service Portfolios link.
@@ -29,6 +33,11 @@ public class MembershipApplication extends BaseEntity implements BranchAware {
     public static final String APPROVAL_PENDING = "PENDING";
     public static final String APPROVAL_APPROVED = "APPROVED";
     public static final String APPROVAL_REJECTED = "REJECTED";
+
+    /** Visitor applied on the public share link. */
+    public static final String SOURCE_SHARE_LINK = "SHARE_LINK";
+    /** Staff raised it at the gym for a walk-in (Service Portfolios → Register as New Member). */
+    public static final String SOURCE_DESK = "DESK";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -122,6 +131,25 @@ public class MembershipApplication extends BaseEntity implements BranchAware {
 
     @Column(name = "member_code", length = 50)
     private String memberCode;
+
+    @Column(nullable = false, length = 20)
+    private String source = SOURCE_SHARE_LINK;
+
+    @Column(name = "reg_doc_number", length = 100)
+    private String regDocNumber;
+
+    @Column(name = "medical_conditions", columnDefinition = "TEXT")
+    private String medicalConditions;
+
+    /** Partner / family members on a Family or Couple plan (JSON); empty for one person. */
+    @Convert(converter = ApplicationFamilyMembersConverter.class)
+    @Column(name = "family_members", columnDefinition = "TEXT")
+    private List<ApplicationFamilyMember> familyMembers = new ArrayList<>();
+
+    public List<ApplicationFamilyMember> getFamilyMembers() { return familyMembers; }
+    public void setFamilyMembers(List<ApplicationFamilyMember> familyMembers) {
+        this.familyMembers = familyMembers != null ? familyMembers : new ArrayList<>();
+    }
 
     public boolean isPaid() { return PAYMENT_PAID.equals(paymentStatus); }
     public boolean isAwaitingDecision() { return APPROVAL_PENDING.equals(approvalStatus); }
@@ -218,4 +246,13 @@ public class MembershipApplication extends BaseEntity implements BranchAware {
 
     public String getMemberCode() { return memberCode; }
     public void setMemberCode(String memberCode) { this.memberCode = memberCode; }
+
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
+
+    public String getRegDocNumber() { return regDocNumber; }
+    public void setRegDocNumber(String regDocNumber) { this.regDocNumber = regDocNumber; }
+
+    public String getMedicalConditions() { return medicalConditions; }
+    public void setMedicalConditions(String medicalConditions) { this.medicalConditions = medicalConditions; }
 }

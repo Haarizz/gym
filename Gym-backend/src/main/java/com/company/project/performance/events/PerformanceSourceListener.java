@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * JPA listener on every entity that can earn credit (receipts, POS sales, leads, training
- * sessions and their bookings). It only records which rows changed; the recorder reconciles them
+ * sessions and their bookings, training package enrolments and the add-ons they were sold as). It only records which rows changed; the recorder reconciles them
  * after commit. Hibernate instantiates listeners itself, so the recorder is looked up from the
  * Spring context.
  */
@@ -40,6 +40,13 @@ public class PerformanceSourceListener implements ApplicationContextAware {
         else if (entity instanceof SaleTransaction s) recorder.touch("sale", s.getId());
         else if (entity instanceof Lead l) recorder.touch("lead", l.getId());
         else if (entity instanceof TrainingSession t) recorder.touch("session", t.getId());
-        else if (entity instanceof Booking b && b.getSession() != null) recorder.touch("session", b.getSession().getId());
+        else if (entity instanceof PackageEnrolment p) recorder.touch("enrolment", p.getId());
+        else if (entity instanceof MemberAddon a) recorder.touch("addon", a.getId());
+        if (entity instanceof Booking b) {
+            if (b.getSession() != null) recorder.touch("session", b.getSession().getId());
+            if (b.getEnrolmentId() != null) recorder.touch("enrolment", b.getEnrolmentId());
+            // A paid PT booking earns through its receipt; a refund changes what it earns.
+            if (b.getReceiptId() != null) recorder.touch("receipt", b.getReceiptId());
+        }
     }
 }

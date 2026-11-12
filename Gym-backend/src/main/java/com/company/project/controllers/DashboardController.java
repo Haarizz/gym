@@ -1,6 +1,7 @@
 package com.company.project.controllers;
 
 import com.company.project.dto.dashboard.DashboardDTOs.GenericResponse;
+import com.company.project.services.BusinessInsightsService;
 import com.company.project.services.DashboardService;
 import com.company.project.services.RevenueDashboardService;
 import com.company.project.services.RevenueOperationsService;
@@ -18,12 +19,15 @@ public class DashboardController {
     private final DashboardService dashboardService;
     private final RevenueDashboardService revenueDashboardService;
     private final RevenueOperationsService revenueOperationsService;
+    private final BusinessInsightsService businessInsightsService;
 
     public DashboardController(DashboardService dashboardService, RevenueDashboardService revenueDashboardService,
-                               RevenueOperationsService revenueOperationsService) {
+                               RevenueOperationsService revenueOperationsService,
+                               BusinessInsightsService businessInsightsService) {
         this.dashboardService = dashboardService;
         this.revenueDashboardService = revenueDashboardService;
         this.revenueOperationsService = revenueOperationsService;
+        this.businessInsightsService = businessInsightsService;
     }
 
     // period: today | week (last 7 days) | month | lastMonth
@@ -119,6 +123,31 @@ public class DashboardController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate to,
             @RequestParam(required = false) String compare) {
         return ResponseEntity.ok(new GenericResponse<>(true, revenueOperationsService.getTargets(from, to, compare)));
+    }
+
+    // Business Insights sections, each loaded when opened
+    @GetMapping("/insights/campaigns")
+    public ResponseEntity<GenericResponse<?>> getCampaignInsights(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            @RequestParam(required = false) String compare) {
+        return ResponseEntity.ok(new GenericResponse<>(true, businessInsightsService.getCampaigns(from, to, compare)));
+    }
+
+    @GetMapping("/insights/renewals")
+    public ResponseEntity<GenericResponse<?>> getRenewalInsights(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            @RequestParam(required = false) String compare) {
+        return ResponseEntity.ok(new GenericResponse<>(true, businessInsightsService.getRenewals(from, to, compare)));
+    }
+
+    @GetMapping("/insights/training")
+    public ResponseEntity<GenericResponse<?>> getTrainingInsights(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            @RequestParam(required = false) String compare) {
+        return ResponseEntity.ok(new GenericResponse<>(true, businessInsightsService.getTraining(from, to, compare)));
     }
 
     @GetMapping("/member-churn")

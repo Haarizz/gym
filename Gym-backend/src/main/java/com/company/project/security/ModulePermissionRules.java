@@ -150,6 +150,8 @@ public final class ModulePermissionRules {
         writes("/api/checkin/**", "CHECK_IN", "ATTENDANCE");
         writes("/api/training-streams/**", "TRAINING_STREAMS");
         writes("/api/sessions/**", "TRAININGS_CLASSES", "BOOKINGS");
+        writes("/api/training-packages/**", "TRAININGS_CLASSES", "MEMBERSHIP_PLANS");
+        writes("/api/package-enrolments/**", "MEMBERS", "BILLING", "TRAININGS_CLASSES");
         writes("/api/bookings/**", "BOOKINGS", "TRAININGS_CLASSES", "MEMBERS");
 
         // Staff & payroll

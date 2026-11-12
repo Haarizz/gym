@@ -15,7 +15,7 @@ const CLIENT_TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().
 
 export type MetricCode =
   | 'MEMBER_ADMISSION' | 'LEAD_CONVERSION' | 'POS_SALE'
-  | 'PT_SESSION_DELIVERED' | 'CLASS_TAUGHT' | 'CLASS_ATTENDEE' | 'REVENUE_TOTAL';
+  | 'PT_SESSION_DELIVERED' | 'CLASS_TAUGHT' | 'CLASS_ATTENDEE' | 'PT_SALE' | 'PT_REVENUE' | 'REVENUE_TOTAL';
 export type Measure = 'count' | 'amount';
 
 export interface MetricDef {
@@ -29,13 +29,15 @@ export interface MetricDef {
 
 /** Labels and units shown in the web app (the backend sends English labels too). */
 export const METRICS: Array<{ code: MetricCode; label: string; unit: string; hasCount: boolean; hasAmount: boolean; hint: string }> = [
-  { code: 'REVENUE_TOTAL', label: 'Total revenue', unit: 'revenue', hasCount: false, hasAmount: true, hint: 'Admissions + POS sales' },
+  { code: 'REVENUE_TOTAL', label: 'Total revenue', unit: 'revenue', hasCount: false, hasAmount: true, hint: 'Admissions + POS sales + PT sales' },
   { code: 'MEMBER_ADMISSION', label: 'New member admissions', unit: 'admission', hasCount: true, hasAmount: true, hint: 'New-member receipts they processed (money received)' },
   { code: 'LEAD_CONVERSION', label: 'Lead conversions', unit: 'conversion', hasCount: true, hasAmount: false, hint: 'Leads assigned to them marked converted' },
   { code: 'POS_SALE', label: 'POS sales', unit: 'sale', hasCount: true, hasAmount: true, hint: 'Completed POS bills they rang up, net of refunds' },
-  { code: 'PT_SESSION_DELIVERED', label: 'PT sessions delivered', unit: 'session', hasCount: true, hasAmount: false, hint: 'Booked PT sessions they trained, once the session time has passed' },
+  { code: 'PT_SESSION_DELIVERED', label: 'PT sessions delivered', unit: 'session', hasCount: true, hasAmount: false, hint: 'PT sessions they trained where the member came (checked in, or a counted no-show)' },
   { code: 'CLASS_TAUGHT', label: 'Classes taught', unit: 'class', hasCount: true, hasAmount: false, hint: 'Classes they led with at least one booking' },
   { code: 'CLASS_ATTENDEE', label: 'Class attendees', unit: 'attendee', hasCount: true, hasAmount: false, hint: 'Members checked in to their classes' },
+  { code: 'PT_SALE', label: 'PT sales', unit: 'sale', hasCount: true, hasAmount: true, hint: 'Money members paid for PT with them: packages and paid PT sessions, counted on payment' },
+  { code: 'PT_REVENUE', label: 'PT earned for commission', unit: 'revenue', hasCount: false, hasAmount: true, hint: "PT money their commission is paid on: all at once for packages set to 'on booking' and paid sessions, or month by month as sessions are used for 'on completion' packages" },
 ];
 export const metricLabel = (code: string) => METRICS.find(m => m.code === code)?.label ?? code;
 export const metricUnit = (code: string) => METRICS.find(m => m.code === code)?.unit ?? 'unit';
@@ -214,6 +216,34 @@ export interface IncentivePlan {
 
 export type PlanRequest = Omit<IncentivePlan, 'id' | 'effective_to' | 'settled_months'>;
 
+export interface PlanPreview {
+  period: string;
+  /** What the previewed plan would pay everyone listed. */
+  total: number;
+  /** What they actually got (or are getting) under their current plans. */
+  actual: number;
+  rows: Array<{ staff_id: number; name: string | null; total: number; actual: number; incentive: IncentiveResult }>;
+}
+
+// ── Credited activity ───────────────────────────────────────────────────────
+
+export interface CreditEvent {
+  id: number;
+  metric: MetricCode;
+  occurred_at: string;
+  quantity: number;
+  amount: number | null;
+  source_type: string;
+  source_id: number;
+  correction: boolean;
+  /** "b:<booking>" = one package session used, "d:<yyyy-MM>" = a month of a day package, "expiry" = unused sessions paid out */
+  part?: string;
+  title: string | null;
+  person: string | null;
+  /** at the month's plan rates, before caps and bonuses */
+  commission: number;
+}
+
 // ── Unassigned ──────────────────────────────────────────────────────────────
 
 export interface UnassignedRow {
@@ -271,6 +301,12 @@ export const performanceService = {
   updatePlan: (id: number, body: PlanRequest) => request<IncentivePlan>(`/plans/${id}`, 'Failed to save plan', put(body)),
   newPlanVersion: (id: number, body: PlanRequest) => request<IncentivePlan>(`/plans/${id}/versions`, 'Failed to create a new version', post(body)),
   deletePlan: (id: number) => request<void>(`/plans/${id}`, 'Failed to delete plan', del),
+  /** What an unsaved plan would pay these people for a month (default: last month), next to what they got. */
+  previewPlan: (body: { plan: PlanRequest; staff_ids: number[]; period?: string }) =>
+    request<PlanPreview>('/plans/preview', 'Failed to preview plan', post(body)),
+
+  events: (staffId: number, period: string) =>
+    request<CreditEvent[]>(`/events?staff_id=${staffId}&period=${period}`, 'Failed to load activity'),
 
   unassigned: (months = 6) => request<UnassignedList>(`/unassigned?months=${months}`, 'Failed to load unassigned sales'),
   assign: (type: 'receipt' | 'sale' | 'lead', id: number, staffId: number | null) =>

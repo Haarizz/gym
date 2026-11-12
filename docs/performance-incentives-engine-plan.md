@@ -315,3 +315,13 @@ record PeriodResult(Long staffId, YearMonth period,
 - **Missed reconcile**: a source row changed inside a nested transaction that commits while the outer one rolls back may not be reconciled. `POST /rebuild` repairs it.
 - **Trend windows**: the mobile staff performance growth and six-month trend use UTC month boundaries; the headline month uses the gym's zone.
 - **Malayalam and Tamil** have the new ledger strings but don't load the ledger namespace yet, so they show English.
+
+## 12. Simple incentive editor (2026-11-11)
+
+The Incentive Plans tab opens in **Simple** mode; **Advanced** is the full plan editor, unchanged. The choice is remembered per browser.
+
+- **One card per role** (roles taken from staff records, with case-insensitive matching, so `TRAINER` and `Trainer` are one role). Commission is written as sentences with a number: "Pay [10] % of the PT revenue they earn", "Pay [150] per PT session they deliver". Trainer-type roles (train/coach/instruct) see the trainer options first; the rest are behind "Show more".
+- **Bonus for reaching a target**: one amount per metric, paid at 100% of the person's own goal. Rows appear for every metric someone in the role has a target on. The target form shows the bonus that reaching each goal pays and links to the role card.
+- **Live preview**: `POST /api/performance/plans/preview` runs `IncentiveCalculator` for an unsaved plan against each person's real figures and goals for last month or this month so far, next to what they got. Nothing is stored (`IncentivePlanService.draft`).
+- **Storage**: a card is an ordinary plan assigned to that role only. Saving updates it in place, starts a new version from the current month when months were approved under it, or creates it when the role used a shared plan or none. A new role plan goes in the same branch as the shared one, so it takes over for that role.
+- A role plan with minimums, caps, tiers, conditions or %-of-amount bonuses is shown read-only, with "Edit in Advanced". Personal and multi-role plans are listed under "other plans".

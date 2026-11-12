@@ -16,6 +16,8 @@ const ledger = {
           PT_SESSION_DELIVERED: "நடத்திய PT அமர்வுகள்",
           CLASS_TAUGHT: "நடத்திய வகுப்புகள்",
           CLASS_ATTENDEE: "வகுப்பு வருகையாளர்கள்",
+          PT_SALE: "PT விற்பனை",
+          PT_REVENUE: "ஈட்டிய PT வருவாய்",
           REVENUE_TOTAL: "வருவாய்",
         },
         units: {
@@ -25,6 +27,7 @@ const ledger = {
           PT_SESSION_DELIVERED: "அமர்வு",
           CLASS_TAUGHT: "வகுப்பு",
           CLASS_ATTENDEE: "வருகையாளர்",
+          PT_SALE: "விற்பனை",
         },
       },
     },

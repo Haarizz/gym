@@ -181,7 +181,9 @@ public class RevenueDashboardService {
         netCard.put("trend", percentageChange(net, previousNet));
         result.put("netRevenue", netCard);
 
-        long activeMembers = memberRepository.countByMembershipStatus("active");
+        // Same "effectively active" rule as the Overview KPI and the Members page (case-insensitive
+        // status, not suspended, end date not passed) — an exact "active" match missed "Active" rows.
+        long activeMembers = memberRepository.countEffectivelyActive(LocalDate.now().atStartOfDay());
         Map<String, Object> membersCard = new LinkedHashMap<>();
         membersCard.put("count", activeMembers);
         membersCard.put("newInPeriod", memberRepository.countByJoinDateBetween(from.atStartOfDay(), to.plusDays(1).atStartOfDay()));

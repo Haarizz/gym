@@ -62,9 +62,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { referralService, ReferralResponse } from "../utils/supabase/referral-service";
 import { walletService } from "../utils/supabase/reward-service";
 import { membersService, Member as ApiMember } from "../utils/supabase/members-service";
-import { addonsService, MemberAddon } from "../utils/supabase/addons-service";
+import { addonsService, MemberAddon, type AddonPromoQuote } from "../utils/supabase/addons-service";
 import { addonPlansService, AddonPlan as ApiAddonPlan } from "../utils/supabase/addon-plans-service";
 import { facilitiesService, FacilityApi } from "../utils/supabase/facilities-service";
+import { packageService, packageSummary, type TrainingPackage } from "../utils/supabase/package-service";
 import { accountHeadsService, AccountHead } from "../utils/supabase/account-heads-service";
 import { staffService, Staff } from "../utils/supabase/staff-service";
 import { usePaymentManager } from "../payments/usePaymentManager";
@@ -224,6 +225,28 @@ function buildFacilityAddonCards(facilities: FacilityApi[]): Addon[] {
   return cards;
 }
 
+// PT packages (Trainings & Classes → PT Packages) are sold here too, as "Training" cards. Their
+// ids are offset far below the facility cards' so they never collide.
+const PACKAGE_CARD_OFFSET = -1_000_000;
+const packageCardId = (packageId: number) => PACKAGE_CARD_OFFSET - packageId;
+
+function buildPackageAddonCards(packages: TrainingPackage[]): Addon[] {
+  return packages.filter((p) => p.is_active).map((p) => ({
+    id: packageCardId(p.id),
+    name: p.name,
+    description: `PT package · ${packageSummary(p)}${p.description ? ` — ${p.description}` : ""}`,
+    price: p.price,
+    validity: p.validity_days,
+    category: "Training" as Addon["category"],
+    isActive: true,
+  }));
+}
+
+const isoToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 // Use the MemberAddon type from the API service directly
 
 // BG_104: matches AddonPlanService.MAX_DESCRIPTION_LENGTH on the backend.
@@ -315,6 +338,19 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
       .catch(() => {}); // non-fatal — the catalog add-ons still work without it
   }, []);
   const facilityAddonCards = useMemo(() => buildFacilityAddonCards(facilities), [facilities]);
+
+  // PT packages, sold through this same purchase dialog (plus a trainer and a start date).
+  const [trainingPackages, setTrainingPackages] = useState<TrainingPackage[]>([]);
+  useEffect(() => {
+    packageService.list(true).then(setTrainingPackages).catch(() => {}); // non-fatal
+  }, []);
+  const packageAddonCards = useMemo(() => buildPackageAddonCards(trainingPackages), [trainingPackages]);
+  const packageByCardId = useMemo(
+    () => new Map(trainingPackages.map((p) => [packageCardId(p.id), p] as const)),
+    [trainingPackages],
+  );
+  const [packageTrainerId, setPackageTrainerId] = useState("");
+  const [packageStartDate, setPackageStartDate] = useState(isoToday());
 
   const handleOpenManageModal = () => {
     setEditingPlan(null);
@@ -413,11 +449,20 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
   const [memberWalletBalance, setMemberWalletBalance] = useState(0);
   const [walletAmountApplied, setWalletAmountApplied] = useState(0);
 
+  // Promotion code — comes off the price first; the reward and wallet then combine with it.
+  // Only promotions with Add-ons in their Applicable Services are accepted (checked server-side).
+  const [promoInput, setPromoInput] = useState("");
+  const [promoApplied, setPromoApplied] = useState<AddonPromoQuote | null>(null);
+  const [promoChecking, setPromoChecking] = useState(false);
+  const promoDiscount = promoApplied ? Math.min(promoApplied.discount_amount, customAmount) : 0;
+  const priceAfterPromo = Math.max(0, customAmount - promoDiscount);
+  const rewardDeduction = rewardApplied && availableReward ? availableReward.rewardAmount : 0;
+
   // The panel settles amountToPay (sticker price minus reward/wallet
   // deductions), never the sticker price itself. Only a billed-to-head
   // member may leave a balance on CREDIT — everyone else must fully cover
   // amountToPay with CASH/CARD/ONLINE.
-  const amountToPay = Math.max(0, customAmount - (rewardApplied && availableReward ? availableReward.rewardAmount : 0) - walletAmountApplied);
+  const amountToPay = Math.max(0, priceAfterPromo - rewardDeduction - walletAmountApplied);
   const paymentManager = usePaymentManager({ invoiceTotal: amountToPay });
 
   // Load transactions from API on mount
@@ -524,7 +569,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
   };
 
   const filteredAddons = useMemo(() => {
-    let active: Addon[] = [...addonPlans, ...facilityAddonCards].filter((addon) => addon.isActive);
+    let active: Addon[] = [...packageAddonCards, ...addonPlans, ...facilityAddonCards].filter((addon) => addon.isActive);
     if (filterCategory !== "all") {
       active = active.filter((addon) => addon.category === filterCategory);
     }
@@ -535,7 +580,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
       );
     }
     return active;
-  }, [addonPlans, facilityAddonCards, filterCategory, addonSearchQuery]);
+  }, [addonPlans, facilityAddonCards, packageAddonCards, filterCategory, addonSearchQuery]);
 
   const filteredTransactions = useMemo(() => {
     let filtered = [...transactions];
@@ -574,11 +619,16 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
     setSelectedAddon(addon);
     setCustomValidity(addon.validity);
     setCustomAmount(addon.price);
+    const pkg = packageByCardId.get(addon.id);
+    setPackageTrainerId(pkg?.default_trainer_id != null ? String(pkg.default_trainer_id) : "");
+    setPackageStartDate(isoToday());
     paymentManager.clearLines();
     setRewardApplied(false);
     setAvailableReward(null);
     setWalletAmountApplied(0);
     setMemberWalletBalance(0);
+    setPromoInput("");
+    setPromoApplied(null);
     referralService.getUnredeemedReward(selectedMember.membershipId)
       .then(setAvailableReward)
       .catch(() => {}); // no reward to offer — not a purchase-blocking failure
@@ -592,9 +642,31 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
     setRewardApplied(true);
   };
 
+  const handleApplyPromo = async () => {
+    const code = promoInput.trim();
+    if (!code || !selectedMember) return;
+    setPromoChecking(true);
+    try {
+      const quote = await addonsService.validatePromoCode(code, customAmount, Number(selectedMember.id));
+      setPromoApplied(quote);
+      setWalletAmountApplied(0); // re-apply against the lower price
+      toast.success(`${quote.name} applied`);
+    } catch (err: any) {
+      setPromoApplied(null);
+      toast.error(err?.message || "Invalid promotion code");
+    } finally {
+      setPromoChecking(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setPromoApplied(null);
+    setWalletAmountApplied(0);
+  };
+
   const handleApplyWallet = () => {
     if (!memberWalletBalance) return;
-    const remainingBeforeWallet = Math.max(0, customAmount - (rewardApplied && availableReward ? availableReward.rewardAmount : 0));
+    const remainingBeforeWallet = Math.max(0, priceAfterPromo - rewardDeduction);
     const amount = Math.min(memberWalletBalance, remainingBeforeWallet);
     setWalletAmountApplied(amount);
   };
@@ -610,8 +682,20 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
     return addonExpiry > memberExpiry ? addonExpiry : memberExpiry;
   };
 
+  const selectedPackage = selectedAddon ? packageByCardId.get(selectedAddon.id) ?? null : null;
+  const packageEndDate = useMemo(() => {
+    if (!selectedPackage || !packageStartDate) return null;
+    const end = new Date(`${packageStartDate}T00:00:00`);
+    end.setDate(end.getDate() + selectedPackage.validity_days - 1);
+    return end;
+  }, [selectedPackage, packageStartDate]);
+
   const handleConfirmPurchase = async () => {
     if (!selectedMember || !selectedAddon || customAmount === undefined || customAmount < 0) return;
+    if (selectedPackage && !packageTrainerId) {
+      toast.error("Choose the trainer in charge of this package");
+      return;
+    }
 
     const billedToHead = selectedMember.billedToHead;
 
@@ -640,9 +724,54 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
       if (amountToPay === 0) {
         if (walletAmountApplied > 0) paymentModeToSend = "Wallet";
         else if (rewardApplied) paymentModeToSend = "Reward";
+        else if (promoApplied) paymentModeToSend = "Promotion";
       } else if (billedToHead && paidNowAmount <= 0) {
         paymentModeToSend = "Credit";
       }
+      if (selectedPackage) {
+        const sold = await packageService.sell({
+          package_id: selectedPackage.id,
+          member_id: Number(selectedMember.id),
+          trainer_id: Number(packageTrainerId),
+          start_date: packageStartDate,
+          payment_mode: paymentModeToSend,
+          payment_breakdown: paymentBreakdown,
+          paid_amount: billedToHead ? paidNowAmount : undefined,
+          wallet_amount_applied: walletAmountApplied > 0 ? walletAmountApplied : undefined,
+          processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
+          notes: notes || undefined,
+        });
+        if (rewardApplied && availableReward) referralService.redeemReward(availableReward.id).catch(() => {});
+        // The sale is an add-on underneath: reload the list so it shows up with its receipt.
+        addonsService.getAddons({}, { limit: 500 }).then((res) => setTransactions(res.addons)).catch(() => {});
+        setLastCreatedAddon({
+          id: String(sold.enrolment.member_addon_id ?? ""),
+          transaction_id: sold.enrolment.transaction_id ?? "",
+          member_db_id: String(selectedMember.id),
+          member_id: selectedMember.membershipId,
+          member_name: selectedMember.name,
+          addon_name: selectedPackage.name,
+          category: "Training",
+          amount: selectedPackage.price,
+          payment_mode: paymentModeToSend,
+          start_date: sold.enrolment.start_date,
+          expiry_date: sold.enrolment.end_date,
+          purchase_date: new Date().toISOString(),
+          status: "Active",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          receipt: sold.receipt ?? undefined,
+        });
+        setIsPurchaseDialogOpen(false);
+        setIsSuccessDialogOpen(true);
+        setAvailableReward(null);
+        setRewardApplied(false);
+        setNotes("");
+        paymentManager.clearLines();
+        setProcessedByStaffId("");
+        return;
+      }
+
       const created = await addonsService.createAddon({
         member_db_id: Number(selectedMember.id),
         member_id: selectedMember.membershipId,
@@ -662,6 +791,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
         // apart the way a separate follow-up debit call could.
         wallet_amount_applied: walletAmountApplied > 0 ? walletAmountApplied : undefined,
         processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
+        promo_code: promoApplied?.code || undefined,
       });
       if (rewardApplied && availableReward) {
         // Best-effort: the add-on purchase already succeeded, so a failure here
@@ -1224,13 +1354,45 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
               {/* Addon summary */}
               <div className="rounded-xl border bg-muted/30 px-4 py-3 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-0.5">Add-on</p>
+                  <p className="text-xs text-muted-foreground mb-0.5">{selectedPackage ? "PT package" : "Add-on"}</p>
                   <p className="text-sm font-semibold">{selectedAddon.name}</p>
                 </div>
                 <Badge variant="secondary" className="text-[11px]">{selectedAddon.category}</Badge>
               </div>
 
+              {/* PT package: trainer + start date; its price and length come from the package */}
+              {selectedPackage && (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">{packageSummary(selectedPackage)}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">Trainer in charge</Label>
+                      <Select value={packageTrainerId || undefined} onValueChange={setPackageTrainerId}>
+                        <SelectTrigger><SelectValue placeholder="Choose a trainer" /></SelectTrigger>
+                        <SelectContent>
+                          {staffOptions.filter(s => s.status !== "inactive").map(s => (
+                            <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pkg-start" className="text-xs font-medium">Starts</Label>
+                      <Input id="pkg-start" type="date" value={packageStartDate} onChange={(e) => setPackageStartDate(e.target.value)} />
+                      <p className="text-[11px] text-muted-foreground">
+                        Ends: {packageEndDate?.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-2 border rounded-xl">
+                    <span className="text-sm text-muted-foreground">Price</span>
+                    <span className="text-sm font-bold">{currencyPrefix}{selectedPackage.price}</span>
+                  </div>
+                </div>
+              )}
+
               {/* Validity + Amount */}
+              {!selectedPackage && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="validity" className="text-xs font-medium">Validity (Days)</Label>
@@ -1254,10 +1416,48 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                       setCustomAmount(Number(e.target.value));
                       setWalletAmountApplied(0); // reset on manual change
                       setRewardApplied(false);
+                      setPromoApplied(null); // its discount was priced on the old amount
                     }}
                   />
                 </div>
               </div>
+              )}
+
+              {/* Promotion code (not for training packages, which are sold at their set price) */}
+              {!selectedPackage && customAmount > 0 && (
+                <div className="rounded-xl border px-4 py-3 space-y-2">
+                  <Label htmlFor="addon-promo" className="text-xs font-medium">Promo code</Label>
+                  {promoApplied ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold">
+                          {promoApplied.code} · {promoApplied.name}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          −{currencyPrefix}{promoDiscount.toFixed(2)} off this add-on
+                        </p>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={handleRemovePromo}>Remove</Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="addon-promo"
+                        placeholder="Enter code"
+                        value={promoInput}
+                        onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleApplyPromo(); } }}
+                      />
+                      <Button size="sm" variant="outline" onClick={handleApplyPromo} disabled={!promoInput.trim() || promoChecking}>
+                        {promoChecking ? "Checking…" : "Apply"}
+                      </Button>
+                    </div>
+                  )}
+                  <p className="text-[11px] text-muted-foreground">
+                    Only promotions with Add-ons ticked under Applicable Services work here.
+                  </p>
+                </div>
+              )}
 
               {/* Referral reward available for this member */}
               {availableReward && (
@@ -1289,7 +1489,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                       {walletAmountApplied > 0 ? `${currencyPrefix}${walletAmountApplied} applied to this purchase.` : "Use it toward this purchase."}
                     </p>
                   </div>
-                  {walletAmountApplied === 0 && customAmount - (rewardApplied && availableReward ? availableReward.rewardAmount : 0) > 0 && (
+                  {walletAmountApplied === 0 && priceAfterPromo - rewardDeduction > 0 && (
                     <Button size="sm" variant="outline" className="border-blue-300 text-blue-800 hover:bg-blue-100" onClick={handleApplyWallet}>
                       Use Wallet
                     </Button>
@@ -1298,11 +1498,11 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
               )}
 
               {/* Outstanding Amount to Pay */}
-              {customAmount > 0 && (rewardApplied || walletAmountApplied > 0) && (
+              {customAmount > 0 && (rewardApplied || walletAmountApplied > 0 || promoApplied) && (
                 <div className="flex items-center justify-between px-4 py-2 bg-muted/20 border rounded-xl">
                   <span className="text-sm font-medium">Balance to Pay</span>
                   <span className="text-sm font-bold text-primary">
-                    {currencyPrefix}{Math.max(0, customAmount - (rewardApplied && availableReward ? availableReward.rewardAmount : 0) - walletAmountApplied).toFixed(2)}
+                    {currencyPrefix}{amountToPay.toFixed(2)}
                   </span>
                 </div>
               )}
@@ -1365,7 +1565,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
               </div>
 
               {/* Membership update */}
-              {selectedMember && calculateNewExpiry() && (
+              {selectedMember && !selectedPackage && calculateNewExpiry() && (
                 <div className="rounded-xl border border-blue-200 bg-blue-50/50 overflow-hidden">
                   <div className="h-0.5 w-full bg-gradient-to-r from-blue-400 to-blue-600" />
                   <div className="px-4 py-3">
@@ -1418,7 +1618,8 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
           <div className="px-8 py-6 space-y-2">
             {[
               { label: "Add-on", value: selectedAddon?.name },
-              { label: "Amount", value: `${currencyPrefix}${customAmount}` },
+              // The saved amount is after any promo code
+              { label: "Amount", value: `${currencyPrefix}${lastCreatedAddon?.amount ?? customAmount}` },
               ...(selectedMember?.billedToHead
                 ? [{ label: "Billed To", value: selectedMember.familyHeadName || "Family Head" }]
                 : [{ label: "Payment", value: lastCreatedAddon?.payment_mode ?? "" }]),

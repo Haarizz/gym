@@ -49,13 +49,16 @@ public class PerformanceEventRecorder {
 
     private final PerformanceEventRepository repository;
     private final Map<String, SourceDeriver> derivers;
+    private final Map<String, SourceRedirect> redirects;
     private final PerformanceClock clock;
     private final TransactionTemplate newTransaction;
 
     public PerformanceEventRecorder(PerformanceEventRepository repository, List<SourceDeriver> derivers,
+                                    List<SourceRedirect> redirects,
                                     PerformanceClock clock, PlatformTransactionManager transactionManager) {
         this.repository = repository;
         this.derivers = derivers.stream().collect(Collectors.toMap(SourceDeriver::sourceType, Function.identity()));
+        this.redirects = redirects.stream().collect(Collectors.toMap(SourceRedirect::sourceType, Function.identity()));
         this.clock = clock;
         this.newTransaction = new TransactionTemplate(transactionManager);
         this.newTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -72,7 +75,7 @@ public class PerformanceEventRecorder {
     /** A source row changed: reconcile it after the current transaction commits (or now, outside one). */
     @SuppressWarnings("unchecked")
     public void touch(String sourceType, Long sourceId) {
-        if (sourceId == null || !derivers.containsKey(sourceType)) return;
+        if (sourceId == null || (!derivers.containsKey(sourceType) && !redirects.containsKey(sourceType))) return;
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             reconcileQuietly(sourceType, sourceId);
             return;
@@ -99,6 +102,22 @@ public class PerformanceEventRecorder {
 
     /** Reconciles in a new transaction; logs instead of throwing (the source write already committed). */
     public void reconcileQuietly(String sourceType, Long sourceId) {
+        SourceRedirect redirect = redirects.get(sourceType);
+        if (redirect != null) {
+            List<Long> targets;
+            Long branch = BranchContextHolder.getActiveBranchId();
+            BranchContextHolder.clear();
+            try {
+                targets = newTransaction.execute(tx -> redirect.targets(sourceId));
+            } catch (RuntimeException e) {
+                log.warn("Performance ledger: could not resolve {} {}", sourceType, sourceId, e);
+                return;
+            } finally {
+                if (branch != null) BranchContextHolder.setActiveBranchId(branch);
+            }
+            if (targets != null) for (Long id : targets) reconcileQuietly(redirect.targetType(), id);
+            return;
+        }
         for (int attempt = 1; attempt <= 2; attempt++) {
             try {
                 reconcileInNewTransaction(sourceType, sourceId);
@@ -176,11 +195,11 @@ public class PerformanceEventRecorder {
         Map<Credit.Key, Credit> want = new LinkedHashMap<>();
         for (Credit c : desired) {
             want.merge(c.key(), c, (a, b) -> new Credit(a.metric(), a.staffId(), a.branchId(), a.occurredAt(),
-                    a.quantity() + b.quantity(), add(a.amount(), b.amount())));
+                    a.quantity() + b.quantity(), add(a.amount(), b.amount()), a.part()));
         }
         Map<Credit.Key, List<PerformanceEvent>> have = new LinkedHashMap<>();
         for (PerformanceEvent e : existing) {
-            have.computeIfAbsent(new Credit.Key(e.getMetric(), e.getStaffId()), k -> new ArrayList<>()).add(e);
+            have.computeIfAbsent(new Credit.Key(e.getMetric(), e.getStaffId(), e.getPart()), k -> new ArrayList<>()).add(e);
         }
         Set<Credit.Key> keys = new LinkedHashSet<>(have.keySet());
         keys.addAll(want.keySet());
@@ -203,6 +222,7 @@ public class PerformanceEventRecorder {
             e.setSourceId(sourceId);
             e.setMetric(key.metric());
             e.setStaffId(key.staffId());
+            e.setPart(key.part());
             e.setQuantity(dq);
             e.setAmount(da);
             e.setCreatedAt(now);

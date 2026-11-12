@@ -31,7 +31,7 @@ import {
 import { cn } from "../components/ui/utils";
 import { StaffTargetsBoard } from "../components/targets/StaffTargetsBoard";
 import { isGymAdminRole } from "../utils/permissions";
-import { MetricGrid } from "../components/targets/target-metrics";
+import { MetricGrid, compareCompletion, completionPct } from "../components/targets/target-metrics";
 import { unitLabel } from "../utils/target-units";
 import { ReportActions, type ReportDocument, col, kpiSection, moneyCol, tableSection } from "../components/report-export";
 
@@ -136,7 +136,12 @@ export function MyTargets() {
 
   const ranking = useMemo(() => {
     if (!profile) return null;
-    const rows = [...peerTargets].sort((a, b) => (b.percentage || 0) - (a.percentage || 0));
+    // Rank on completion across every metric that has a target (not just overall revenue),
+    // each capped at 100%, with over-achievement breaking ties. Rows with no targets are left out.
+    const rows = peerTargets
+      .map(t => ({ ...t, completion: completionPct(t) }))
+      .filter(t => t.completion.count > 0)
+      .sort((a, b) => compareCompletion(a.completion, b.completion));
     const position = rows.findIndex(t => t.staff_db_id === profile.id);
     return { position: position === -1 ? null : position + 1, total: rows.length, rows };
   }, [peerTargets, profile]);
@@ -155,8 +160,8 @@ export function MyTargets() {
       ], "This month"),
       tableSection("Unit targets", [col("service", "Service"), col("target_units", "Target", "integer", { total: "sum" }), col("achieved_units", "Achieved", "integer", { total: "sum" }), col("pct", "Progress", "percent")],
         unitTargets.map(u => ({ ...u, service: unitLabel(u.service) || u.service, pct: u.target_units ? Math.round((u.achieved_units / u.target_units) * 1000) / 10 : null })), { totals: true, emptyText: "No unit targets this month." }),
-      ...(ranking && ranking.rows.length ? [tableSection("Team ranking", [col("rank", "Rank", "integer"), col("name", "Staff"), moneyCol("target", "Target"), moneyCol("achieved", "Achieved"), col("pct", "Progress", "percent")],
-        ranking.rows.map((t, i) => ({ rank: i + 1, name: t.staff_name || "", target: Number(t.revenue_target || 0), achieved: Number(t.revenue_achieved || 0), pct: Number(t.percentage || 0) })), { totals: true })] : []),
+      ...(ranking && ranking.rows.length ? [tableSection("Team ranking", [col("rank", "Rank", "integer"), col("name", "Staff"), moneyCol("target", "Target"), moneyCol("achieved", "Achieved"), col("pct", "Completion", "percent"), col("met", "Targets met"), col("stretch", "Incl. over-achievement", "percent")],
+        ranking.rows.map((t, i) => ({ rank: i + 1, name: t.staff_name || "", target: Number(t.revenue_target || 0), achieved: Number(t.revenue_achieved || 0), pct: t.completion.pct, met: `${t.completion.met} of ${t.completion.count}`, stretch: t.completion.stretch })), { totals: true })] : []),
     ],
   });
 
@@ -592,7 +597,7 @@ export function MyTargets() {
                   <Trophy className="h-5 w-5 mr-2 text-secondary" />
                   Team Leaderboard
                 </CardTitle>
-                <CardDescription>Ranking by target completion this period</CardDescription>
+                <CardDescription>Ranking by how much of their targets each person has met this period (each target counts up to 100%; going over breaks ties)</CardDescription>
               </CardHeader>
               <CardContent>
                 {!ranking || ranking.rows.length === 0 ? (
@@ -626,8 +631,13 @@ export function MyTargets() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <span className="font-bold text-foreground">{t.percentage || 0}%</span>
+                            <span className="font-bold text-foreground">{t.completion.pct}%</span>
                             {index === 0 && <Crown className="h-4 w-4 text-yellow-500 ml-1 inline" />}
+                            <p className="text-xs text-muted-foreground">
+                              {t.completion.met === t.completion.count && t.completion.stretch > 100
+                                ? <span className="text-green-600 font-medium">Exceeded · {t.completion.stretch}%</span>
+                                : `${t.completion.met} of ${t.completion.count} target${t.completion.count === 1 ? "" : "s"} met`}
+                            </p>
                           </div>
                         </div>
                       );

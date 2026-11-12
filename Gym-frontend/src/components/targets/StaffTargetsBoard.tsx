@@ -164,7 +164,7 @@ export function StaffTargetsBoard() {
         {kpi("overall", Target, "Overall revenue")}
         {kpi("memberships", CreditCard, "Membership revenue")}
         {kpi("pos", ShoppingBag, "POS sales")}
-        {kpi("pt", Dumbbell, "PT revenue")}
+        {kpi("pt", Dumbbell, "PT sales")}
         {kpi("pt_sessions", CalendarCheck, "PT sessions", false)}
         <Kpi icon={Percent} label="Commission earned" value={<Money value={totals.commission} />}
           sub={`${totals.withTarget} of ${rows.length} staff have targets`} tone="violet" />
@@ -196,7 +196,7 @@ export function StaffTargetsBoard() {
             <table className={s.table}>
               <thead>
                 <tr>
-                  <th>Staff</th><th>Overall</th><th>Membership</th><th>POS sales</th><th>PT revenue</th><th>PT sessions</th>
+                  <th>Staff</th><th>Overall</th><th>Membership</th><th>POS sales</th><th>PT sales</th><th>PT sessions</th>
                   <th className={s.right}>Commission</th><th aria-label="Open" />
                 </tr>
               </thead>
@@ -283,9 +283,9 @@ export function StaffTargetsBoard() {
                     </div>
                   )}
                   <Note tone="blue">
-                    Revenue is credited to whoever took the payment, and PT session bookings (incl. the app) to the session's trainer.
-                    Payments still awaiting approval or rejected don't count. Membership revenue excludes PT, so membership + POS + PT
-                    add up to the overall figure.
+                    Memberships and POS sales count for whoever took the payment. PT sales (packages and paid PT sessions) count for the
+                    trainer, in full, when the member pays. Payments still awaiting approval don't count. Commission on PT follows each
+                    package's setting: all at once (On booking) or a share per session used (On completion).
                   </Note>
                 </div>
                 <div className={s.dialogFooter}>

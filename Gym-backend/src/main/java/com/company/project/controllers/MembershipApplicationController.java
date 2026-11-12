@@ -1,6 +1,8 @@
 package com.company.project.controllers;
 
+import com.company.project.dto.MembershipApplicationDTOs.ApplicationReceipt;
 import com.company.project.dto.MembershipApplicationDTOs.ApplicationView;
+import com.company.project.dto.MembershipApplicationDTOs.DeskApplication;
 import com.company.project.dto.MembershipApplicationDTOs.ApproveRequest;
 import com.company.project.dto.MembershipApplicationDTOs.RejectRequest;
 import com.company.project.dto.MembershipApplicationDTOs.ShareLink;
@@ -48,6 +50,16 @@ public class MembershipApplicationController {
     @GetMapping("/api/members/applications")
     public ResponseEntity<List<ApplicationView>> list(@RequestParam(required = false) String status) {
         return ResponseEntity.ok(applicationService.list(status));
+    }
+
+    /**
+     * POST /api/members/applications — staff raise an application for a walk-in from the
+     * Service Portfolios page. Lands in Approvals → Applications as a cash application.
+     */
+    @PostMapping("/api/members/applications")
+    public ResponseEntity<ApplicationReceipt> create(@RequestBody DeskApplication body) {
+        if (body == null) throw new IllegalArgumentException("Missing application details");
+        return ResponseEntity.ok(portfolioService.applyAtDesk(body));
     }
 
     @GetMapping("/api/members/applications/count")

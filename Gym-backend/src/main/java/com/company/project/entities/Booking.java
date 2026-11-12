@@ -173,6 +173,13 @@ public class Booking extends BaseEntity implements BranchAware {
     public String getPaymentRejectionReason() { return paymentRejectionReason; }
     public void setPaymentRejectionReason(String paymentRejectionReason) { this.paymentRejectionReason = paymentRejectionReason; }
 
+    // The training package (PackageEnrolment) this booking used a session of, if any (V130).
+    @Column(name = "enrolment_id")
+    private Long enrolmentId;
+
+    public Long getEnrolmentId() { return enrolmentId; }
+    public void setEnrolmentId(Long enrolmentId) { this.enrolmentId = enrolmentId; }
+
     @Column(name = "branch_id")
     private Long branchId;
 

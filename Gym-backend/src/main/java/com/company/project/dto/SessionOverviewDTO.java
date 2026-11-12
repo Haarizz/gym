@@ -75,6 +75,11 @@ public class SessionOverviewDTO {
         private String status;
         private String paymentStatus;
         private BigDecimal price;
+        // Set when the booking used a session of the member's training package.
+        private Long enrolmentId;
+
+        public Long getEnrolmentId() { return enrolmentId; }
+        public void setEnrolmentId(Long enrolmentId) { this.enrolmentId = enrolmentId; }
         /** 1-based place in the waitlist; null when not waitlisted. */
         private Integer waitlistPosition;
         @JsonSerialize(using = UtcLocalDateTimeSerializer.class)

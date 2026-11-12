@@ -40,6 +40,9 @@ public class MemberAddonRequestDTO {
     // What it's sold from (optional): an add-on plan, or a facility for facility access.
     private Long addonPlanId;
     private Long facilityId;
+    // Optional promotion code, redeemed server-side on `amount` before the wallet/payment —
+    // only promotions whose Applicable Services include Add-ons (DiscountCodeService.resolveForAddon).
+    private String promoCode;
 
     public MemberAddonRequestDTO() {}
 
@@ -88,6 +91,9 @@ public class MemberAddonRequestDTO {
 
     public BigDecimal getPaidAmount() { return paidAmount; }
     public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
+
+    public String getPromoCode() { return promoCode; }
+    public void setPromoCode(String promoCode) { this.promoCode = promoCode; }
 
     public BigDecimal getWalletAmountApplied() { return walletAmountApplied; }
     public void setWalletAmountApplied(BigDecimal walletAmountApplied) { this.walletAmountApplied = walletAmountApplied; }

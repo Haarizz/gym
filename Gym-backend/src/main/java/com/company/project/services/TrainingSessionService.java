@@ -215,6 +215,7 @@ public class TrainingSessionService {
         p.setStatus(booking.getStatus());
         p.setPaymentStatus(booking.getPaymentStatus());
         p.setPrice(booking.getPrice());
+        p.setEnrolmentId(booking.getEnrolmentId());
         p.setWaitlistPosition(waitlistPosition);
         p.setCheckedInAt(booking.getCheckedInAt());
         p.setBookedAt(booking.getCreatedAt());

@@ -46,6 +46,8 @@ class BookingRewardPassTest {
 
     @Mock private com.company.project.services.mobile.push.SessionMemberNotifier sessionMemberNotifier;
     @Mock private com.company.project.services.pos.PosBusinessDayService businessDay;
+    @Mock private com.company.project.packages.PackageUsageService packageUsage;
+    @Mock private com.company.project.repositories.PackageEnrolmentRepository enrolmentRepository;
 
     private BookingService service;
     private TrainingSession session;
@@ -57,7 +59,8 @@ class BookingRewardPassTest {
                 walletService, receiptService, receiptRepository, memberRepository, financialEventService,
                 notificationService, bookingPaymentNotifier);
         service = new BookingService(bookingRepository, sessionRepository, memberRepository,
-                notificationService, qrCodeService, rewardRedemptionService, payments, sessionMemberNotifier, businessDay);
+                notificationService, qrCodeService, rewardRedemptionService, payments, sessionMemberNotifier, businessDay,
+                packageUsage, enrolmentRepository);
 
         session = new TrainingSession();
         session.setId(1L);

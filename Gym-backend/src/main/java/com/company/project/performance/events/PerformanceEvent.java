@@ -44,6 +44,10 @@ public class PerformanceEvent {
     @Column(name = "source_id", nullable = false)
     private Long sourceId;
 
+    /** Which credit of the row this is, when one row earns several for the same metric and person ("" otherwise). */
+    @Column(name = "part", nullable = false, length = 40)
+    private String part = "";
+
     @Column(name = "revision", nullable = false)
     private int revision;
 
@@ -71,6 +75,9 @@ public class PerformanceEvent {
     public void setSourceType(String sourceType) { this.sourceType = sourceType; }
     public Long getSourceId() { return sourceId; }
     public void setSourceId(Long sourceId) { this.sourceId = sourceId; }
+    public String getPart() { return part; }
+    public void setPart(String part) { this.part = part != null ? part : ""; }
+
     public int getRevision() { return revision; }
     public void setRevision(int revision) { this.revision = revision; }
     public Long getReversesEventId() { return reversesEventId; }

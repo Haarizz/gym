@@ -1,5 +1,7 @@
 package com.company.project.controllers.mobile.family;
 
+import com.company.project.config.OsivSuspension;
+
 import com.company.project.controlplane.entities.FamilyInvitationDirectoryEntry;
 import com.company.project.controlplane.repositories.FamilyInvitationDirectoryRepository;
 import com.company.project.security.TenantContextHolder;
@@ -10,10 +12,7 @@ import jakarta.persistence.EntityManagerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.orm.jpa.EntityManagerFactoryUtils;
-import org.springframework.orm.jpa.EntityManagerHolder;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -60,34 +59,31 @@ public class MobileFamilyClaimController {
 
         // Each tenant's claim runs in its own transaction on its own connection —
         // an OSIV EntityManager would pin them all to the first one.
-        if (TransactionSynchronizationManager.hasResource(entityManagerFactory)) {
-            EntityManagerHolder emHolder = (EntityManagerHolder) TransactionSynchronizationManager.unbindResource(entityManagerFactory);
-            EntityManagerFactoryUtils.closeEntityManager(emHolder.getEntityManager());
-        }
-
-        for (FamilyInvitationDirectoryEntry entry : pending) {
-            String status;
-            try {
-                TenantContextHolder.setCurrentTenant(entry.getTenantSlug());
-                ClaimStatus result = invitationService.claimInTenant(entry.getInvitationId(), email, user.getId());
-                status = result.name();
-                invitationService.updateDirectoryStatus(entry.getTenantSlug(), entry.getInvitationId(),
-                        result == ClaimStatus.SKIPPED_EXISTING_MEMBERSHIP ? "SKIPPED" : result.name());
-            } catch (Exception e) {
-                // Left PENDING in the directory, so the next login retries it.
-                log.error("Family invitation claim failed for tenant {} invitation {}",
-                        entry.getTenantSlug(), entry.getInvitationId(), e);
-                status = "ERROR";
-            } finally {
-                TenantContextHolder.clear();
+        try (OsivSuspension ignored = OsivSuspension.suspend(entityManagerFactory)) {
+            for (FamilyInvitationDirectoryEntry entry : pending) {
+                String status;
+                try {
+                    TenantContextHolder.setCurrentTenant(entry.getTenantSlug());
+                    ClaimStatus result = invitationService.claimInTenant(entry.getInvitationId(), email, user.getId());
+                    status = result.name();
+                    invitationService.updateDirectoryStatus(entry.getTenantSlug(), entry.getInvitationId(),
+                            result == ClaimStatus.SKIPPED_EXISTING_MEMBERSHIP ? "SKIPPED" : result.name());
+                } catch (Exception e) {
+                    // Left PENDING in the directory, so the next login retries it.
+                    log.error("Family invitation claim failed for tenant {} invitation {}",
+                            entry.getTenantSlug(), entry.getInvitationId(), e);
+                    status = "ERROR";
+                } finally {
+                    TenantContextHolder.clear();
+                }
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("tenantSlug", entry.getTenantSlug());
+                row.put("gymName", entry.getGymName());
+                row.put("inviterName", entry.getInviterName());
+                row.put("planName", entry.getPlanName());
+                row.put("status", status);
+                results.add(row);
             }
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("tenantSlug", entry.getTenantSlug());
-            row.put("gymName", entry.getGymName());
-            row.put("inviterName", entry.getInviterName());
-            row.put("planName", entry.getPlanName());
-            row.put("status", status);
-            results.add(row);
         }
         return ResponseEntity.ok(results);
     }

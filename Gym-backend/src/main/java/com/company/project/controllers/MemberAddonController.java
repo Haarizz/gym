@@ -1,5 +1,6 @@
 package com.company.project.controllers;
 
+import com.company.project.dto.DiscountCodeDTO;
 import com.company.project.dto.MemberAddonPageResponseDTO;
 import com.company.project.dto.MemberAddonRequestDTO;
 import com.company.project.dto.MemberAddonResponseDTO;
@@ -94,6 +95,17 @@ public class MemberAddonController {
     @GetMapping("/{id}/receipt")
     public ResponseEntity<ReceiptResponseDTO> getAddonReceipt(@PathVariable Long id) {
         return ResponseEntity.ok(memberAddonService.getAddonReceipt(id));
+    }
+
+    /**
+     * GET /api/member-addons/validate-code?code=..&amount=..&memberDbId=..
+     * Prices a promotion code on a staff add-on sale without spending it.
+     */
+    @GetMapping("/validate-code")
+    public ResponseEntity<DiscountCodeDTO> validatePromoCode(@RequestParam String code,
+                                                            @RequestParam java.math.BigDecimal amount,
+                                                            @RequestParam Long memberDbId) {
+        return ResponseEntity.ok(memberAddonService.previewPromoCode(code, amount, memberDbId));
     }
 
     /**

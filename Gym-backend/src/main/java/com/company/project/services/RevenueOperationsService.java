@@ -48,13 +48,13 @@ import java.util.function.Function;
 public class RevenueOperationsService {
 
     /** Booking statuses that don't hold a seat (BookingService.NO_SEAT_STATUSES). */
-    private static final Set<String> NO_SEAT = Set.of("cancelled", "waitlisted");
+    static final Set<String> NO_SEAT = Set.of("cancelled", "waitlisted");
     private static final List<String> RECEIPT_TYPES_SHOWN =
             List.of("New", "Renewal", "Add-on", "Daily Entry", "Class Booking", "Freeze Charge", "Payment");
     private static final Map<String, String> RECEIPT_TYPE_LABELS = Map.of(
             "New", "New memberships", "Renewal", "Renewals", "Add-on", "Add-ons", "Daily Entry", "Day passes",
             "Class Booking", "Class bookings", "Freeze Charge", "Freeze charges", "Payment", "Balance settlements");
-    private static final int TOP_ROWS = 8;
+    static final int TOP_ROWS = 8;
 
     @PersistenceContext
     private EntityManager em;
@@ -71,14 +71,14 @@ public class RevenueOperationsService {
     }
 
     /** [from, to] as LocalDates; start/end as the half-open [start, end) timestamps. */
-    private record Window(LocalDate from, LocalDate to) {
+    record Window(LocalDate from, LocalDate to) {
         LocalDateTime start() { return from.atStartOfDay(); }
         LocalDateTime end() { return to.plusDays(1).atStartOfDay(); }
         boolean contains(LocalDateTime t) { return t != null && !t.isBefore(start()) && t.isBefore(end()); }
     }
 
     /** One metric of the "at a glance" scorecard. */
-    private record Metric(String area, String key, String label, double current, double previous,
+    record Metric(String area, String key, String label, double current, double previous,
                           String format, boolean goodWhenUp) {
         Map<String, Object> toMap() {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -552,11 +552,11 @@ public class RevenueOperationsService {
 
     // ── Bookings ────────────────────────────────────────────────────────────
 
-    private static String bstatus(Object[] b) {
+    static String bstatus(Object[] b) {
         return b[0] == null ? "confirmed" : ((String) b[0]).toLowerCase(Locale.ROOT);
     }
 
-    private static boolean isPt(Object type) {
+    static boolean isPt(Object type) {
         return type != null && "pt".equalsIgnoreCase(((String) type).trim());
     }
 
@@ -638,7 +638,7 @@ public class RevenueOperationsService {
                 waitlisted, scheduled, pct(seated, seats), value.doubleValue()};
     }
 
-    private static String bookingStatusLabel(String s) {
+    static String bookingStatusLabel(String s) {
         return switch (s) {
             case "confirmed" -> "Confirmed";
             case "pending_approval" -> "Pending approval";
@@ -650,7 +650,7 @@ public class RevenueOperationsService {
         };
     }
 
-    private static String sessionTypeLabel(String type) {
+    static String sessionTypeLabel(String type) {
         if (type == null || type.isBlank()) return "Classes";
         return switch (type.trim().toLowerCase(Locale.ROOT)) {
             case "class" -> "Classes";
@@ -937,7 +937,7 @@ public class RevenueOperationsService {
     // ═════════════════════════════════════════════════════════════════════════
 
     /** (name, current, previous) counts, largest current first, then previous-only names. */
-    private static <T> List<Map<String, Object>> countRows(List<T> cur, List<T> prev, Function<T, String> key, int limit) {
+    static <T> List<Map<String, Object>> countRows(List<T> cur, List<T> prev, Function<T, String> key, int limit) {
         return amountRows(cur, prev, key, null, limit);
     }
 
@@ -945,7 +945,7 @@ public class RevenueOperationsService {
      * (name, current, previous[, amount, previousAmount]) rows. With an amount function rows are
      * ranked by amount, else by count.
      */
-    private static <T> List<Map<String, Object>> amountRows(List<T> cur, List<T> prev, Function<T, String> key,
+    static <T> List<Map<String, Object>> amountRows(List<T> cur, List<T> prev, Function<T, String> key,
                                                             Function<T, BigDecimal> amount, int limit) {
         Map<String, double[]> c = tally(cur, key, amount);
         Map<String, double[]> p = tally(prev, key, amount);
@@ -974,7 +974,7 @@ public class RevenueOperationsService {
     }
 
     /** Count rows in a fixed order (every label present, even at zero in both periods). */
-    private static <T> List<Map<String, Object>> orderedCountRows(List<T> cur, List<T> prev, Function<T, String> key,
+    static <T> List<Map<String, Object>> orderedCountRows(List<T> cur, List<T> prev, Function<T, String> key,
                                                                   List<String> order) {
         Map<String, double[]> c = tally(cur, key, null);
         Map<String, double[]> p = tally(prev, key, null);
@@ -992,7 +992,7 @@ public class RevenueOperationsService {
         return rows;
     }
 
-    private static <T> Map<String, double[]> tally(List<T> items, Function<T, String> key, Function<T, BigDecimal> amount) {
+    static <T> Map<String, double[]> tally(List<T> items, Function<T, String> key, Function<T, BigDecimal> amount) {
         Map<String, double[]> out = new LinkedHashMap<>();
         for (T item : items) {
             String k = key.apply(item);
@@ -1005,7 +1005,7 @@ public class RevenueOperationsService {
     }
 
     /** Mon–Sun counts (and amounts for POS) for both periods. */
-    private static List<Map<String, Object>> weekdayRows(List<Object[]> cur, List<Object[]> prev,
+    static List<Map<String, Object>> weekdayRows(List<Object[]> cur, List<Object[]> prev,
                                                          Function<Object[], LocalDateTime> at) {
         Function<Object[], String> day = r -> {
             LocalDateTime t = at.apply(r);
@@ -1048,39 +1048,39 @@ public class RevenueOperationsService {
         };
     }
 
-    private static String label(String value, String fallback) {
+    static String label(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : capitalize(value.trim().replace('_', ' '));
     }
 
-    private static String capitalize(String s) {
+    static String capitalize(String s) {
         return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     // ── Numbers ─────────────────────────────────────────────────────────────
 
-    private static double pct(double part, double whole) {
+    static double pct(double part, double whole) {
         return whole == 0 ? Double.NaN : part * 100.0 / whole;
     }
 
-    private static double avg(BigDecimal total, long count) {
+    static double avg(BigDecimal total, long count) {
         return count == 0 ? Double.NaN : total.doubleValue() / count;
     }
 
-    private static double round(double v) {
+    static double round(double v) {
         return Math.round(v * 100.0) / 100.0;
     }
 
-    private static long num(Object v) {
+    static long num(Object v) {
         return v == null ? 0 : ((Number) v).longValue();
     }
 
-    private static BigDecimal bd(Object v) {
+    static BigDecimal bd(Object v) {
         if (v == null) return BigDecimal.ZERO;
         if (v instanceof BigDecimal b) return b;
         return new BigDecimal(v.toString());
     }
 
-    private static BigDecimal nz(BigDecimal v) {
+    static BigDecimal nz(BigDecimal v) {
         return v == null ? BigDecimal.ZERO : v;
     }
 

@@ -8,6 +8,7 @@ import com.company.project.entities.MemberDueWriteOff;
 import com.company.project.entities.Receipt;
 import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
+import com.company.project.performance.PerformanceClock;
 import com.company.project.repositories.MemberDueWriteOffRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.ReceiptRepository;
@@ -25,6 +26,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -58,13 +61,16 @@ public class PendingPaymentService {
     private final MemberRepository memberRepository;
     private final MemberDueWriteOffRepository writeOffRepository;
     private final StaffRepository staffRepository;
+    private final PerformanceClock clock;
 
     public PendingPaymentService(ReceiptRepository receiptRepository, MemberRepository memberRepository,
-                                 MemberDueWriteOffRepository writeOffRepository, StaffRepository staffRepository) {
+                                 MemberDueWriteOffRepository writeOffRepository, StaffRepository staffRepository,
+                                 PerformanceClock clock) {
         this.receiptRepository = receiptRepository;
         this.memberRepository = memberRepository;
         this.writeOffRepository = writeOffRepository;
         this.staffRepository = staffRepository;
+        this.clock = clock;
     }
 
     public static String reasonLabel(String reason) {
@@ -110,7 +116,8 @@ public class PendingPaymentService {
     }
 
     private List<Due> openDues(String search) {
-        LocalDate today = LocalDate.now();
+        // "Overdue" turns over at the gym's midnight, not UTC's.
+        LocalDate today = LocalDate.now(clock.zone(null));
         List<Due> dues = new ArrayList<>();
         for (Receipt r : receiptRepository.findOpenBills(likePattern(search))) {
             BigDecimal due = owed(r);
@@ -246,7 +253,8 @@ public class PendingPaymentService {
     public Report report(LocalDate from, LocalDate to) {
         List<MemberDueWriteOff> all = writeOffsIn(from, to);
         DateTimeFormatter monthFmt = DateTimeFormatter.ofPattern("MMM yyyy");
-        List<Group> byMonth = group(all, w -> YearMonth.from(w.getWrittenOffAt()).toString(),
+        ZoneId zone = clock.zone(null);
+        List<Group> byMonth = group(all, w -> YearMonth.from(toLocal(w.getWrittenOffAt(), zone)).toString(),
                 k -> YearMonth.parse(k).format(monthFmt));
         byMonth.sort(Comparator.comparing(Group::key));
         return new Report(from, to, sum(all, MemberDueWriteOff::getWrittenOffAmount), all.size(),
@@ -276,10 +284,20 @@ public class PendingPaymentService {
         return groups;
     }
 
+    /**
+     * Write-offs in [from, to], both local days in the gym's zone. written_off_at is stored as
+     * UTC (the JVM runs in UTC), so the local days become a UTC window — otherwise a write-off
+     * made between local midnight and the UTC offset lands on the previous day.
+     */
     private List<MemberDueWriteOff> writeOffsIn(LocalDate from, LocalDate to) {
-        LocalDateTime start = from != null ? from.atStartOfDay() : LocalDateTime.of(1900, 1, 1, 0, 0);
-        LocalDateTime end = to != null ? to.plusDays(1).atStartOfDay() : LocalDateTime.of(3000, 1, 1, 0, 0);
+        LocalDateTime start = from != null ? clock.toUtc(from.atStartOfDay(), null) : LocalDateTime.of(1900, 1, 1, 0, 0);
+        LocalDateTime end = to != null ? clock.toUtc(to.plusDays(1).atStartOfDay(), null) : LocalDateTime.of(3000, 1, 1, 0, 0);
         return writeOffRepository.findInPeriod(start, end);
+    }
+
+    /** A stored UTC timestamp as the gym's local wall-clock time. */
+    private static LocalDateTime toLocal(LocalDateTime utc, ZoneId zone) {
+        return utc.atOffset(ZoneOffset.UTC).atZoneSameInstant(zone).toLocalDateTime();
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

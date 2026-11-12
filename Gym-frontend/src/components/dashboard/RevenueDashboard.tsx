@@ -1,10 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import { Calendar } from "../ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Skeleton } from "../ui/skeleton";
 import { cn } from "../ui/utils";
 import {
@@ -25,7 +22,6 @@ import {
 import {
   TrendingUp,
   Users,
-  Calendar as CalendarIcon,
   CreditCard,
   Banknote,
   Receipt,
@@ -37,43 +33,17 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Activity,
-  Clock,
-  RefreshCw,
-  AlertTriangle
+  Clock
 } from 'lucide-react';
 import {
-  format,
-  parseISO,
-  subDays,
-  startOfWeek,
-  endOfWeek,
-  startOfMonth,
-  endOfMonth,
-  startOfQuarter,
-  endOfQuarter,
-  startOfYear,
-  endOfYear
-} from 'date-fns';
-import {
-  dashboardService,
   type RevenueBreakdownRow,
-  type RevenueCompareMode,
   type RevenueGranularity,
-  type RevenueStreamKey,
-  type RevenueSummary
+  type RevenueStreamKey
 } from "../../utils/supabase/dashboard-service";
 import { CurrencyGlyph, useCurrency } from "../../utils/currency";
-import { RevenueInsightTiles, RevenueReportsTab, formatRange } from "./RevenueReports";
-import { ComparisonHub } from "./RevenueOperations";
+import { RevenueInsightTiles, formatRange } from "./RevenueReports";
+import { PeriodHeader, type RevenuePeriod } from "./RevenuePeriod";
 import { ReportActions, type ReportDocument, type ReportSection, chartFromRows, col, countCol, kpiSection, moneyCol, pieSection, tableSection } from "../report-export";
-import reportStyles from "./RevenueReports.module.css";
-
-type FilterType = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom';
-
-interface DateRange {
-  from: Date;
-  to: Date;
-}
 
 // GymBios palette
 const COLORS = {
@@ -85,36 +55,6 @@ const COLORS = {
 };
 
 const CHART_COLORS = ['var(--gb-primary-deep)', '#3B82F6', '#10B981', '#F59E0B', '#B91C1C', '#8B5CF6', '#EC4899'];
-
-// Labelled by the period each preset covers (see presetRange) — "Daily" used to read
-// as "today" although it shows the last 7 days, one point per day.
-const PRESETS: { type: Exclude<FilterType, 'custom'>; label: string }[] = [
-  { type: 'hourly', label: 'Today' },
-  { type: 'daily', label: 'Last 7 Days' },
-  { type: 'weekly', label: 'This Week' },
-  { type: 'monthly', label: 'This Month' },
-  { type: 'quarterly', label: 'This Quarter' },
-  { type: 'yearly', label: 'This Year' },
-];
-
-/** Each preset is a window plus the trend-chart bucket size that suits it. */
-function presetRange(type: Exclude<FilterType, 'custom'>): { range: DateRange; granularity: RevenueGranularity } {
-  const now = new Date();
-  switch (type) {
-    case 'hourly':
-      return { range: { from: now, to: now }, granularity: 'hourly' };
-    case 'daily':
-      return { range: { from: subDays(now, 6), to: now }, granularity: 'daily' };
-    case 'weekly':
-      return { range: { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) }, granularity: 'daily' };
-    case 'monthly':
-      return { range: { from: startOfMonth(now), to: endOfMonth(now) }, granularity: 'daily' };
-    case 'quarterly':
-      return { range: { from: startOfQuarter(now), to: endOfQuarter(now) }, granularity: 'weekly' };
-    case 'yearly':
-      return { range: { from: startOfYear(now), to: endOfYear(now) }, granularity: 'monthly' };
-  }
-}
 
 const TREND_TITLES: Record<RevenueGranularity, string> = {
   hourly: 'Hourly Revenue Trend',
@@ -139,63 +79,15 @@ const cardShell = "border-0 shadow-md hover:shadow-lg transition-shadow";
 const tileShell = "rounded-lg bg-card p-3 shadow-sm";
 
 interface RevenueDashboardProps {
-  /** Bumped by the parent's Refresh button to re-fetch */
-  refreshKey?: number;
+  /** Period, compare mode and summary — shared with the Business Insights and Sales Reports tabs */
+  period: RevenuePeriod;
 }
 
-export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
-  const { currencyCode, currencySymbol } = useCurrency();
-  const initial = presetRange('monthly');
-  const [dateFilterType, setDateFilterType] = useState<FilterType>('monthly');
-  const [dateRange, setDateRange] = useState<DateRange>(initial.range);
-  const [granularity, setGranularity] = useState<RevenueGranularity | undefined>(initial.granularity);
-  const [draftRange, setDraftRange] = useState<{ from?: Date; to?: Date } | undefined>();
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('total-collection');
-  const [compareMode, setCompareMode] = useState<RevenueCompareMode>('previous');
+export function RevenueDashboard({ period }: RevenueDashboardProps) {
+  const { currencySymbol } = useCurrency();
+  const [activeTab, setActiveTab] = React.useState('total-collection');
+  const { data, isLoading, compareMode, compareText, rangeLabel } = period;
 
-  const [data, setData] = useState<RevenueSummary | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  const fromKey = format(dateRange.from, 'yyyy-MM-dd');
-  const toKey = format(dateRange.to, 'yyyy-MM-dd');
-
-  useEffect(() => {
-    let cancelled = false;
-    setIsLoading(true);
-    setError(null);
-    dashboardService.getRevenueSummary(fromKey, toKey, granularity, compareMode)
-      .then((res) => {
-        if (cancelled) return;
-        if (res?.success && res.data) {
-          setData(res.data);
-        } else {
-          setError(res?.error || 'Could not load revenue data');
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e?.message || 'Could not load revenue data');
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [fromKey, toKey, granularity, compareMode, refreshKey, reloadKey]);
-
-  const compareText = compareMode === 'last-year' ? 'vs last year' : 'vs previous period';
-
-  const handleDateFilterChange = (type: Exclude<FilterType, 'custom'>) => {
-    const preset = presetRange(type);
-    setDateFilterType(type);
-    setDateRange(preset.range);
-    setGranularity(preset.granularity);
-  };
-
-  const rangeLabel = fromKey === toKey
-    ? format(dateRange.from, 'MMM dd, yyyy')
-    : `${format(dateRange.from, 'MMM dd')} - ${format(dateRange.to, 'MMM dd, yyyy')}`;
 
   // Custom tooltip for charts
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -558,7 +450,7 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
     cafe: { stream: 'cafe', title: 'Cafe & F&B Revenue', breakdown: 'Category breakdown' },
     equipment: { stream: 'equipment', title: 'Equipment Revenue', breakdown: 'Category breakdown' },
   };
-  const tabHasOwnExport = activeTab === 'comparison' || activeTab === 'reports' || activeTab === 'facilities';
+  const tabHasOwnExport = activeTab === 'facilities';
   const buildRevenueReport = (): ReportDocument => {
     if (!data) throw new Error('Revenue data is still loading');
     const n = toNumber;
@@ -624,106 +516,12 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header & Filters */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Revenue Dashboard</h2>
-            <p className="text-muted-foreground">
-              Comprehensive revenue analytics and insights
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {isLoading && data && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />}
-            <Badge variant="outline" className="text-sm">{rangeLabel}</Badge>
-            {!tabHasOwnExport && <ReportActions report={buildRevenueReport} disabled={!data || isLoading} menuLabel={`Revenue · ${rangeLabel}`} compact />}
-          </div>
-        </div>
-
-        {/* Date Filter Controls */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
-            {PRESETS.map(({ type, label }) => (
-              <Button
-                key={type}
-                variant={dateFilterType === type ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleDateFilterChange(type)}
-                className={dateFilterType === type ? "bg-primary text-white" : ""}
-              >
-                {label}
-              </Button>
-            ))}
-          </div>
-
-          <Popover
-            open={calendarOpen}
-            onOpenChange={(open) => {
-              setCalendarOpen(open);
-              if (open) setDraftRange({ from: dateRange.from, to: dateRange.to });
-            }}
-          >
-            <PopoverTrigger asChild>
-              <Button
-                variant={dateFilterType === 'custom' ? "default" : "outline"}
-                size="sm"
-                className={dateFilterType === 'custom' ? "bg-primary text-white" : ""}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                Custom Range
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="range"
-                selected={draftRange as any}
-                onSelect={(range: any) => {
-                  setDraftRange(range);
-                  if (range?.from && range?.to) {
-                    setDateRange({ from: range.from, to: range.to });
-                    setGranularity(undefined); // let the backend pick a bucket size for the span
-                    setDateFilterType('custom');
-                    setCalendarOpen(false);
-                  }
-                }}
-                numberOfMonths={2}
-              />
-            </PopoverContent>
-          </Popover>
-
-          <div className={reportStyles.compareSwitch} role="group" aria-label="Compare with">
-            <span>Compare with</span>
-            <button type="button" aria-pressed={compareMode === 'previous'} onClick={() => setCompareMode('previous')}>
-              Previous period
-            </button>
-            <button type="button" aria-pressed={compareMode === 'last-year'} onClick={() => setCompareMode('last-year')}>
-              Same period last year
-            </button>
-          </div>
-          {data && (
-            <span className={reportStyles.compareRange}>
-              {data.toDate
-                ? `Up to today: ${formatRange(data.from, data.to)} vs ${formatRange(data.previousFrom, data.previousTo)}`
-                : `Comparing with ${formatRange(data.previousFrom, data.previousTo)}`}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {error && (
-        <Card className={cn(cardShell, "bg-red-50")}>
-          <CardContent className="p-4 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-red-700">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm">{error}</span>
-            </div>
-            <Button size="sm" variant="outline" onClick={() => setReloadKey((k) => k + 1)}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      <PeriodHeader
+        period={period}
+        title="Revenue"
+        description="Collections, expenses and revenue by stream"
+        actions={!tabHasOwnExport && <ReportActions report={buildRevenueReport} disabled={!data || isLoading} menuLabel={`Revenue · ${rangeLabel}`} compact />}
+      />
 
       {/* Top KPI Summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -773,8 +571,6 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="w-full flex flex-wrap h-auto p-1 gap-1">
           <TabsTrigger value="total-collection" className="text-xs">Total Collection</TabsTrigger>
-          <TabsTrigger value="comparison" className="text-xs">Comparison</TabsTrigger>
-          <TabsTrigger value="reports" className="text-xs">Detailed Reports</TabsTrigger>
           <TabsTrigger value="membership" className="text-xs">Membership</TabsTrigger>
           <TabsTrigger value="personal-training" className="text-xs">PT & Services</TabsTrigger>
           <TabsTrigger value="merchandise" className="text-xs">Merchandise</TabsTrigger>
@@ -881,27 +677,6 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
                   </CardContent>
                 </Card>
               </AnimatedGrid>
-            </TabsContent>
-
-            {/* Period-vs-period comparison */}
-            <TabsContent value="comparison" className="space-y-4">
-              {/* Revenue plus freezes, targets, CRM, POS, attendance, bookings and members */}
-              <ComparisonHub
-                summary={data}
-                from={fromKey}
-                to={toKey}
-                granularity={granularity}
-                compare={compareMode}
-                refreshKey={refreshKey + reloadKey}
-                currencyCode={currencyCode}
-              />
-            </TabsContent>
-
-            {/* Detailed reports: top plans/products/members, staff, day & hour patterns */}
-            <TabsContent value="reports" className="space-y-4">
-              {data?.insights && data?.comparison
-                ? <RevenueReportsTab data={data} currencyCode={currencyCode} />
-                : <EmptyState title="Detailed reports" message="Detailed reports aren't available from the server yet." />}
             </TabsContent>
 
             {/* Membership Revenue Tab */}

@@ -11,8 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { AddMember } from "./add-member";
-import { MemberDraftModal } from "../components/shared/member-draft-modal";
+import { MemberDraftModal, type DraftPlanOption } from "../components/shared/member-draft-modal";
 import { toast } from "sonner";
 import QRCode from "react-qr-code";
 import { plansService, Plan, planHasOffer, planOfferPrice } from "../utils/supabase/plans-service";
@@ -90,7 +89,6 @@ const DEFAULT_CATALOG_CONFIG = {
 export function ServicePortfolios() {
     const [isFullscreen, setIsFullscreen] = useState(false);
   const [showInquiryForm, setShowInquiryForm] = useState(false);
-  const [showOnboardForm, setShowOnboardForm] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
   const [showShareLink, setShowShareLink] = useState(false);
   const [shareLink, setShareLink] = useState<ShareLink | null>(null);
@@ -110,7 +108,9 @@ export function ServicePortfolios() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [showDraftModal, setShowDraftModal] = useState(false);
-  const [pendingMembers, setPendingMembers] = useState<any[]>([]);
+  // Member On-board opens the request form without a plan (it shows a picker);
+  // Choose Plan → Register as New Member opens it with the chosen plan.
+  const [draftWithPlan, setDraftWithPlan] = useState(false);
   const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
   // Real membership plans (plansService -> GET /api/plans)
@@ -422,6 +422,20 @@ export function ServicePortfolios() {
     }
   };
 
+  // Family / Couple plans are set up with the whole household through Member On-board.
+  const isHouseholdPlan = (plan: Plan) =>
+    [plan.planType, plan.type].some(t => ['family', 'couple'].includes((t || '').trim().toLowerCase()));
+
+  const toDraftPlan = (plan: Plan): DraftPlanOption => ({
+    id: plan.id.toString(),
+    name: plan.name,
+    price: plan.price,
+    duration: plan.duration,
+    benefits: getPlanFeatures(plan),
+    effectivePrice: planOfferPrice(plan),
+    offerLabel: planHasOffer(plan) ? plan.offerLabel : null,
+  });
+
   const handleClassInterest = (session: TrainingSessionApi) => {
     setInquiryData({
       ...inquiryData,
@@ -593,25 +607,17 @@ export function ServicePortfolios() {
             </DialogContent>
           </Dialog>
           
-          <Dialog open={showOnboardForm} onOpenChange={setShowOnboardForm}>
-            <DialogTrigger asChild>
-              <Button className="bg-[#2B7A78] hover:bg-[#2B7A78]/90 text-white">
-                <UserPlus className="h-4 w-4 mr-2" />
-                Member On-board
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-y-auto p-0">
-              <DialogHeader className="px-6 pt-6">
-                <DialogTitle>Member On-boarding</DialogTitle>
-                <DialogDescription>
-                  Complete the form below to register a new member
-                </DialogDescription>
-              </DialogHeader>
-              <div className="px-6 pb-6">
-                <AddMember onNavigate={() => setShowOnboardForm(false)} />
-              </div>
-            </DialogContent>
-          </Dialog>
+          {/* New members only join through an approval request (Approvals → Applications). */}
+          <Button
+            className="bg-[#2B7A78] hover:bg-[#2B7A78]/90 text-white"
+            onClick={() => {
+              setDraftWithPlan(false);
+              setShowDraftModal(true);
+            }}
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Member On-board
+          </Button>
         </div>
       )}
 
@@ -1183,12 +1189,16 @@ export function ServicePortfolios() {
                         <div className="flex-1">
                           <h5 className="font-semibold text-lg mb-2">I'm a New Member</h5>
                           <p className="text-sm text-gray-600 mb-4">
-                            Start your fitness journey by completing our quick on-boarding process
+                            {isHouseholdPlan(selectedPlan)
+                              ? 'Family and couple plans are set up at reception with the whole household.'
+                              : 'Fill in the member’s details. The request waits in Approvals until payment is taken at reception.'}
                           </p>
-                          <Button 
+                          <Button
                             className="bg-[#2B7A78] hover:bg-[#236360] text-white"
+                            disabled={isHouseholdPlan(selectedPlan)}
                             onClick={() => {
                               setShowChoosePlan(false);
+                              setDraftWithPlan(true);
                               setShowDraftModal(true);
                             }}
                           >
@@ -1273,7 +1283,10 @@ export function ServicePortfolios() {
 
       {/* Share Link Dialog */}
       <Dialog open={showShareLink} onOpenChange={setShowShareLink}>
-        <DialogContent className="sm:max-w-[520px]">
+        {/* Width via inline style: the app ships a precompiled Tailwind build, so
+            arbitrary sizes like sm:max-w-[520px] aren't generated and the dialog
+            would otherwise stretch to the full screen width. */}
+        <DialogContent style={{ maxWidth: 'min(500px, calc(100% - 2rem))' }}>
           <DialogHeader>
             <DialogTitle>Share Service Portfolios</DialogTitle>
             <DialogDescription>
@@ -1292,7 +1305,7 @@ export function ServicePortfolios() {
                 <p className="text-sm text-gray-600">Branch: <span className="font-medium text-gray-900">{shareLink.branch_name}</span></p>
               )}
               <div className="flex gap-2">
-                <Input readOnly value={shareUrl} onFocus={(e) => e.currentTarget.select()} aria-label="Share link" className="font-mono text-xs" />
+                <Input readOnly value={shareUrl} onFocus={(e) => e.currentTarget.select()} aria-label="Share link" className="font-mono text-xs min-w-0" />
                 <Button onClick={copyShareLink} className="bg-[#2B7A78] hover:bg-[#236360] text-white shrink-0">
                   <Copy className="h-4 w-4 mr-2" /> Copy
                 </Button>
@@ -1338,28 +1351,8 @@ export function ServicePortfolios() {
       <MemberDraftModal
         open={showDraftModal}
         onOpenChange={setShowDraftModal}
-        selectedPlan={selectedPlan ? {
-          id: selectedPlan.id.toString(),
-          name: selectedPlan.name,
-          price: selectedPlan.price,
-          duration: selectedPlan.duration,
-          benefits: getPlanFeatures(selectedPlan),
-          effectivePrice: planOfferPrice(selectedPlan),
-          offerLabel: planHasOffer(selectedPlan) ? selectedPlan.offerLabel : null,
-        } : null}
-        onSubmitDraft={(draftData) => {
-          setPendingMembers(prev => [...prev, draftData]);
-          
-          // Save to sessionStorage (simulating backend)
-          const existing = JSON.parse(sessionStorage.getItem('pendingMembers') || '[]');
-          existing.push(draftData);
-          sessionStorage.setItem('pendingMembers', JSON.stringify(existing));
-          
-          // Notify other components
-          window.dispatchEvent(new Event('pendingMembersUpdated'));
-          
-          console.log('Draft submitted:', draftData);
-        }}
+        selectedPlan={draftWithPlan && selectedPlan ? toDraftPlan(selectedPlan) : null}
+        planOptions={plans.filter(p => !isHouseholdPlan(p) && (p.planType || '').toLowerCase() !== 'walk-in').map(toDraftPlan)}
       />
     </div>
   );

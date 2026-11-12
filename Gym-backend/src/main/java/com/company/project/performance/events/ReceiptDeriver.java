@@ -11,9 +11,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Membership receipts. MEMBER_ADMISSION: a "New" receipt with money received — fully paid or
- * part-paid (its paid portion), and for a mobile Cash/Credit/Mixed payment only once reception
- * has approved it. Credited to the staff member who processed it.
+ * Receipts with money received — fully paid or part-paid (its paid portion), and for a mobile
+ * Cash/Credit/Mixed payment only once reception has approved it.
+ *
+ *  - MEMBER_ADMISSION: a "New" receipt, credited to the staff member who processed it.
+ *  - PT_SALE and PT_REVENUE: a "Class Booking" receipt for a normal (not package-covered) PT
+ *    session, credited to the session's trainer on the payment date, less anything refunded.
+ *    Commission on a single paid session counts when the member pays, so both move together.
  */
 @Component
 public class ReceiptDeriver implements SourceDeriver {
@@ -57,9 +61,31 @@ public class ReceiptDeriver implements SourceDeriver {
             }
         }
 
-        if (!"New".equals(type) || !counts(status, approval) || when == null) return List.of();
+        if (!counts(status, approval) || when == null) return List.of();
         BigDecimal received = receivedAmount(status, Rows.money(r[3]), Rows.money(r[4]));
-        return List.of(new Credit(Metric.MEMBER_ADMISSION, staffId, branchId, when, 1, received));
+        if ("New".equals(type)) return List.of(new Credit(Metric.MEMBER_ADMISSION, staffId, branchId, when, 1, received));
+        if (TXN_CLASS_BOOKING.equals(type)) return ptBooking(id, branchId, when, received);
+        return List.of();
+    }
+
+    static final String TXN_CLASS_BOOKING = "Class Booking";
+
+    /** A paid PT session booking: the money received less refunds, to the session's trainer. */
+    private List<Credit> ptBooking(Long receiptId, Long branchId, LocalDateTime when, BigDecimal received) {
+        List<?> rows = em.createNativeQuery(
+                        "SELECT s.trainer_id, b.refunded_amount FROM bookings b " +
+                        "JOIN training_sessions s ON s.id = b.session_id " +
+                        "WHERE b.receipt_id = :id AND b.enrolment_id IS NULL AND LOWER(COALESCE(s.type, '')) = 'pt' " +
+                        "ORDER BY b.id")
+                .setParameter("id", receiptId).setMaxResults(1).getResultList();
+        if (rows.isEmpty()) return List.of();
+        Object[] b = (Object[]) rows.get(0);
+        BigDecimal refunded = Rows.money(b[1]) != null ? Rows.money(b[1]) : BigDecimal.ZERO;
+        BigDecimal net = (received != null ? received : BigDecimal.ZERO).subtract(refunded);
+        if (net.signum() <= 0) return List.of();
+        Long trainerId = Rows.lng(b[0]);
+        return List.of(new Credit(Metric.PT_SALE, trainerId, branchId, when, 1, net),
+                new Credit(Metric.PT_REVENUE, trainerId, branchId, when, 0, net));
     }
 
     /** Money actually received: the paid portion of a part-payment, never its full price. */
@@ -78,6 +104,6 @@ public class ReceiptDeriver implements SourceDeriver {
 
     @Override
     public List<Long> sourceIds(Long branchId, LocalDateTime from, LocalDateTime to) {
-        return SourceIds.query(em, "SELECT id FROM receipts WHERE transaction_type = 'New'", "branch_id", "COALESCE(transaction_date, created_at)", branchId, from, to);
+        return SourceIds.query(em, "SELECT id FROM receipts WHERE transaction_type IN ('New', '" + TXN_CLASS_BOOKING + "')", "branch_id", "COALESCE(transaction_date, created_at)", branchId, from, to);
     }
 }

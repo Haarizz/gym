@@ -119,7 +119,7 @@ public class AdminDashboardKpiService {
         // can't be reconstructed historically without a status-history table, so
         // this always reflects the live count regardless of the selected range,
         // consistent with how DashboardService.getKPIs() treats it today.
-        long active = memberRepository.countEffectivelyActive(java.time.LocalDate.now().atStartOfDay());
+        long active = memberRepository.countEffectivelyActive(LocalDate.now().atStartOfDay());
         return AdminDashboardKpiDTO.of("active-members", "Active Members", "count",
                 BigDecimal.valueOf(active), null, true);
     }
@@ -145,7 +145,7 @@ public class AdminDashboardKpiService {
      */
     ChurnFigures churnFigures(java.time.LocalDateTime start, java.time.LocalDateTime end) {
         long churned = memberRepository.countByMembershipStatusAndExpiryDateBetween("expired", start, end);
-        long activeNow = memberRepository.countByMembershipStatus("active");
+        long activeNow = memberRepository.countEffectivelyActive(LocalDate.now().atStartOfDay());
         long baseline = activeNow + churned;
         BigDecimal churnRate = baseline == 0 ? BigDecimal.ZERO
                 : BigDecimal.valueOf(churned).multiply(BigDecimal.valueOf(100))

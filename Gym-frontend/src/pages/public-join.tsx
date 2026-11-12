@@ -1,20 +1,23 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
 import {
   AlertCircle, ArrowLeft, ArrowRight, Award, Banknote, Calendar, CheckCircle, CheckCircle2, ChevronDown, Clock,
-  CreditCard, Dumbbell, Loader2, Lock, Mail, MapPin, Phone, Radio, Sparkles, Star, Users, Video,
+  ChevronRight, CreditCard, Dumbbell, Plus, Trash2, X, Loader2, Lock, Mail, MapPin, Phone, Radio, Sparkles, Star, Users, Video,
 } from 'lucide-react';
 import {
   servicePortfolioService, apiErrorMessage,
-  type ApplicationPaymentMethod, type ApplicationReceipt, type PortfolioPlan, type PortfolioSession, type PublicPortfolio,
+  type ApplicationFamilyMember, type ApplicationPaymentMethod, type ApplicationReceipt, type PortfolioPlan, type PortfolioSession, type PortfolioTrainer,
+  type PublicPortfolio,
 } from '../utils/supabase/service-portfolio-service';
 import {
   DEFAULT_DIAL_COUNTRY, DIAL_COUNTRIES, findDialCountry, formatNational, nationalDigits,
   parsePhoneInput, toInternational, validatePhone, type DialCountry,
 } from '../utils/phone-number';
+import { resolveBackendImageUrl } from '../utils/resolve-image-url';
 import s from './PublicLeadForm.module.css';
 import j from './PublicJoin.module.css';
 import w from './PublicWalkIn.module.css';
@@ -23,6 +26,116 @@ import w from './PublicWalkIn.module.css';
 // Rendered standalone from main.tsx like the lead forms. A visitor browses the gym, picks a
 // plan, fills in their details and pays online (simulated card checkout) or chooses cash at
 // the gym. Either way the gym must approve the application before the membership starts.
+
+type PlanCategory = 'individual' | 'family' | 'couple';
+const PLAN_CATEGORIES: { id: PlanCategory; label: string }[] = [
+  { id: 'individual', label: 'Individual' },
+  { id: 'family', label: 'Family' },
+  { id: 'couple', label: 'Couple' },
+];
+// Family / Couple come from the plan type; everything else counts as an individual plan.
+function planCategory(p: PortfolioPlan): PlanCategory {
+  const t = (p.plan_type || '').trim().toLowerCase();
+  return t === 'family' || t === 'couple' ? t : 'individual';
+}
+
+// ── Family / Couple households ──
+// The applicant is the family head; these rows are everyone joining with them.
+interface FamilyRow {
+  key: number;
+  name: string;
+  relationship: string;
+  gender: string;
+  dob: string;
+  child: boolean;
+  phone: string;
+  email: string;
+}
+type FamilyField = 'name' | 'relationship' | 'gender' | 'dob' | 'email';
+
+// Same choices as the desk's Add Member family section; the gender each implies.
+const RELATIONSHIPS: { value: string; gender: 'Male' | 'Female' | null }[] = [
+  { value: 'Wife', gender: 'Female' },
+  { value: 'Husband', gender: 'Male' },
+  { value: 'Son', gender: 'Male' },
+  { value: 'Daughter', gender: 'Female' },
+  { value: 'Father', gender: 'Male' },
+  { value: 'Mother', gender: 'Female' },
+  { value: 'Brother', gender: 'Male' },
+  { value: 'Sister', gender: 'Female' },
+  { value: 'Other', gender: null },
+];
+const COUPLE_RELATIONSHIPS = ['Wife', 'Husband', 'Other'];
+const GENDERS = ['Male', 'Female', 'Other'];
+
+type BranchAccess = NonNullable<PublicPortfolio['access']>;
+/** Same rule as BranchAccessPolicy: Ladies Only takes Female, Men Only takes Male, Mixed takes anyone. */
+const genderAllowed = (access: BranchAccess, gender: string) =>
+  access === 'MIXED' || (access === 'LADIES_ONLY' ? gender === 'Female' : gender === 'Male');
+/** The one gender a Ladies Only / Men Only branch takes; '' for a mixed branch. */
+const onlyGender = (access: BranchAccess) => (access === 'LADIES_ONLY' ? 'Female' : access === 'MEN_ONLY' ? 'Male' : '');
+const MAX_FAMILY_ROWS = 20;
+
+let familyKey = 0;
+const newFamilyRow = (): FamilyRow =>
+  ({ key: ++familyKey, name: '', relationship: '', gender: '', dob: '', child: false, phone: '', email: '' });
+
+const ageOn = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? null : (Date.now() - d.getTime()) / (365.25 * 864e5);
+};
+/** Under 18 — from the date of birth when given (the server works it out the same way). */
+const isChild = (r: FamilyRow) => {
+  const age = r.dob ? ageOn(r.dob) : null;
+  return age != null ? age < 18 : r.child;
+};
+const rowGender = (r: FamilyRow) => r.gender || RELATIONSHIPS.find(x => x.value === r.relationship)?.gender || '';
+
+/** What the household pays: per person (applicant included) when the plan is priced that way, else the plan price. */
+function householdTotal(plan: PortfolioPlan, headcount: number) {
+  const h = plan.household;
+  if (!h?.price_per_member) return plan.effective_price;
+  let total = 0;
+  for (let i = 0; i < headcount; i++) {
+    total += h.max_members && i >= h.max_members ? (h.additional_member_price ?? h.price_per_member) : h.price_per_member;
+  }
+  return total;
+}
+
+/** The plan's member caps as one message, or null when the household fits. Mirrors MemberService.enforceFamilyMemberCaps. */
+function householdCapError(plan: PortfolioPlan, rows: FamilyRow[]): string | null {
+  const h = plan.household;
+  if (!h) return null;
+  if (h.kind === 'couple') {
+    if (rows.length !== 1) return 'A couple plan is for you and one partner.';
+    if (isChild(rows[0])) return 'A couple plan is for you and one adult partner.';
+    return null;
+  }
+  if (rows.length === 0) return 'Add at least one family member.';
+  const adults = 1 + rows.filter(r => !isChild(r)).length;
+  const children = rows.filter(isChild).length;
+  if (h.max_adults && adults > h.max_adults) return `This plan allows up to ${h.max_adults} adults, including you.`;
+  if (h.max_children && children > h.max_children) return `This plan allows up to ${h.max_children} children.`;
+  if (h.max_members && adults + children > h.max_members && !h.allow_additional_members) {
+    return `This plan allows up to ${h.max_members} people, including you.`;
+  }
+  return null;
+}
+
+/** One line on the plan card saying who the plan covers. */
+function householdLine(plan: PortfolioPlan) {
+  const h = plan.household;
+  if (!h) return null;
+  if (h.kind === 'couple') return 'For you and one partner';
+  const parts: string[] = [];
+  if (h.max_members) parts.push(`Up to ${h.max_members} people${h.allow_additional_members ? ' (more can be added)' : ''}`);
+  if (h.max_adults) parts.push(`${h.max_adults} adults`);
+  if (h.max_children) parts.push(`${h.max_children} children`);
+  return parts.length ? parts.join(' · ') : 'For you and your family';
+}
+
+/** Number of accent colours cards cycle through (data-tone 0–4 in PublicJoin.module.css). */
+const TONES = 5;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TEST_CARD = '4242 4242 4242 4242';
@@ -132,7 +245,23 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
   const [page, setPage] = useState<PublicPortfolio | null>(null);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'missing'>('loading');
   const [view, setView] = useState<View>('browse');
+  // Browse view shows one section at a time; kept across details/payment so "back" returns here.
+  const [tab, setTab] = useState('plans');
+  // +1 when moving to a tab on the right, -1 to the left: the new content slides in from that side.
+  const [tabDir, setTabDir] = useState<1 | -1>(1);
+  // Position of the highlight pill that glides between tab chips.
+  const navRef = useRef<HTMLDivElement>(null);
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+  // Which edges of the scrolling tab bar hide more tabs (shown as a soft fade).
+  const [navFade, setNavFade] = useState({ left: false, right: false });
+  const navCentredRef = useRef(false);
+  const [planFilter, setPlanFilter] = useState<PlanCategory | 'all'>('all');
+  const [openTrainer, setOpenTrainer] = useState<PortfolioTrainer | null>(null);
+  // The profile panel portals into the page root so it keeps the page's colour variables.
+  const [pageEl, setPageEl] = useState<HTMLDivElement | null>(null);
   const [plan, setPlan] = useState<PortfolioPlan | null>(null);
+  const [family, setFamily] = useState<FamilyRow[]>([]);
+  const [familyTouched, setFamilyTouched] = useState<Record<string, boolean>>({});
 
   const [details, setDetails] = useState({
     fullName: '', phone: '', email: '', gender: '', dob: '', address: '',
@@ -160,11 +289,52 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
     return () => { document.body.style.zoom = previous; };
   }, []);
 
+  // Keep the tab pill under the selected chip — re-measured when the chip resizes (fonts, viewport).
+  useLayoutEffect(() => {
+    const chip = navRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!chip) { setPill(null); return; }
+    const place = () => setPill({ left: chip.offsetLeft, width: chip.offsetWidth });
+    place();
+    // Bring the selected chip to the middle of the bar — only the bar scrolls, never the page.
+    const bar = navRef.current!;
+    if (bar.scrollWidth > bar.clientWidth) {
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      bar.scrollTo({
+        left: chip.offsetLeft - (bar.clientWidth - chip.offsetWidth) / 2,
+        behavior: navCentredRef.current && !reduce ? 'smooth' : 'auto',
+      });
+    }
+    navCentredRef.current = true;
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(place) : null;
+    observer?.observe(chip);
+    return () => observer?.disconnect();
+  }, [tab, view, loadState, page]);
+
+  useEffect(() => {
+    const bar = navRef.current;
+    if (!bar) return;
+    const update = () => {
+      const left = bar.scrollLeft > 4;
+      const right = bar.scrollLeft + bar.clientWidth < bar.scrollWidth - 4;
+      setNavFade(f => (f.left === left && f.right === right ? f : { left, right }));
+    };
+    update();
+    bar.addEventListener('scroll', update, { passive: true });
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    observer?.observe(bar);
+    return () => {
+      bar.removeEventListener('scroll', update);
+      observer?.disconnect();
+    };
+  }, [view, loadState, page]);
+
   useEffect(() => {
     servicePortfolioService.getPublic(tenantSlug, branchId, token)
       .then(data => {
         setPage(data);
         if (!data.online_payment_enabled) setMethod('CASH');
+        const only = onlyGender(data.access ?? 'MIXED');
+        if (only) setDetails(v => (v.gender ? v : { ...v, gender: only }));
         setLoadState('ready');
         const name = [data.gym_name, data.branch_name].filter(Boolean).join(' · ');
         document.title = name ? `${name} — Plans & membership` : 'Plans & membership';
@@ -181,9 +351,21 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
   };
 
   const choosePlan = (p: PortfolioPlan) => {
+    if (p.id !== plan?.id) {
+      // A Family / Couple plan starts with one row to fill in; switching plans starts over.
+      setFamily(p.household ? [newFamilyRow()] : []);
+      setFamilyTouched({});
+    }
     setPlan(p);
     goTo('details');
   };
+
+  const access: BranchAccess = page?.access ?? 'MIXED';
+  const branchGender = onlyGender(access);
+  const genderOptions = GENDERS.filter(g => genderAllowed(access, g));
+  const household = plan?.household ?? null;
+  const familyRows = household ? family : [];
+  const amountDue = plan ? householdTotal(plan, 1 + familyRows.length) : 0;
 
   const touch = (field: DetailKey | PayKey) => () => {
     if (submitPressRef.current) return;
@@ -221,6 +403,39 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
     return e;
   }, [details, phoneCountry]);
 
+  const familyErrors = useMemo(() => {
+    const out: Record<number, Partial<Record<FamilyField, string>>> = {};
+    const emails = new Set<string>(details.email.trim() ? [details.email.trim().toLowerCase()] : []);
+    for (const r of familyRows) {
+      const e: Partial<Record<FamilyField, string>> = {};
+      if (!r.name.trim()) e.name = 'Please enter their full name';
+      if (!r.relationship) e.relationship = 'Please choose how they are related to you';
+      else if (!rowGender(r)) e.gender = 'Please select their gender';
+      if (r.dob) {
+        const age = ageOn(r.dob);
+        if (age == null || age < 0 || age > 110) e.dob = 'Please enter a valid date of birth';
+      }
+      const email = r.email.trim().toLowerCase();
+      if (email && !isChild(r)) {
+        if (!EMAIL_PATTERN.test(email)) e.email = 'Please enter a valid email address or leave it blank';
+        else if (emails.has(email)) e.email = 'Each person needs their own email — use another or leave it blank';
+        else emails.add(email);
+      }
+      if (Object.keys(e).length) out[r.key] = e;
+    }
+    return out;
+  }, [familyRows, details.email]);
+  const householdError = plan ? householdCapError(plan, familyRows) : null;
+
+  const familyError = (r: FamilyRow, f: FamilyField) =>
+    (detailsAttempted || familyTouched[`${r.key}-${f}`]) ? familyErrors[r.key]?.[f] : undefined;
+  const touchFamily = (r: FamilyRow, f: FamilyField) => () => {
+    if (submitPressRef.current) return;
+    setFamilyTouched(t => (t[`${r.key}-${f}`] ? t : { ...t, [`${r.key}-${f}`]: true }));
+  };
+  const updateFamily = (key: number, patch: Partial<FamilyRow>) =>
+    setFamily(rows => rows.map(r => (r.key === key ? { ...r, ...patch } : r)));
+
   const payErrors = useMemo(() => {
     const e: Partial<Record<PayKey, string>> = {};
     if (method === 'ONLINE') {
@@ -238,12 +453,19 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
     e.preventDefault();
     setDetailsAttempted(true);
     const firstInvalid = (Object.keys(DETAIL_IDS) as DetailKey[]).find(k => detailErrors[k]);
-    if (firstInvalid) {
-      const el = document.getElementById(DETAIL_IDS[firstInvalid]);
+    const focus = (id: string) => {
+      const el = document.getElementById(id);
       el?.focus();
       el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    };
+    if (firstInvalid) { focus(DETAIL_IDS[firstInvalid]); return; }
+    const badRow = familyRows.find(r => familyErrors[r.key]);
+    if (badRow) {
+      const field = (['name', 'relationship', 'gender', 'dob', 'email'] as FamilyField[]).find(f => familyErrors[badRow.key]?.[f])!;
+      focus(`jn-fm-${badRow.key}-${field}`);
       return;
     }
+    if (householdError) { focus('jn-household'); return; }
     goTo('payment');
   };
 
@@ -278,6 +500,18 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
           name_on_card: card.name.trim() || undefined,
         } : undefined,
         accept_terms: acceptTerms,
+        family_members: familyRows.length ? familyRows.map((r): ApplicationFamilyMember => {
+          const child = isChild(r);
+          return {
+            name: r.name.trim(),
+            relationship: r.relationship,
+            gender: rowGender(r),
+            date_of_birth: r.dob || null,
+            minor: child,
+            phone: child ? null : r.phone.trim() || null,
+            email: child ? null : r.email.trim() || null,
+          };
+        }) : undefined,
       });
       setReceipt(result);
       goTo('done');
@@ -313,8 +547,10 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
 
   // ── Layout shells ──
   const shell = (children: React.ReactNode, narrow = false) => (
-    <div className={s.page}>
+    <div className={`${s.page} ${j.page}`} ref={setPageEl}>
       <div className={s.backdrop} aria-hidden="true" />
+      {/* Slow-drifting colour behind the glass panels (static when reduced motion is preferred). */}
+      <div className={j.aurora} aria-hidden="true"><span /><span /><span /><span /><span /></div>
       <main className={`${s.shell} ${narrow ? s.shellNarrow : j.wide}`}>{children}</main>
     </div>
   );
@@ -386,14 +622,14 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
     const dobError = detailError('dob');
     const ecPhoneError = detailError('ecPhone');
     return shell(
-      <section className={s.card} aria-labelledby="jn-details-title">
+      <section className={`${s.card} ${j.glassCard}`} aria-labelledby="jn-details-title">
         <Steps current={1} />
         <div className={j.backRow}>
           <button type="button" className={j.linkButton} onClick={() => goTo('browse')}>
             <ArrowLeft size={13} style={{ display: 'inline', verticalAlign: '-2px' }} /> Back to plans
           </button>
         </div>
-        <PlanSummary plan={plan} money={money} onChange={() => goTo('browse')} />
+        <PlanSummary plan={plan} money={money} amount={amountDue} people={1 + familyRows.length} onChange={() => goTo('browse')} />
         <h1 id="jn-details-title" className={s.title} style={{ fontSize: 22 }}>Your details</h1>
         <p className={s.subtitle}>We use these to set up your membership.</p>
 
@@ -407,7 +643,7 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
                   aria-describedby={nameError ? 'jn-name-error' : undefined} />
               </Field>
 
-              <Field id="jn-phone" label="Phone number" required error={phoneError}>
+              <Field id="jn-phone" label="Phone number" required error={phoneError} full>
                 <div className={`${s.control} ${s.phone}`} data-invalid={!!phoneError || undefined}>
                   <div className={s.dial}>
                     <span className={s.flag} aria-hidden="true">{phoneCountry.flag}</span>
@@ -425,7 +661,7 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
                 </div>
               </Field>
 
-              <Field id="jn-email" label="Email" required error={emailError}>
+              <Field id="jn-email" label="Email" required error={emailError} full>
                 <Input id="jn-email" className={s.control} type="email" inputMode="email" autoComplete="email"
                   autoCapitalize="off" spellCheck={false} value={details.email} onChange={setDetail('email')}
                   onBlur={touch('email')} placeholder="you@example.com" aria-required="true"
@@ -437,9 +673,7 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
                   onChange={setDetail('gender')} onBlur={touch('gender')} aria-required="true"
                   aria-invalid={!!genderError || undefined} aria-describedby={genderError ? 'jn-gender-error' : undefined}>
                   <option value="">Select…</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
+                  {genderOptions.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </Field>
 
@@ -456,6 +690,119 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
               </Field>
             </div>
           </div>
+
+          {household && (
+            <div className={s.section}>
+              <h2 className={s.sectionTitle}>{household.kind === 'couple' ? 'Your partner' : 'Your family'}</h2>
+              <p className={j.householdIntro}>
+                {household.kind === 'couple'
+                  ? 'You are the main member. Add the partner joining you — you pay for both of you together.'
+                  : 'You are the main member. Add everyone joining with you — you pay for the whole family together.'}
+                {household.kind === 'family' && (household.max_members || household.max_adults || household.max_children)
+                  ? ` ${householdLine(plan)}.` : ''}
+                {branchGender && (
+                  <> <strong>{page.branch_name || 'This branch'} is for {branchGender === 'Female' ? 'women' : 'men'} only</strong>, so
+                    everyone joining needs to be {branchGender.toLowerCase()}.</>
+                )}
+              </p>
+              <div className={j.familyList}>
+                {familyRows.map((r, i) => {
+                  const id = (f: string) => `jn-fm-${r.key}-${f}`;
+                  const err = (f: FamilyField) => familyError(r, f);
+                  const child = isChild(r);
+                  const implied = RELATIONSHIPS.find(x => x.value === r.relationship)?.gender ?? null;
+                  const options = RELATIONSHIPS
+                    .filter(x => household.kind !== 'couple' || COUPLE_RELATIONSHIPS.includes(x.value))
+                    .filter(x => x.gender === null || genderAllowed(access, x.gender));
+                  return (
+                    <fieldset key={r.key} className={j.familyCard}>
+                      <legend className={j.familyLegend}>
+                        {household.kind === 'couple' ? 'Partner' : `Family member ${i + 1}`}
+                      </legend>
+                      {household.kind === 'family' && familyRows.length > 1 && (
+                        <button type="button" className={j.familyRemove} onClick={() => setFamily(rows => rows.filter(x => x.key !== r.key))}
+                          aria-label={`Remove ${r.name.trim() || `family member ${i + 1}`}`}>
+                          <Trash2 aria-hidden="true" />
+                        </button>
+                      )}
+                      <div className={s.grid}>
+                        <Field id={id('name')} label="Full name" required error={err('name')} full>
+                          <Input id={id('name')} className={s.control} autoComplete="off" autoCapitalize="words"
+                            value={r.name} onChange={e => updateFamily(r.key, { name: e.target.value })} onBlur={touchFamily(r, 'name')}
+                            aria-required="true" aria-invalid={!!err('name') || undefined}
+                            aria-describedby={err('name') ? `${id('name')}-error` : undefined} />
+                        </Field>
+                        <Field id={id('relationship')} label="Relationship to you" required error={err('relationship')}>
+                          <select id={id('relationship')} className={`${s.control} ${j.select}`} value={r.relationship}
+                            // A relationship that implies a gender sets it (rowGender); "Other" asks for it,
+                            // unless the branch only takes one gender.
+                            onChange={e => updateFamily(r.key, { relationship: e.target.value, gender: branchGender })}
+                            onBlur={touchFamily(r, 'relationship')} aria-required="true"
+                            aria-invalid={!!err('relationship') || undefined}
+                            aria-describedby={err('relationship') ? `${id('relationship')}-error` : undefined}>
+                            <option value="">Select…</option>
+                            {options.map(o => <option key={o.value} value={o.value}>{o.value}</option>)}
+                          </select>
+                        </Field>
+                        {r.relationship && !implied && !branchGender && (
+                          <Field id={id('gender')} label="Gender" required error={err('gender')}>
+                            <select id={id('gender')} className={`${s.control} ${j.select}`} value={r.gender}
+                              onChange={e => updateFamily(r.key, { gender: e.target.value })} onBlur={touchFamily(r, 'gender')}
+                              aria-required="true" aria-invalid={!!err('gender') || undefined}
+                              aria-describedby={err('gender') ? `${id('gender')}-error` : undefined}>
+                              <option value="">Select…</option>
+                              {genderOptions.map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                          </Field>
+                        )}
+                        <Field id={id('dob')} label="Date of birth" optional error={err('dob')}>
+                          <Input id={id('dob')} className={s.control} type="date" max={new Date().toISOString().slice(0, 10)}
+                            value={r.dob} onChange={e => updateFamily(r.key, { dob: e.target.value })} onBlur={touchFamily(r, 'dob')}
+                            aria-invalid={!!err('dob') || undefined} aria-describedby={err('dob') ? `${id('dob')}-error` : undefined} />
+                        </Field>
+                        {household.kind === 'family' && !r.dob && (
+                          <label className={j.childToggle} htmlFor={id('child')} style={{ gridColumn: '1 / -1' }}>
+                            <Checkbox id={id('child')} className={s.checkbox} checked={r.child}
+                              onCheckedChange={v => updateFamily(r.key, { child: v === true })} />
+                            <span>Under 18</span>
+                          </label>
+                        )}
+                        {!child && (
+                          <>
+                            <Field id={id('phone')} label="Phone" optional>
+                              <Input id={id('phone')} className={s.control} type="tel" inputMode="tel" autoComplete="off"
+                                value={r.phone} onChange={e => updateFamily(r.key, { phone: e.target.value })} placeholder="+971 50 123 4567" />
+                            </Field>
+                            <Field id={id('email')} label="Email" optional error={err('email')}>
+                              <Input id={id('email')} className={s.control} type="email" inputMode="email" autoComplete="off"
+                                autoCapitalize="off" spellCheck={false} value={r.email}
+                                onChange={e => updateFamily(r.key, { email: e.target.value })} onBlur={touchFamily(r, 'email')}
+                                aria-invalid={!!err('email') || undefined} aria-describedby={err('email') ? `${id('email')}-error` : undefined} />
+                            </Field>
+                          </>
+                        )}
+                      </div>
+                    </fieldset>
+                  );
+                })}
+              </div>
+              {household.kind === 'family' && familyRows.length < MAX_FAMILY_ROWS && (
+                <button type="button" className={j.familyAdd} onClick={() => setFamily(rows => [...rows, newFamilyRow()])}>
+                  <Plus aria-hidden="true" />Add family member
+                </button>
+              )}
+              <div id="jn-household" tabIndex={-1} className={j.householdTotal}>
+                <span>
+                  {1 + familyRows.length} {familyRows.length === 0 ? 'person' : 'people'} including you
+                  {household.price_per_member ? ` · ${money(household.price_per_member)} per person` : ''}
+                </span>
+                <strong>{money(amountDue)}</strong>
+              </div>
+              {householdError && (
+                <FieldError id="jn-household-error" message={householdError} style={{ marginTop: 8 }} />
+              )}
+            </div>
+          )}
 
           <div className={s.section}>
             <h2 className={s.sectionTitle}>Emergency contact <span className={s.optional}>(optional)</span></h2>
@@ -495,14 +842,14 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
     const cardErr = payError('card');
     const termsErr = payError('terms');
     return shell(
-      <section className={s.card} aria-labelledby="jn-pay-title">
+      <section className={`${s.card} ${j.glassCard}`} aria-labelledby="jn-pay-title">
         <Steps current={2} />
         <div className={j.backRow}>
           <button type="button" className={j.linkButton} onClick={() => goTo('details')}>
             <ArrowLeft size={13} style={{ display: 'inline', verticalAlign: '-2px' }} /> Back to your details
           </button>
         </div>
-        <PlanSummary plan={plan} money={money} />
+        <PlanSummary plan={plan} money={money} amount={amountDue} people={1 + familyRows.length} />
         <h1 id="jn-pay-title" className={s.title} style={{ fontSize: 22 }}>How would you like to pay?</h1>
         <p className={s.subtitle}>Your membership starts once the gym approves your application.</p>
 
@@ -514,7 +861,7 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
                 <span className={j.methodIcon}><CreditCard aria-hidden="true" /></span>
                 <span>
                   <span className={j.methodTitle}>Pay online</span>
-                  <span className={j.methodText}>Card payment now — {money(plan.effective_price)}</span>
+                  <span className={j.methodText}>Card payment now — {money(amountDue)}</span>
                 </span>
               </label>
             )}
@@ -568,7 +915,7 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
           ) : (
             <div className={j.cashNote}>
               Your application is sent to the gym now with payment <strong>pending</strong>. Visit reception and pay{' '}
-              <strong>{money(plan.effective_price)}</strong> in cash — staff will confirm it and activate your membership.
+              <strong>{money(amountDue)}</strong> in cash — staff will confirm it and activate your membership.
             </div>
           )}
 
@@ -598,7 +945,7 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
               {submitting
                 ? <><Loader2 className={s.spin} aria-hidden="true" />{method === 'ONLINE' ? 'Processing payment…' : 'Submitting…'}</>
                 : method === 'ONLINE'
-                  ? <><Lock aria-hidden="true" />Pay {money(plan.effective_price)}</>
+                  ? <><Lock aria-hidden="true" />Pay {money(amountDue)}</>
                   : <>Submit application<ArrowRight aria-hidden="true" /></>}
             </Button>
           </div>
@@ -619,12 +966,29 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
     { id: 'about', label: 'About & timings', show: !!(page.about || page.operating_hours || page.terms_and_policies || page.gallery_image_urls.length > 1) },
   ];
   const visible = sections.filter(x => x.show);
-  const jump = (id: string) => document.getElementById(`jn-sec-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const active = visible.some(x => x.id === tab) ? tab : 'plans';
+  // Only offer filters for categories that actually have plans; no row at all if there's just one.
+  const planCounts = PLAN_CATEGORIES
+    .map(c => ({ ...c, count: page.plans.filter(p => planCategory(p) === c.id).length }))
+    .filter(c => c.count > 0);
+  const showPlanFilter = planCounts.length > 1;
+  const shownPlans = showPlanFilter && planFilter !== 'all'
+    ? page.plans.filter(p => planCategory(p) === planFilter)
+    : page.plans;
+  const selectTab = (id: string) => {
+    if (id === active) return;
+    const from = visible.findIndex(x => x.id === active);
+    setTabDir(visible.findIndex(x => x.id === id) > from ? 1 : -1);
+    setTab(id);
+    // Keep the tab bar in view when switching from further down the page.
+    const nav = document.getElementById('jn-tabs');
+    if (nav && nav.getBoundingClientRect().top < 0) nav.scrollIntoView({ block: 'start' });
+  };
 
   return shell(
     <>
       <header className={j.hero}>
-        {page.cover_image_url && <img className={j.heroImage} src={page.cover_image_url} alt="" />}
+        {page.cover_image_url && <img className={j.heroImage} src={resolveBackendImageUrl(page.cover_image_url)} alt="" />}
         <div className={j.heroShade} aria-hidden="true" />
         <div className={j.heroBody}>
           <div className={j.heroEyebrow}><Dumbbell size={14} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 6 }} />Plans & membership</div>
@@ -638,24 +1002,61 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
       </header>
 
       {visible.length > 1 && (
-        <nav className={j.nav} aria-label="Sections">
+        <nav id="jn-tabs" className={j.nav} aria-label="Sections">
+          <div className={j.navInner} role="tablist" ref={navRef} data-pill={pill ? '' : undefined}
+            data-fade-left={navFade.left ? '' : undefined} data-fade-right={navFade.right ? '' : undefined}>
+          {pill && (
+            <span className={j.navPill} aria-hidden="true"
+              style={{ width: pill.width, transform: `translateX(${pill.left}px)` }} />
+          )}
           {visible.map(x => (
-            <button key={x.id} type="button" className={j.navChip} onClick={() => jump(x.id)}>{x.label}</button>
+            <button
+              key={x.id}
+              type="button"
+              role="tab"
+              aria-selected={active === x.id}
+              aria-controls={`jn-sec-${x.id}`}
+              className={`${j.navChip} ${active === x.id ? j.navChipActive : ''}`}
+              onClick={() => selectTab(x.id)}
+            >
+              {x.label}
+            </button>
           ))}
+          </div>
         </nav>
       )}
 
+      {/* Keyed by tab so its content re-enters with the slide/fade each switch. */}
+      <div key={active} className={j.tabPanel} data-dir={tabDir}>
+      {active === 'plans' && (
       <section id="jn-sec-plans" className={j.block} aria-labelledby="jn-plans-title">
         <h2 id="jn-plans-title" className={j.blockTitle}>Membership plans</h2>
         <p className={j.blockSub}>Pick a plan to apply — pay online now or in cash at the gym.</p>
+        {showPlanFilter && (
+          <div className={j.filters} role="group" aria-label="Filter plans by type">
+            {[{ id: 'all' as const, label: 'All', count: page.plans.length }, ...planCounts].map(c => (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={planFilter === c.id}
+                className={`${j.filterChip} ${planFilter === c.id ? j.filterChipActive : ''}`}
+                onClick={() => setPlanFilter(c.id)}
+              >
+                {c.label}<span className={j.filterCount}>{c.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
         {page.plans.length === 0 ? (
           <div className={j.empty}>No plans are open for online sign-up right now. Please contact the gym.</div>
         ) : (
-          <div className={`${j.grid} ${j.grid3}`}>
-            {page.plans.map(p => {
+          <div key={planFilter} className={`${j.grid} ${j.grid3}`}>
+            {shownPlans.map(p => {
+              // Colour follows the plan's place in the full list, so it doesn't change when filtering.
+              const tone = page.plans.indexOf(p) % TONES;
               const offer = p.effective_price < p.price;
               return (
-                <article key={p.id} className={`${j.tile} ${j.plan}`}>
+                <article key={p.id} className={`${j.tile} ${j.plan}`} data-tone={tone}>
                   <div className={j.planHead}>
                     <div>
                       <h3 className={j.planName}>{p.name}</h3>
@@ -663,10 +1064,19 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
                     </div>
                     {offer && <span className={j.badge}>{p.offer_label || 'Offer'}</span>}
                   </div>
-                  <div>
-                    <span className={j.price}>{money(p.effective_price)}</span>
-                    {offer && <span className={j.wasPrice}>{money(p.price)}</span>}
-                  </div>
+                  {p.household?.price_per_member ? (
+                    <div>
+                      <span className={j.price}>{money(p.household.price_per_member)}</span>
+                      <span className={j.priceUnit}> per person</span>
+                    </div>
+                  ) : (
+                    <div>
+                      <span className={j.price}>{money(p.effective_price)}</span>
+                      {offer && <span className={j.wasPrice}>{money(p.price)}</span>}
+                      {p.household && <span className={j.priceUnit}> {p.household.kind === 'couple' ? 'for both' : 'for the family'}</span>}
+                    </div>
+                  )}
+                  {p.household && <div className={j.householdBadge}><Users aria-hidden="true" />{householdLine(p)}</div>}
                   {p.description && <p className={j.prose} style={{ margin: 0 }}>{p.description}</p>}
                   <ul className={j.features}>
                     {p.features.map((f, i) => <li key={i}><CheckCircle aria-hidden="true" />{f}</li>)}
@@ -677,7 +1087,7 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
                         Join with this plan<ArrowRight aria-hidden="true" />
                       </Button>
                     ) : (
-                      <span className={j.planNote}>Family and couple plans are set up at reception — contact the gym to join.</span>
+                      <span className={j.planNote}>This plan is set up at reception — contact the gym to join.</span>
                     )}
                   </div>
                 </article>
@@ -686,22 +1096,23 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
           </div>
         )}
       </section>
+      )}
 
-      {page.classes.length > 0 && (
+      {active === 'classes' && page.classes.length > 0 && (
         <SessionBlock id="classes" title="Group classes" sub="Upcoming classes over the next few weeks" sessions={page.classes} money={money} />
       )}
 
-      {page.programs.length > 0 && (
+      {active === 'programs' && page.programs.length > 0 && (
         <SessionBlock id="programs" title="Training programs" sub="Personal training sessions with our trainers" sessions={page.programs} money={money} />
       )}
 
-      {page.streams.length > 0 && (
+      {active === 'streams' && page.streams.length > 0 && (
         <section id="jn-sec-streams" className={j.block} aria-labelledby="jn-streams-title">
           <h2 id="jn-streams-title" className={j.blockTitle}>Training streams</h2>
           <p className={j.blockSub}>Live and upcoming online sessions led by our trainers — included for members.</p>
           <div className={j.rowList}>
-            {page.streams.map(st => (
-              <div key={st.id} className={`${j.tile} ${j.row}`}>
+            {page.streams.map((st, i) => (
+              <div key={st.id} className={`${j.tile} ${j.row}`} data-tone={i % TONES}>
                 <span className={j.facilityIcon}>{st.status === 'Live' ? <Radio aria-hidden="true" /> : <Video aria-hidden="true" />}</span>
                 <div className={j.rowBody}>
                   <div className={j.rowTitle}>{st.title}</div>
@@ -722,13 +1133,13 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
         </section>
       )}
 
-      {page.facilities.length > 0 && (
+      {active === 'facilities' && page.facilities.length > 0 && (
         <section id="jn-sec-facilities" className={j.block} aria-labelledby="jn-fac-title">
           <h2 id="jn-fac-title" className={j.blockTitle}>Facilities</h2>
           <p className={j.blockSub}>What's available at this branch</p>
           <div className={`${j.grid} ${j.grid3}`}>
-            {page.facilities.map(f => (
-              <div key={f.id} className={`${j.tile} ${j.facility}`}>
+            {page.facilities.map((f, i) => (
+              <div key={f.id} className={`${j.tile} ${j.facility}`} data-tone={i % TONES}>
                 <span className={j.facilityIcon}><Sparkles aria-hidden="true" /></span>
                 <div className={j.rowBody}>
                   <div className={j.rowTitle}>{f.name}</div>
@@ -740,15 +1151,22 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
         </section>
       )}
 
-      {page.trainers.length > 0 && (
+      {active === 'trainers' && page.trainers.length > 0 && (
         <section id="jn-sec-trainers" className={j.block} aria-labelledby="jn-tr-title">
           <h2 id="jn-tr-title" className={j.blockTitle}>Our trainers</h2>
           <p className={j.blockSub}>The team you'll train with</p>
           <div className={`${j.grid} ${j.grid3}`}>
-            {page.trainers.map(t => (
-              <div key={t.id} className={`${j.tile} ${j.facility}`}>
+            {page.trainers.map((t, i) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`${j.tile} ${j.facility} ${j.trainerCard}`}
+                data-tone={i % TONES}
+                onClick={() => setOpenTrainer(t)}
+                aria-label={`View ${t.name}'s profile`}
+              >
                 <span className={j.avatar}>
-                  {t.photo_url ? <img src={t.photo_url} alt="" /> : (t.name || '?').charAt(0).toUpperCase()}
+                  {t.photo_url ? <img src={resolveBackendImageUrl(t.photo_url)} alt="" /> : (t.name || '?').charAt(0).toUpperCase()}
                 </span>
                 <div className={j.rowBody}>
                   <div className={j.rowTitle}>{t.name}</div>
@@ -759,13 +1177,25 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
                     )}
                   </div>
                 </div>
-              </div>
+                <ChevronRight className={j.trainerChevron} aria-hidden="true" />
+              </button>
             ))}
           </div>
         </section>
       )}
 
-      {sections.find(x => x.id === 'about')?.show && (
+      <TrainerProfile
+        trainer={openTrainer}
+        sessions={openTrainer
+          ? [...page.classes, ...page.programs]
+              .filter(se => se.trainer_id === openTrainer.id)
+              .sort((a, b) => `${a.date ?? ''}${a.start_time ?? ''}`.localeCompare(`${b.date ?? ''}${b.start_time ?? ''}`))
+          : []}
+        container={pageEl}
+        onClose={() => setOpenTrainer(null)}
+      />
+
+      {active === 'about' && sections.find(x => x.id === 'about')?.show && (
         <section id="jn-sec-about" className={j.block} aria-labelledby="jn-about-title">
           <h2 id="jn-about-title" className={j.blockTitle}>About & timings</h2>
           <div className={j.grid}>
@@ -784,7 +1214,7 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
           </div>
           {page.gallery_image_urls.length > 1 && (
             <div className={j.gallery} style={{ marginTop: 14 }}>
-              {page.gallery_image_urls.map((url, i) => <img key={i} src={url} alt="" loading="lazy" />)}
+              {page.gallery_image_urls.map((url, i) => <img key={i} src={resolveBackendImageUrl(url)} alt="" loading="lazy" />)}
             </div>
           )}
           {page.terms_and_policies && (
@@ -795,6 +1225,8 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
           )}
         </section>
       )}
+
+      </div>
 
       <p className={j.footer}>Membership applications are reviewed by {page.gym_name || 'the gym'} before they start.</p>
     </>,
@@ -821,15 +1253,151 @@ function Steps({ current }: { current: 1 | 2 }) {
   );
 }
 
-function PlanSummary({ plan, money, onChange }: { plan: PortfolioPlan; money: (n: number) => string; onChange?: () => void }) {
+function PlanSummary({ plan, money, amount, people, onChange }: {
+  plan: PortfolioPlan; money: (n: number) => string; amount: number; people: number; onChange?: () => void;
+}) {
   return (
     <div className={j.summary}>
       <div>
         <strong>{plan.name}</strong>
-        <span>{plan.duration}{onChange && <> · <button type="button" className={j.linkButton} onClick={onChange}>Change plan</button></>}</span>
+        <span>
+          {plan.duration}{plan.household ? ` · ${people} ${people === 1 ? 'person' : 'people'}` : ''}
+          {onChange && <> · <button type="button" className={j.linkButton} onClick={onChange}>Change plan</button></>}
+        </span>
       </div>
-      <div className={j.summaryPrice}>{money(plan.effective_price)}</div>
+      <div className={j.summaryPrice}>{money(amount)}</div>
     </div>
+  );
+}
+
+const MAX_PROFILE_SESSIONS = 5;
+
+function sinceLabel(iso?: string | null) {
+  if (!iso) return null;
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+/** A trainer's public profile — opened from a trainer card on the Trainers tab. */
+function TrainerProfile({ trainer, sessions, container, onClose }: {
+  trainer: PortfolioTrainer | null;
+  sessions: PortfolioSession[];
+  container: HTMLElement | null;
+  onClose: () => void;
+}) {
+  // Keep the last trainer while the panel animates closed.
+  const [shown, setShown] = useState<PortfolioTrainer | null>(trainer);
+  useEffect(() => { if (trainer) setShown(trainer); }, [trainer]);
+  const t = trainer ?? shown;
+
+  const dist = t?.rating_distribution?.length === 5 ? t.rating_distribution : [0, 0, 0, 0, 0];
+  const maxBar = Math.max(1, ...dist);
+  const rated = !!t && t.rating_count > 0 && t.average_rating != null;
+  const since = sinceLabel(t?.join_date);
+  const certs = t?.certifications ?? [];
+  const tags = t?.top_tags ?? [];
+
+  return (
+    <DialogPrimitive.Root open={!!trainer} onOpenChange={open => { if (!open) onClose(); }}>
+      <DialogPrimitive.Portal container={container ?? undefined}>
+        <DialogPrimitive.Overlay className={j.profileOverlay} />
+        <DialogPrimitive.Content className={j.profilePanel} aria-describedby={undefined}>
+          {t && (
+            <>
+              <DialogPrimitive.Close className={j.profileClose} aria-label="Close">
+                <X aria-hidden="true" />
+              </DialogPrimitive.Close>
+
+              <div className={j.profileHead}>
+                <span className={`${j.avatar} ${j.profileAvatar}`}>
+                  {t.photo_url ? <img src={resolveBackendImageUrl(t.photo_url)} alt="" /> : (t.name || '?').charAt(0).toUpperCase()}
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <DialogPrimitive.Title className={j.profileName}>{t.name}</DialogPrimitive.Title>
+                  <div className={j.rowMeta}>
+                    {t.role && <span>{t.role}</span>}
+                    {since && <span><Calendar aria-hidden="true" />With us since {since}</span>}
+                  </div>
+                </div>
+              </div>
+
+              <div className={j.profileSection}>
+                <h3 className={j.profileLabel}>Member ratings</h3>
+                {rated ? (
+                  <div className={j.ratingWrap}>
+                    <div className={j.ratingScore}>
+                      <strong>{t.average_rating!.toFixed(1)}</strong>
+                      <span className={j.ratingStars} aria-hidden="true">
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <Star key={n} className={n <= Math.round(t.average_rating!) ? j.starOn : j.starOff} />
+                        ))}
+                      </span>
+                      <span>{t.rating_count} rating{t.rating_count === 1 ? '' : 's'}</span>
+                    </div>
+                    <ul className={j.ratingBars} aria-label="Ratings by star">
+                      {[5, 4, 3, 2, 1].map(star => (
+                        <li key={star}>
+                          <span className={j.barLabel}>{star}<Star aria-hidden="true" /></span>
+                          <span className={j.barTrack}>
+                            <span className={j.barFill} style={{ width: `${(dist[star - 1] / maxBar) * 100}%` }} />
+                          </span>
+                          <span className={j.barCount}>{dist[star - 1]}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className={j.profileMuted}>No ratings yet.</p>
+                )}
+                {tags.length > 0 && (
+                  <div className={j.tagRow}>
+                    {tags.map(tag => <span key={tag} className={j.tag}>{tag}</span>)}
+                  </div>
+                )}
+              </div>
+
+              {certs.length > 0 && (
+                <div className={j.profileSection}>
+                  <h3 className={j.profileLabel}>Certifications</h3>
+                  <ul className={j.certList}>
+                    {certs.map((c, i) => <li key={i}><Award aria-hidden="true" />{c}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {sessions.length > 0 && (
+                <div className={j.profileSection}>
+                  <h3 className={j.profileLabel}>Upcoming sessions</h3>
+                  <ul className={j.profileSessions}>
+                    {sessions.slice(0, MAX_PROFILE_SESSIONS).map(se => {
+                      const d = dateParts(se.date);
+                      return (
+                        <li key={se.id}>
+                          <span className={j.dateBox}>
+                            {d ? <><span>{d.weekday}</span><strong>{d.day}</strong><span>{d.month}</span></> : <Calendar aria-hidden="true" />}
+                          </span>
+                          <div className={j.rowBody}>
+                            <div className={j.rowTitle}>{se.name}</div>
+                            <div className={j.rowMeta}>
+                              {(se.start_time || se.end_time) && <span><Clock aria-hidden="true" />{hhmm(se.start_time)}{se.end_time ? `–${hhmm(se.end_time)}` : ''}</span>}
+                              {se.location && <span><MapPin aria-hidden="true" />{se.location}</span>}
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {sessions.length > MAX_PROFILE_SESSIONS && (
+                    <p className={j.profileMuted}>+{sessions.length - MAX_PROFILE_SESSIONS} more upcoming</p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 
@@ -841,11 +1409,11 @@ function SessionBlock({ id, title, sub, sessions, money }: {
       <h2 id={`jn-${id}-title`} className={j.blockTitle}>{title}</h2>
       <p className={j.blockSub}>{sub}</p>
       <div className={j.rowList}>
-        {sessions.map(se => {
+        {sessions.map((se, i) => {
           const d = dateParts(se.date);
           const full = se.spots_left != null && se.spots_left <= 0;
           return (
-            <div key={se.id} className={`${j.tile} ${j.row}`}>
+            <div key={se.id} className={`${j.tile} ${j.row}`} data-tone={i % TONES}>
               <span className={j.dateBox}>
                 {d ? <><span>{d.weekday}</span><strong>{d.day}</strong><span>{d.month}</span></> : <Calendar aria-hidden="true" />}
               </span>

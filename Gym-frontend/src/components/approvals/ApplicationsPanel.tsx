@@ -1,5 +1,6 @@
 // Approvals → Applications: membership applications from the public Service Portfolios
-// link. Payment and approval are separate: a paid online application still waits here,
+// link, and ones staff raise for a walk-in (Service Portfolios → Choose Plan → New Member,
+// source DESK — always cash at reception). Payment and approval are separate: a paid online application still waits here,
 // and a cash one is approved only once reception confirms the cash. Approving creates
 // the member with the chosen plan (starting today) and posts the receipt.
 import React, { useState } from 'react';
@@ -8,7 +9,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Checkbox } from '../ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
-import { Banknote, CheckCircle, Clock, CreditCard, FileText, Globe, RefreshCw, XCircle } from 'lucide-react';
+import { Banknote, CheckCircle, Clock, CreditCard, FileText, Globe, RefreshCw, Store, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { styles, Panel, Status, fmtDate } from '../overview/overview-kit';
 import q from './approvals.module.css';
@@ -40,6 +41,14 @@ export function paymentLabel(a: MembershipApplication) {
   if (a.payment_status === 'VOID') return 'Not paid';
   return 'Cash — pending';
 }
+
+const householdLabel = (a: MembershipApplication) => {
+  const n = 1 + (a.family_members?.length ?? 0);
+  return `${n} people`;
+};
+
+const sourceLabel = (a: MembershipApplication) =>
+  a.source === 'DESK' ? `Registered at the desk${a.submitted_by ? ` by ${a.submitted_by}` : ''}` : 'Share link (applied online)';
 
 export function ApplicationsPanel({ applications, loading, onChanged, money }: {
   applications: MembershipApplication[];
@@ -126,7 +135,10 @@ export function ApplicationsPanel({ applications, loading, onChanged, money }: {
               <span className={q.avatar}>{initials(a.full_name)}</span>
               <div className={q.who}>
                 <span className={q.name}>{a.full_name}<span className={styles.muted} style={{ fontWeight: 400 }}> · {a.reference}</span></span>
-                <span className={q.what}>{a.plan_name}{a.plan_duration ? ` · ${a.plan_duration}` : ''}</span>
+                <span className={q.what}>
+                  {a.plan_name}{a.plan_duration ? ` · ${a.plan_duration}` : ''}
+                  {!!a.family_members?.length && ` · ${householdLabel(a)}`}
+                </span>
                 <span className={q.meta}>
                   <span>{a.phone}</span>
                   {a.branch_name && <span>{a.branch_name}</span>}
@@ -134,6 +146,9 @@ export function ApplicationsPanel({ applications, loading, onChanged, money }: {
                     {a.payment_method === 'ONLINE' ? <CreditCard size={11} /> : <Banknote size={11} />}
                     {paymentLabel(a)}
                   </Status>
+                  {a.source === 'DESK'
+                    ? <Status kind="info"><Store size={11} />Walk-in · desk</Status>
+                    : <Status kind="info"><Globe size={11} />Share link</Status>}
                   <Status kind="info"><Clock size={11} />Approval pending</Status>
                   <span title={dateTime(a.created_at)}>{ago(a.created_at)}</span>
                 </span>
@@ -181,7 +196,7 @@ export function ApplicationsPanel({ applications, loading, onChanged, money }: {
       <div style={{ height: 16 }} />
       <Panel title="Cash applications — awaiting payment" icon={Banknote}
         sub="The applicant will pay at reception. Confirm the cash when you approve">
-        {renderList(cash, 'No cash applications waiting', 'Applicants who chose to pay cash at the gym appear here.')}
+        {renderList(cash, 'No cash applications waiting', 'Applicants who chose to pay cash at the gym, and walk-ins registered from Service Portfolios, appear here.')}
       </Panel>
 
       <Dialog open={!!r} onOpenChange={(o) => { if (!o) setReview(null); }}>
@@ -203,14 +218,41 @@ export function ApplicationsPanel({ applications, loading, onChanged, money }: {
                     <div><dt>Email</dt><dd style={{ overflowWrap: 'anywhere' }}>{r.email || '—'}</dd></div>
                     <div><dt>Gender</dt><dd>{r.gender || '—'}</dd></div>
                     <div><dt>Date of birth</dt><dd>{r.date_of_birth ? fmtDate(r.date_of_birth) : '—'}</dd></div>
+                    {r.reg_doc_number && <div><dt>National ID</dt><dd>{r.reg_doc_number}</dd></div>}
+                    <div><dt>Source</dt><dd>{sourceLabel(r)}</dd></div>
                     {r.address && <div style={{ gridColumn: '1 / -1' }}><dt>Address</dt><dd>{r.address}</dd></div>}
                     {(r.emergency_contact_name || r.emergency_contact_phone) && (
                       <div style={{ gridColumn: '1 / -1' }}><dt>Emergency contact</dt>
                         <dd>{[r.emergency_contact_name, r.emergency_contact_phone].filter(Boolean).join(' · ')}</dd></div>
                     )}
+                    {r.medical_conditions && <div style={{ gridColumn: '1 / -1' }}><dt>Medical conditions</dt><dd style={{ whiteSpace: 'pre-line' }}>{r.medical_conditions}</dd></div>}
                     {r.notes && <div style={{ gridColumn: '1 / -1' }}><dt>Notes</dt><dd style={{ whiteSpace: 'pre-line' }}>{r.notes}</dd></div>}
                   </dl>
                 </div>
+
+                {!!r.family_members?.length && (
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                      Family members ({r.family_members.length})
+                    </div>
+                    <ul className={q.householdList}>
+                      {r.family_members.map((m, i) => (
+                        <li key={i}>
+                          <div className={q.householdName}>
+                            {m.name}
+                            <span className={styles.muted} style={{ fontWeight: 400 }}>
+                              {' · '}{m.relationship}{m.minor ? ' · Child' : ''}
+                            </span>
+                          </div>
+                          <div className={q.householdMeta}>
+                            {[m.gender, m.date_of_birth ? `Born ${fmtDate(m.date_of_birth)}` : null, m.phone, m.email]
+                              .filter(Boolean).join(' · ') || 'No other details'}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Plan & payment</div>
@@ -246,6 +288,7 @@ export function ApplicationsPanel({ applications, loading, onChanged, money }: {
                     <p className="text-sm text-muted-foreground">
                       Approving creates {r.full_name}'s member profile, assigns <strong>{r.plan_name}</strong> starting today,
                       activates the membership and records the {reviewPaid && r.payment_method === 'ONLINE' ? 'card' : 'cash'} payment on a receipt.
+                      {!!r.family_members?.length && <> {r.full_name} becomes the family head and the {r.family_members.length === 1 ? 'other member is' : `${r.family_members.length} other members are`} added to the family, billed on the same receipt.</>}
                     </p>
                   </>
                 ) : (

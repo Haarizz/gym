@@ -116,8 +116,12 @@ public class StaffTargetService {
                 ? revenue.multiply(BigDecimal.valueOf(100)).divide(revenueGoal, 0, RoundingMode.HALF_UP).intValue() : 0);
         dto.setMembershipRevenueTarget(goals.goal(Metric.MEMBER_ADMISSION, Measure.AMOUNT));
         dto.setPosRevenueTarget(goals.goal(Metric.POS_SALE, Measure.AMOUNT));
+        // PT: money members paid for PT with this trainer (packages + paid sessions), on payment.
+        // Commission timing (package "on completion") affects only the commission, not the target.
+        dto.setPtRevenueTarget(goals.goal(Metric.PT_SALE, Measure.AMOUNT));
         dto.withRevenueBreakdown(achieved.getOrDefault(Metric.MEMBER_ADMISSION, Achieved.ZERO).amountOrZero(),
-                achieved.getOrDefault(Metric.POS_SALE, Achieved.ZERO).amountOrZero(), BigDecimal.ZERO);
+                achieved.getOrDefault(Metric.POS_SALE, Achieved.ZERO).amountOrZero(),
+                achieved.getOrDefault(Metric.PT_SALE, Achieved.ZERO).amountOrZero());
         dto.setSessionsTarget(intOrNull(goals.goal(Metric.PT_SESSION_DELIVERED, Measure.COUNT)));
         dto.setSessionsAchieved((int) achieved.getOrDefault(Metric.PT_SESSION_DELIVERED, Achieved.ZERO).count());
         dto.setNewClientsTarget(intOrNull(goals.goal(Metric.LEAD_CONVERSION, Measure.COUNT)));
@@ -125,13 +129,15 @@ public class StaffTargetService {
         StringBuilder units = new StringBuilder("[");
         Map<String, Integer> unitsAchieved = new LinkedHashMap<>();
         for (Object[] u : new Object[][]{{"admissions", Metric.MEMBER_ADMISSION}, {"pos_sales", Metric.POS_SALE},
-                {"pt_sessions", Metric.PT_SESSION_DELIVERED}}) {
+                {"pt_sessions", Metric.PT_SESSION_DELIVERED}, {"pt_packages", Metric.PT_SALE}}) {
             Metric metric = (Metric) u[1];
-            unitsAchieved.put((String) u[0], (int) achieved.getOrDefault(metric, Achieved.ZERO).count());
+            int done = (int) achieved.getOrDefault(metric, Achieved.ZERO).count();
+            unitsAchieved.put((String) u[0], done);
             Integer goal = intOrNull(goals.goal(metric, Measure.COUNT));
-            if (goal == null || metric == Metric.PT_SESSION_DELIVERED) continue;
+            if (goal == null) continue;
             if (units.length() > 1) units.append(',');
-            units.append("{\"service\":\"").append(u[0]).append("\",\"target_units\":").append(goal).append('}');
+            units.append("{\"service\":\"").append(u[0]).append("\",\"target_units\":").append(goal)
+                    .append(",\"achieved_units\":").append(done).append('}');
         }
         dto.setUnitTargetsJson(units.append(']').toString());
         dto.withUnits(unitsAchieved);

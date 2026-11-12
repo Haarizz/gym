@@ -1,5 +1,7 @@
 package com.company.project.controllers.mobile.discovery;
 
+import com.company.project.config.OsivSuspension;
+
 import com.company.project.controlplane.entities.GlobalBranchDiscovery;
 import com.company.project.controlplane.repositories.GlobalBranchDiscoveryRepository;
 import com.company.project.dto.CenterDetailsDTO;
@@ -350,13 +352,8 @@ public class MobileDiscoveryController {
         // to prevent OSIV from binding the primary DB connection to the main request's EntityManager
         UserProfile profile = globalUserService.getUserProfileRequiresNew(globalUserId);
 
-        // 2. Unbind OSIV EntityManager so the next JPA operation creates a NEW one with the tenant connection!
-        if (TransactionSynchronizationManager.hasResource(entityManagerFactory)) {
-            EntityManagerHolder emHolder = (EntityManagerHolder) TransactionSynchronizationManager.unbindResource(entityManagerFactory);
-            EntityManagerFactoryUtils.closeEntityManager(emHolder.getEntityManager());
-        }
-
-        try {
+        // 2. Set aside the OSIV EntityManager so the next JPA operation creates a NEW one with the tenant connection.
+        try (OsivSuspension ignored = OsivSuspension.suspend(entityManagerFactory)) {
             TenantContextHolder.setCurrentTenant(tenantSlug);
             BranchContextHolder.setActiveBranchId(branchId);
             

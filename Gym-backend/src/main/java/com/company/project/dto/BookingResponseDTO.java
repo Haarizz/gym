@@ -89,6 +89,16 @@ public class BookingResponseDTO {
     public String getPaymentStatus() { return paymentStatus; }
     public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
 
+    // The training package this booking used a session of, if any.
+    private Long enrolmentId;
+    private String packageName;
+
+    public Long getEnrolmentId() { return enrolmentId; }
+    public void setEnrolmentId(Long enrolmentId) { this.enrolmentId = enrolmentId; }
+
+    public String getPackageName() { return packageName; }
+    public void setPackageName(String packageName) { this.packageName = packageName; }
+
     // The Reward Pass this booking was paid with, if any.
     private Long rewardId;
 

@@ -5,6 +5,9 @@ import com.company.project.dto.BookingResponseDTO;
 import com.company.project.dto.BookingStatusUpdateDTO;
 import com.company.project.entities.Booking;
 import com.company.project.entities.Member;
+import com.company.project.entities.PackageEnrolment;
+import com.company.project.packages.PackageUsageService;
+import com.company.project.repositories.PackageEnrolmentRepository;
 import com.company.project.entities.TrainingSession;
 import com.company.project.enums.PassContext;
 import com.company.project.exceptions.BusinessRuleViolationException;
@@ -43,6 +46,8 @@ public class BookingService {
     private final BookingPaymentService bookingPaymentService;
     private final SessionMemberNotifier sessionMemberNotifier;
     private final PosBusinessDayService businessDay;
+    private final PackageUsageService packageUsage;
+    private final PackageEnrolmentRepository enrolmentRepository;
 
     public BookingService(BookingRepository bookingRepository,
                           TrainingSessionRepository sessionRepository,
@@ -52,7 +57,9 @@ public class BookingService {
                           RewardRedemptionService rewardRedemptionService,
                           BookingPaymentService bookingPaymentService,
                           SessionMemberNotifier sessionMemberNotifier,
-                          PosBusinessDayService businessDay) {
+                          PosBusinessDayService businessDay,
+                          PackageUsageService packageUsage,
+                          PackageEnrolmentRepository enrolmentRepository) {
         this.bookingRepository = bookingRepository;
         this.sessionRepository = sessionRepository;
         this.memberRepository = memberRepository;
@@ -62,6 +69,8 @@ public class BookingService {
         this.bookingPaymentService = bookingPaymentService;
         this.sessionMemberNotifier = sessionMemberNotifier;
         this.businessDay = businessDay;
+        this.packageUsage = packageUsage;
+        this.enrolmentRepository = enrolmentRepository;
     }
 
     public List<BookingResponseDTO> getBookings(String status,
@@ -204,6 +213,23 @@ public class BookingService {
             }
         }
 
+        // A member's PT booking draws on one of their training packages when one fits. An app
+        // booking that already brings a payment (card verified before this runs, wallet, code) is
+        // charged as before; it uses a package only when it names one and brings no payment.
+        boolean bringsPayment = memberSelfService && bringsPayment(request);
+        if (bringsPayment && request.getEnrolmentId() != null) {
+            throw new BusinessRuleViolationException("This session is covered by your PT package — book it without paying");
+        }
+        PackageEnrolment enrolment = null;
+        if (member != null && !waitlisted && request.getRewardPassId() == null && !bringsPayment
+                && !Boolean.TRUE.equals(request.getSkipPackage())) {
+            enrolment = packageUsage.pickFor(member.getId(), session, request.getEnrolmentId());
+        } else if (request.getEnrolmentId() != null) {
+            throw new BusinessRuleViolationException(waitlisted
+                    ? "A waitlist spot can't use a package — book it once a seat frees up"
+                    : "This booking can't use a package");
+        }
+
         Booking booking = new Booking();
         booking.setSession(session);
         booking.setMember(member);
@@ -219,7 +245,13 @@ public class BookingService {
         // Save first to obtain the booking ID, then generate the HMAC-signed QR
         bookingRepository.save(booking);
 
-        if (memberSelfService) {
+        if (enrolment != null) {
+            // Covered by the package: nothing to charge.
+            booking.setEnrolmentId(enrolment.getId());
+            booking.setPrice(BigDecimal.ZERO);
+            booking.setGrossPrice(session.getPrice());
+            booking.setPaymentStatus(null);
+        } else if (memberSelfService) {
             // Prices the booking and takes payment (code/pass, wallet, receipt, approval).
             bookingPaymentService.charge(booking, member, session, request);
         } else if (passContext != null) {
@@ -442,10 +474,25 @@ public class BookingService {
         booking.setRewardId(null);
     }
 
+    /** The app sent money for this booking: payment legs, wallet, a promo code or a price to pay. */
+    static boolean bringsPayment(BookingRequestDTO r) {
+        boolean legs = r.getPaymentBreakdown() != null && r.getPaymentBreakdown().stream()
+                .anyMatch(l -> l != null && l.getAmount() != null && l.getAmount().signum() > 0);
+        return legs
+                || (r.getWalletAmount() != null && r.getWalletAmount().signum() > 0)
+                || StringUtils.hasText(r.getCouponCode())
+                || (r.getExpectedAmount() != null && r.getExpectedAmount().signum() > 0);
+    }
+
     private BookingResponseDTO toResponse(Booking booking) {
         BookingResponseDTO dto = new BookingResponseDTO();
         dto.setId(String.valueOf(booking.getId()));
         dto.setRewardId(booking.getRewardId());
+        dto.setEnrolmentId(booking.getEnrolmentId());
+        if (booking.getEnrolmentId() != null) {
+            enrolmentRepository.findById(booking.getEnrolmentId())
+                    .ifPresent(e -> dto.setPackageName(e.getPackageName()));
+        }
         dto.setSessionId(booking.getSession() == null ? null : String.valueOf(booking.getSession().getId()));
         dto.setSessionName(booking.getSession() == null ? null : booking.getSession().getName());
         dto.setTrainerName(booking.getSession() != null && booking.getSession().getTrainer() != null

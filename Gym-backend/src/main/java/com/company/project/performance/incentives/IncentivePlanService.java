@@ -64,6 +64,19 @@ public class IncentivePlanService {
                 .setParameter("p", planId).getSingleResult()).longValue();
     }
 
+    /**
+     * The plan as it would be saved, validated the same way, but never stored. Used to preview
+     * what a plan would pay before saving it.
+     */
+    @Transactional(readOnly = true)
+    public IncentivePlan draft(PlanRequest req) {
+        IncentivePlan p = new IncentivePlan();
+        apply(p, req.name() == null || req.name().isBlank()
+                ? new PlanRequest("Preview", req.branchId(), req.effectiveFrom(), req.status(), req.assignments(), req.lines(), req.bonuses())
+                : req);
+        return p;
+    }
+
     public IncentivePlan create(PlanRequest req) {
         IncentivePlan p = new IncentivePlan();
         apply(p, req);

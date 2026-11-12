@@ -1,5 +1,7 @@
 package com.company.project.controllers.mobile.family;
 
+import com.company.project.config.OsivSuspension;
+
 import com.company.project.controlplane.entities.GlobalBranchDiscovery;
 import com.company.project.controlplane.repositories.GlobalBranchDiscoveryRepository;
 import com.company.project.dto.mobile.discovery.MobilePurchaseRequestDTO;
@@ -22,10 +24,7 @@ import jakarta.persistence.EntityManagerFactory;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.orm.jpa.EntityManagerFactoryUtils;
-import org.springframework.orm.jpa.EntityManagerHolder;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -117,12 +116,7 @@ public class MobileFamilyPurchaseController {
         UserProfile profile = globalUserService.getUserProfileRequiresNew(user.getId());
         String gymName = globalDiscoveryRepository.findByTenantSlugAndBranchId(tenantSlug, branchId)
                 .map(GlobalBranchDiscovery::getGymName).orElse(null);
-        if (TransactionSynchronizationManager.hasResource(entityManagerFactory)) {
-            EntityManagerHolder emHolder = (EntityManagerHolder) TransactionSynchronizationManager.unbindResource(entityManagerFactory);
-            EntityManagerFactoryUtils.closeEntityManager(emHolder.getEntityManager());
-        }
-
-        try {
+        try (OsivSuspension ignored = OsivSuspension.suspend(entityManagerFactory)) {
             TenantContextHolder.setCurrentTenant(tenantSlug);
             BranchContextHolder.setActiveBranchId(branchId);
 

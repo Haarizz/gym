@@ -238,6 +238,8 @@ public final class PerformanceViews {
             case PT_SESSION_DELIVERED -> "session";
             case CLASS_TAUGHT -> "class";
             case CLASS_ATTENDEE -> "attendee";
+            case PT_SALE -> "sale";
+            case PT_REVENUE -> "unit";
             case REVENUE_TOTAL -> "unit";
         };
     }

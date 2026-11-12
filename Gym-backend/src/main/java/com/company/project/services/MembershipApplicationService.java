@@ -1,5 +1,6 @@
 package com.company.project.services;
 
+import com.company.project.dto.FamilyMemberDTO;
 import com.company.project.dto.MemberRequestDTO;
 import com.company.project.dto.MemberResponseDTO;
 import com.company.project.dto.MembershipApplicationDTOs.ApplicationView;
@@ -9,6 +10,7 @@ import com.company.project.entities.MembershipApplication;
 import com.company.project.entities.MembershipPlan;
 import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.repositories.BranchRepository;
+import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.MembershipApplicationRepository;
 import com.company.project.repositories.MembershipPlanRepository;
 import com.company.project.security.BranchContextHolder;
@@ -50,6 +52,7 @@ public class MembershipApplicationService {
     private final BranchRepository branchRepository;
     private final BranchService branchService;
     private final MemberService memberService;
+    private final MemberRepository memberRepository;
     private final TransactionTemplate tx;
 
     public MembershipApplicationService(MembershipApplicationRepository applicationRepository,
@@ -57,7 +60,9 @@ public class MembershipApplicationService {
                                         BranchRepository branchRepository,
                                         BranchService branchService,
                                         MemberService memberService,
+                                        MemberRepository memberRepository,
                                         PlatformTransactionManager transactionManager) {
+        this.memberRepository = memberRepository;
         this.applicationRepository = applicationRepository;
         this.planRepository = planRepository;
         this.branchRepository = branchRepository;
@@ -110,6 +115,7 @@ public class MembershipApplicationService {
                             "The " + app.getPlanName() + " plan is no longer active. Reject this application"
                                     + " (the payment is refunded) and ask the applicant to apply again."));
 
+            if (!app.getFamilyMembers().isEmpty()) requireHouseholdPrice(app, plan);
             MemberResponseDTO member = memberService.createMember(memberRequest(app, plan));
             app.setMemberId(Long.valueOf(member.getId()));
             app.setMemberCode(member.getMemberId());
@@ -171,7 +177,33 @@ public class MembershipApplicationService {
         }
     }
 
-    private static MemberRequestDTO memberRequest(MembershipApplication app, MembershipPlan plan) {
+    /**
+     * For a Family / Couple plan createMember bills the household at the plan's CURRENT price
+     * (per member × headcount, or the flat price). If that's no longer what the applicant paid —
+     * the plan's price or offer changed since — creating the member would leave the receipt and
+     * the payment out of step, so the admin is asked to reject (refunding it) instead.
+     */
+    private void requireHouseholdPrice(MembershipApplication app, MembershipPlan plan) {
+        if (!MembershipPlan.isGroupPlanType(plan.getPlanType())) {
+            throw new BusinessRuleViolationException("The " + app.getPlanName() + " plan is no longer a family or couple"
+                    + " plan. Reject this application (the payment is refunded) and ask the applicant to apply again.");
+        }
+        int headcount = 1 + app.getFamilyMembers().size();
+        BigDecimal expected;
+        if (memberService.pricesPerMember(plan)) {
+            expected = BigDecimal.ZERO;
+            for (int i = 0; i < headcount; i++) expected = expected.add(memberService.memberPriceForIndex(plan, i));
+        } else {
+            expected = PlanOfferPricing.effectivePrice(plan);
+        }
+        if (expected.compareTo(app.getAmount()) != 0) {
+            throw new BusinessRuleViolationException("The " + app.getPlanName() + " price for this household is now "
+                    + expected + ", but the applicant paid " + app.getAmount() + ". Reject this application"
+                    + " (the payment is refunded) and ask the applicant to apply again.");
+        }
+    }
+
+    private MemberRequestDTO memberRequest(MembershipApplication app, MembershipPlan plan) {
         MemberRequestDTO r = new MemberRequestDTO();
         r.setName(app.getFullName());
         r.setPhone(app.getPhone());
@@ -182,6 +214,8 @@ public class MembershipApplicationService {
         r.setEmergencyContactName(app.getEmergencyContactName());
         r.setEmergencyContactPhone(app.getEmergencyContactPhone());
         if (StringUtils.hasText(app.getNotes())) r.setHealthNotes(app.getNotes());
+        if (StringUtils.hasText(app.getMedicalConditions())) r.setMedicalConditions(app.getMedicalConditions());
+        if (StringUtils.hasText(app.getRegDocNumber())) r.setRegDocNumber(app.getRegDocNumber());
 
         r.setMembershipPlanId(plan.getId());
         r.setMembershipType(StringUtils.hasText(plan.getPlanType()) ? plan.getPlanType() : "Standard");
@@ -212,6 +246,25 @@ public class MembershipApplicationService {
         }
         r.setPaymentMethodUsed(leg.getMethod());
         r.setPaymentBreakdown(List.of(leg));
+
+        // Family / Couple: the applicant is the head; createMember adds everyone else, billed
+        // to the head on the one invoice paid above (memberships start with the head's).
+        if (!app.getFamilyMembers().isEmpty()) {
+            r.setFamilyMembers(app.getFamilyMembers().stream().map(m -> {
+                FamilyMemberDTO fm = new FamilyMemberDTO();
+                fm.setName(m.name());
+                fm.setRelationship(m.relationship());
+                fm.setGender(m.gender());
+                fm.setIsMinor(Boolean.TRUE.equals(m.minor()));
+                fm.setDateOfBirth(m.dateOfBirth());
+                fm.setPhone(m.phone());
+                // Member emails are unique and optional for family members: one that already
+                // belongs to another member is left off rather than failing the whole household.
+                boolean emailTaken = StringUtils.hasText(m.email()) && memberRepository.existsByEmailIgnoreCase(m.email().trim());
+                fm.setEmail(emailTaken ? null : m.email());
+                return fm;
+            }).collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new)));
+        }
         return r;
     }
 
@@ -228,6 +281,8 @@ public class MembershipApplicationService {
                 a.getPaymentMethod(), a.getPaymentStatus(), a.getPaymentReference(), a.getCardBrand(), a.getCardLast4(),
                 a.getPaidAt(), a.getCashReceivedBy(),
                 a.getApprovalStatus(), a.getDecidedBy(), a.getDecidedAt(), a.getRejectionReason(),
-                a.getMemberId(), a.getMemberCode(), a.getCreatedAt());
+                a.getMemberId(), a.getMemberCode(), a.getCreatedAt(),
+                a.getSource(), MembershipApplication.SOURCE_DESK.equals(a.getSource()) ? a.getCreatedBy() : null,
+                a.getRegDocNumber(), a.getMedicalConditions(), a.getFamilyMembers());
     }
 }

@@ -53,7 +53,7 @@ class MobileStaffLedgerControllerTest {
                 ),
                 List.of(
                         new CommissionStructureItemDTO("MEMBERSHIP_SALE", "Membership Sale", "₹1,500"),
-                        new CommissionStructureItemDTO("PT_PACKAGE_SALE", "PT Package Sale", "₹1,000")
+                        new CommissionStructureItemDTO("PT_SALE", "PT Package Sale", "₹1,000")
                 ),
                 Collections.emptyList()
         );

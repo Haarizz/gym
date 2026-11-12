@@ -1,5 +1,6 @@
 package com.company.project.services;
 
+import com.company.project.dto.DiscountCodeDTO;
 import com.company.project.dto.MemberAddonPageResponseDTO;
 import com.company.project.dto.MemberAddonRequestDTO;
 import com.company.project.dto.MemberAddonResponseDTO;
@@ -10,6 +11,9 @@ import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.entities.Member;
 import com.company.project.entities.MemberAddon;
 import com.company.project.entities.Receipt;
+import com.company.project.entities.TrainingSession;
+import com.company.project.packages.PackageUsageService;
+import org.springframework.context.annotation.Lazy;
 import com.company.project.repositories.MemberAddonRepository;
 import com.company.project.repositories.MemberRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -20,6 +24,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -41,6 +46,9 @@ public class MemberAddonService {
     private final ReceiptService receiptService;
     private final WalletService walletService;
     private final AddonPaymentService addonPaymentService;
+    private final PackageUsageService packageUsage;
+    private final BookingService bookingService;
+    private final DiscountCodeService discountCodeService;
 
     public MemberAddonService(MemberAddonRepository memberAddonRepository,
                                ReceiptVoucherService receiptVoucherService,
@@ -48,7 +56,10 @@ public class MemberAddonService {
                                MemberRepository memberRepository,
                                ReceiptService receiptService,
                                WalletService walletService,
-                               AddonPaymentService addonPaymentService) {
+                               AddonPaymentService addonPaymentService,
+                               PackageUsageService packageUsage,
+                               @Lazy BookingService bookingService,
+                               DiscountCodeService discountCodeService) {
         this.memberAddonRepository = memberAddonRepository;
         this.receiptVoucherService = receiptVoucherService;
         this.financialEventService = financialEventService;
@@ -56,6 +67,9 @@ public class MemberAddonService {
         this.receiptService = receiptService;
         this.walletService = walletService;
         this.addonPaymentService = addonPaymentService;
+        this.packageUsage = packageUsage;
+        this.bookingService = bookingService;
+        this.discountCodeService = discountCodeService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -96,6 +110,20 @@ public class MemberAddonService {
         return receiptService.getReceiptById(addon.getReceiptId());
     }
 
+    /**
+     * Checks a promotion code for a staff add-on sale and prices it on `amount`, without spending
+     * it — the same add-on rules as the app (Add-ons opted in, target audience, no referral coupons).
+     */
+    @Transactional(readOnly = true)
+    public DiscountCodeDTO previewPromoCode(String code, BigDecimal amount, Long memberDbId) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new BusinessRuleViolationException("This add-on is free — there's nothing to discount");
+        }
+        Member member = memberRepository.findById(memberDbId)
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + memberDbId));
+        return discountCodeService.resolveForAddon(code, amount, PromotionAudience.Buyer.of(member));
+    }
+
     // ── Write ───────────────────────────────────────────────────────────────
 
     public MemberAddonResponseDTO createAddon(MemberAddonRequestDTO request) {
@@ -128,6 +156,30 @@ public class MemberAddonService {
             }
             guardian = memberRepository.findByMemberId(targetMember.getFamilyHeadId())
                     .orElseThrow(() -> new RuntimeException("Family head not found for this member."));
+        }
+
+        // A promotion code comes off the price first; the referral reward, wallet and payment
+        // then settle what's left. Redeemed in this transaction, so a failure below un-spends it.
+        if (StringUtils.hasText(request.getPromoCode())) {
+            if (targetMember == null) {
+                throw new BusinessRuleViolationException("Choose the member before applying a promo code");
+            }
+            BigDecimal gross = addon.getAmount() != null ? addon.getAmount() : BigDecimal.ZERO;
+            if (gross.signum() <= 0) {
+                throw new BusinessRuleViolationException("This add-on is free — there's nothing to discount");
+            }
+            String code = request.getPromoCode().trim();
+            BigDecimal discount = discountCodeService.redeemForAddon(code, gross, targetMember.getId())
+                    .getDiscountAmount();
+            discount = (discount != null ? discount : BigDecimal.ZERO).max(BigDecimal.ZERO).min(gross);
+            addon.setAmount(gross.subtract(discount));
+            String label = "Code " + code.toUpperCase() + " (-" + discount.stripTrailingZeros().toPlainString() + ")";
+            addon.setNotes(StringUtils.hasText(addon.getNotes()) ? label + " · " + addon.getNotes() : label);
+        }
+        BigDecimal requestedWallet = request.getWalletAmountApplied();
+        if (requestedWallet != null && addon.getAmount() != null
+                && requestedWallet.compareTo(addon.getAmount()) > 0) {
+            throw new BusinessRuleViolationException("Wallet amount can't be more than the price of the add-on");
         }
 
         // First save to get the auto-generated DB id
@@ -276,6 +328,10 @@ public class MemberAddonService {
         if (AddonPaymentService.STATUS_CANCELLED.equalsIgnoreCase(status)) {
             addonPaymentService.settleCancellation(addon, changedBy);
             addon.setStatus(AddonPaymentService.STATUS_CANCELLED);
+            MemberAddon cancelled = memberAddonRepository.save(addon);
+            // A training package sold as this add-on ends with it, with its upcoming bookings.
+            releasePackageBookings(packageUsage.onAddonCancelled(cancelled.getId()));
+            return MemberAddonResponseDTO.fromEntity(cancelled);
         } else if (AddonPaymentService.STATUS_PENDING_APPROVAL.equalsIgnoreCase(current)) {
             throw new BusinessRuleViolationException("Approve or reject this add-on's payment on the Approvals page first");
         } else {
@@ -284,9 +340,17 @@ public class MemberAddonService {
         return MemberAddonResponseDTO.fromEntity(memberAddonRepository.save(addon));
     }
 
+    /** Moves waitlisted members into the PT sessions a cancelled package's bookings gave up. */
+    public void releasePackageBookings(List<TrainingSession> sessions) {
+        for (TrainingSession s : new java.util.LinkedHashSet<>(sessions)) bookingService.promoteFromWaitlist(s);
+    }
+
     public void deleteAddon(Long id) {
         MemberAddon addon = memberAddonRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("MemberAddon not found with id: " + id));
+        if (packageUsage.isPackageSale(id)) {
+            throw new BusinessRuleViolationException("This add-on is a training package — cancel the package instead");
+        }
         if (AddonPaymentService.STATUS_PENDING_APPROVAL.equalsIgnoreCase(addon.getStatus())) {
             // Deleting it would strand the wallet debit and the pending receipt.
             throw new BusinessRuleViolationException("Reject this add-on's payment on the Approvals page instead");

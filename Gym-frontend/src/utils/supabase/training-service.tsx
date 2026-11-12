@@ -54,6 +54,8 @@ export interface SessionParticipant {
   status: string;
   paymentStatus?: string | null;
   price?: number | null;
+  /** Set when the booking used one of the member's PT package sessions. */
+  enrolmentId?: number | null;
   waitlistPosition?: number | null;
   checkedInAt?: string | null;
   bookedAt?: string | null;
@@ -231,6 +233,7 @@ class TrainingService {
         status: p.status ?? "confirmed",
         paymentStatus: p.payment_status ?? null,
         price: p.price ?? null,
+        enrolmentId: p.enrolment_id ?? null,
         waitlistPosition: p.waitlist_position ?? null,
         checkedInAt: p.checked_in_at ?? null,
         bookedAt: p.booked_at ?? null,

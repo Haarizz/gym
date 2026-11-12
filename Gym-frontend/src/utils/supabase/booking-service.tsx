@@ -7,6 +7,9 @@ const CLIENT_TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().
 
 export interface BookingApi {
   id: string;
+  /** The PT package this booking used a session of, if any. */
+  enrolmentId?: number | null;
+  packageName?: string | null;
   sessionId?: string | null;
   sessionName?: string | null;
   trainerName?: string | null;
@@ -48,12 +51,17 @@ export interface BookingRequest {
   rewardPassId?: number;
   // Staff: put the member on the waitlist when the session is full.
   waitlist?: boolean;
+  // A member's PT booking uses their PT package automatically; skipPackage books it on its own.
+  enrolmentId?: number;
+  skipPackage?: boolean;
 }
 
 class BookingService {
   private normalizeBooking(raw: any): BookingApi {
     return {
       id: raw.id,
+      enrolmentId: raw.enrolment_id ?? raw.enrolmentId ?? null,
+      packageName: raw.package_name ?? raw.packageName ?? null,
       sessionId: raw.sessionId ?? raw.session_id ?? null,
       sessionName: raw.sessionName ?? raw.session_name ?? null,
       trainerName: raw.trainerName ?? raw.trainer_name ?? null,
@@ -119,6 +127,8 @@ class BookingService {
       status: payload.status ?? null,
       reward_pass_id: payload.rewardPassId ?? null,
       waitlist: payload.waitlist ?? null,
+      enrolment_id: payload.enrolmentId ?? null,
+      skip_package: payload.skipPackage ?? null,
     };
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/bookings`,

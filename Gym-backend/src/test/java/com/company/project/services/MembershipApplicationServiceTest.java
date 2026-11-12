@@ -8,7 +8,10 @@ import com.company.project.entities.Member;
 import com.company.project.entities.MembershipApplication;
 import com.company.project.entities.MembershipPlan;
 import com.company.project.exceptions.BusinessRuleViolationException;
+import com.company.project.dto.FamilyMemberDTO;
+import com.company.project.dto.MembershipApplicationDTOs.ApplicationFamilyMember;
 import com.company.project.repositories.BranchRepository;
+import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.MembershipApplicationRepository;
 import com.company.project.repositories.MembershipPlanRepository;
 import com.company.project.security.BranchContextHolder;
@@ -23,6 +26,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -37,6 +41,7 @@ class MembershipApplicationServiceTest {
     @Mock private BranchRepository branchRepository;
     @Mock private BranchService branchService;
     @Mock private MemberService memberService;
+    @Mock private MemberRepository memberRepository;
     @Mock private PlatformTransactionManager transactionManager;
 
     private MembershipApplicationService service;
@@ -44,7 +49,7 @@ class MembershipApplicationServiceTest {
     @BeforeEach
     void setUp() {
         service = new MembershipApplicationService(applicationRepository, planRepository, branchRepository,
-                branchService, memberService, transactionManager);
+                branchService, memberService, memberRepository, transactionManager);
         BranchContextHolder.setActiveBranchId(1L);
     }
 
@@ -143,6 +148,63 @@ class MembershipApplicationServiceTest {
         assertEquals("Card", leg.getMethod());
         assertEquals("pi_sim_abc", leg.getReference());
         assertNull(leg.getStripePaymentIntentId(), "simulated charges must never look like real Stripe intents");
+    }
+
+    private MembershipPlan familyPlan(String flatPrice) {
+        MembershipPlan plan = new MembershipPlan();
+        plan.setId(5L);
+        plan.setName("Gold Monthly");
+        plan.setStatus("Active");
+        plan.setPlanType("Family");
+        plan.setPrice(new BigDecimal(flatPrice));
+        when(planRepository.findById(5L)).thenReturn(Optional.of(plan));
+        return plan;
+    }
+
+    @Test
+    void approvingFamilyApplicationCreatesHeadWithHousehold() {
+        MembershipApplication a = application(MembershipApplication.METHOD_ONLINE, MembershipApplication.PAYMENT_PAID);
+        a.setListPrice(new BigDecimal("300"));
+        a.setOfferLabel(null);
+        a.setFamilyMembers(List.of(
+                new ApplicationFamilyMember("Omar Ahmed", "Husband", "Male", null, false, "+971500000001", "omar@example.com"),
+                new ApplicationFamilyMember("Lina Ahmed", "Daughter", "Female", "2016-04-02", true, null, null)));
+        familyPlan("300");
+        Member m = new Member();
+        m.setId(77L);
+        m.setMemberId("MBR-0000000077");
+        when(memberService.createMember(any())).thenReturn(MemberResponseDTO.fromEntity(m));
+        when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(memberRepository.existsByEmailIgnoreCase("omar@example.com")).thenReturn(true);
+
+        service.approve(10L, false, "admin");
+
+        ArgumentCaptor<MemberRequestDTO> req = ArgumentCaptor.forClass(MemberRequestDTO.class);
+        verify(memberService).createMember(req.capture());
+        MemberRequestDTO r = req.getValue();
+        assertEquals("Family", r.getMembershipType());
+        List<FamilyMemberDTO> family = r.getFamilyMembers();
+        assertEquals(2, family.size());
+        assertEquals("Omar Ahmed", family.get(0).getName());
+        assertEquals("Husband", family.get(0).getRelationship());
+        assertFalse(family.get(0).getIsMinor());
+        assertNull(family.get(0).getEmail(), "an email another member already uses is left off, not a failed approval");
+        assertTrue(family.get(1).getIsMinor());
+        assertEquals("2016-04-02", family.get(1).getDateOfBirth());
+        assertEquals(0, new BigDecimal("300").compareTo(r.getPaymentBreakdown().get(0).getAmount()));
+    }
+
+    @Test
+    void familyPriceChangeSinceApplyingBlocksApproval() {
+        MembershipApplication a = application(MembershipApplication.METHOD_ONLINE, MembershipApplication.PAYMENT_PAID);
+        a.setFamilyMembers(List.of(new ApplicationFamilyMember("Omar Ahmed", "Husband", "Male", null, false, null, null)));
+        familyPlan("450"); // applicant paid 300
+
+        BusinessRuleViolationException e = assertThrows(BusinessRuleViolationException.class,
+                () -> service.approve(10L, false, "admin"));
+        assertTrue(e.getMessage().contains("450"));
+        verify(memberService, never()).createMember(any());
+        assertEquals(MembershipApplication.APPROVAL_PENDING, a.getApprovalStatus());
     }
 
     @Test

@@ -1,5 +1,7 @@
 package com.company.project.controllers.mobile.account;
 
+import com.company.project.config.OsivSuspension;
+
 import com.company.project.controlplane.entities.AccountLinkRequest;
 import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.security.UserDetailsImpl;
@@ -8,10 +10,7 @@ import com.company.project.services.accounts.GlobalAccountService;
 import com.company.project.services.accounts.MobileAccountLinkService;
 import jakarta.persistence.EntityManagerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.orm.jpa.EntityManagerFactoryUtils;
-import org.springframework.orm.jpa.EntityManagerHolder;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -82,11 +81,9 @@ public class MobileAccountController {
         long globalUserId = requireGlobal(user);
         // The link is written in the request's gym database; an open-session-in-view
         // EntityManager would pin it to whichever database this request touched first.
-        if (TransactionSynchronizationManager.hasResource(entityManagerFactory)) {
-            EntityManagerHolder holder = (EntityManagerHolder) TransactionSynchronizationManager.unbindResource(entityManagerFactory);
-            EntityManagerFactoryUtils.closeEntityManager(holder.getEntityManager());
+        try (OsivSuspension ignored = OsivSuspension.suspend(entityManagerFactory)) {
+            return ResponseEntity.ok(view(linkService.accept(id, globalUserId)));
         }
-        return ResponseEntity.ok(view(linkService.accept(id, globalUserId)));
     }
 
     @PostMapping("/link-requests/{id}/decline")

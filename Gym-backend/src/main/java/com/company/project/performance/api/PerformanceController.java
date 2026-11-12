@@ -10,6 +10,8 @@ import com.company.project.performance.events.PerformanceEvent;
 import com.company.project.performance.events.PerformanceEventRebuilder;
 import com.company.project.performance.events.PerformanceEventRepository;
 import com.company.project.performance.events.PerformanceParityService;
+import com.company.project.performance.events.SourceLabels;
+import com.company.project.performance.incentives.IncentiveCalculator;
 import com.company.project.performance.incentives.IncentivePlan;
 import com.company.project.performance.incentives.IncentivePlanService;
 import com.company.project.performance.settlement.SettlementService;
@@ -55,11 +57,14 @@ public class PerformanceController {
     private final ShiftAttendanceService attendance;
     private final StaffRepository staffRepository;
     private final PerformanceClock clock;
+    private final SourceLabels sourceLabels;
 
     public PerformanceController(PerformanceEngine engine, SettlementService settlements, TargetService targets,
                                  IncentivePlanService plans, UnassignedService unassigned, PerformanceEventRebuilder rebuilder,
                                  PerformanceEventRepository events, PerformanceParityService parity,
-                                 ShiftAttendanceService attendance, StaffRepository staffRepository, PerformanceClock clock) {
+                                 ShiftAttendanceService attendance, StaffRepository staffRepository, PerformanceClock clock,
+                                 SourceLabels sourceLabels) {
+        this.sourceLabels = sourceLabels;
         this.engine = engine;
         this.settlements = settlements;
         this.targets = targets;
@@ -150,14 +155,26 @@ public class PerformanceController {
         return ResponseEntity.ok(out);
     }
 
-    /** Credited activity behind a person's month (audit trail). */
+    /**
+     * Credited activity behind a person's month (audit trail): what it was, for whom, and the
+     * commission it earned at the month's plan rates (before minimums, caps and bonuses).
+     */
     @GetMapping("/events")
     @Transactional(readOnly = true)
     public List<Map<String, Object>> events(@RequestParam(name = "staff_id") Long staffId, @RequestParam String period) {
-        PerformanceClock.Window w = clock.window(YearMonth.parse(period), null);
+        YearMonth month = YearMonth.parse(period);
+        PerformanceClock.Window w = clock.window(month, null);
+        List<PerformanceEvent> list = events.findForStaff(staffId, w.start(), w.end(), PageRequest.of(0, 500));
+        Map<String, Map<Long, SourceLabels.Label>> labels = sourceLabels.describe(list);
+        IncentivePlan plan = engine.planFor(staffId, month);
         List<Map<String, Object>> out = new ArrayList<>();
-        for (PerformanceEvent e : events.findForStaff(staffId, w.start(), w.end(), PageRequest.of(0, 500))) {
-            out.add(eventView(e));
+        for (PerformanceEvent e : list) {
+            Map<String, Object> m = eventView(e);
+            SourceLabels.Label label = labels.getOrDefault(e.getSourceType(), Map.of()).get(e.getSourceId());
+            m.put("title", label != null ? label.title() : null);
+            m.put("person", label != null ? label.person() : null);
+            m.put("commission", IncentiveCalculator.perActivity(plan, e.getMetric(), e.getQuantity(), e.getAmount()));
+            out.add(m);
         }
         return out;
     }
@@ -172,6 +189,7 @@ public class PerformanceController {
         m.put("source_type", e.getSourceType());
         m.put("source_id", e.getSourceId());
         m.put("correction", e.getRevision() > 0);
+        if (!e.getPart().isEmpty()) m.put("part", e.getPart());
         return m;
     }
 
@@ -224,6 +242,47 @@ public class PerformanceController {
     @GetMapping("/plans")
     public List<Map<String, Object>> plans() {
         return plans.list().stream().map(p -> PerformanceViews.plan(p, plans.settledMonths(p.getId()))).toList();
+    }
+
+    public record PreviewRequest(IncentivePlanService.PlanRequest plan, List<Long> staffIds, String period) {}
+
+    /**
+     * What a plan (not saved) would pay these people for a month, using their real figures and
+     * goals: by default last month. Next to it, what they got (or are getting) under their plan.
+     */
+    @PostMapping("/plans/preview")
+    @Transactional(readOnly = true)
+    public Map<String, Object> previewPlan(@RequestBody PreviewRequest req) {
+        IncentivePlan draft = plans.draft(req.plan());
+        YearMonth current = clock.currentMonth(null);
+        YearMonth period = req.period() != null && !req.period().isBlank() ? YearMonth.parse(req.period()) : current.minusMonths(1);
+        if (period.isAfter(current)) period = current;
+        List<Long> ids = req.staffIds() != null ? req.staffIds().stream().filter(Objects::nonNull).distinct().limit(200).toList() : List.of();
+        Map<Long, PeriodResult> results = engine.evaluate(ids, period);
+        Map<Long, PerformanceEngine.StaffInfo> info = engine.staffInfo(results.keySet());
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal actual = BigDecimal.ZERO;
+        for (PeriodResult r : results.values()) {
+            var breakdown = com.company.project.performance.incentives.IncentiveCalculator.calculate(draft, r.achieved(), r.goals());
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("staff_id", r.staffId());
+            PerformanceEngine.StaffInfo s = info.get(r.staffId());
+            row.put("name", s != null ? s.name() : null);
+            row.put("total", breakdown.total());
+            row.put("actual", r.commission());
+            row.put("incentive", PerformanceViews.incentive(breakdown));
+            rows.add(row);
+            total = total.add(breakdown.total());
+            actual = actual.add(r.commission());
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("period", period.toString());
+        out.put("total", total);
+        out.put("actual", actual);
+        out.put("rows", rows);
+        return out;
     }
 
     @PostMapping("/plans")

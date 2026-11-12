@@ -48,6 +48,8 @@ const ledger = {
           PT_SESSION_DELIVERED: "完成的私教课",
           CLASS_TAUGHT: "授课次数",
           CLASS_ATTENDEE: "课程签到人数",
+          PT_SALE: "私教销售",
+          PT_REVENUE: "已赚私教收入",
           REVENUE_TOTAL: "营收",
         },
         units: {
@@ -57,6 +59,7 @@ const ledger = {
           PT_SESSION_DELIVERED: "节课",
           CLASS_TAUGHT: "节课",
           CLASS_ATTENDEE: "位学员",
+          PT_SALE: "笔销售",
         },
       },
       monthlyComparisonTitle: '月度对比',

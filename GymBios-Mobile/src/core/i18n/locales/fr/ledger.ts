@@ -48,6 +48,8 @@ const ledger = {
           PT_SESSION_DELIVERED: "Séances de coaching données",
           CLASS_TAUGHT: "Cours donnés",
           CLASS_ATTENDEE: "Participants aux cours",
+          PT_SALE: "Ventes PT",
+          PT_REVENUE: "Revenus PT gagnés",
           REVENUE_TOTAL: "chiffre d'affaires",
         },
         units: {
@@ -57,6 +59,7 @@ const ledger = {
           PT_SESSION_DELIVERED: "séance",
           CLASS_TAUGHT: "cours",
           CLASS_ATTENDEE: "participant",
+          PT_SALE: "vente",
         },
       },
       monthlyComparisonTitle: 'Comparaison mensuelle',

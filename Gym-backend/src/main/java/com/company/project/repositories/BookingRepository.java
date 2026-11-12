@@ -12,6 +12,10 @@ import java.util.List;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
+    @Query("SELECT b FROM Booking b JOIN FETCH b.session s LEFT JOIN FETCH s.trainer WHERE b.enrolmentId = :enrolmentId " +
+           "ORDER BY s.date, s.startTime, b.id")
+    List<Booking> findByEnrolmentIdWithSession(@Param("enrolmentId") Long enrolmentId);
+
     java.util.Optional<Booking> findByQrCode(String qrCode);
     long countBySessionIdAndStatusNot(Long sessionId, String status);
     // Seats taken on a session: pass BookingService.NO_SEAT_STATUSES (cancelled, waitlisted).

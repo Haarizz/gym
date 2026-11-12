@@ -1078,16 +1078,24 @@ public class MemberService {
      * member" — otherwise a Couple/Family plan priced at e.g. 100 would bill 0 (BG_83).
      */
     public boolean pricesPerMember(MembershipPlan plan) {
-        return !Boolean.FALSE.equals(plan.getAutoCalculateTotal())
-                && plan.getPricePerMember() != null && plan.getPricePerMember().signum() > 0;
+        return pricesPerMember(plan.getAutoCalculateTotal(), plan.getPricePerMember());
+    }
+
+    /** Field-level form of {@link #pricesPerMember(MembershipPlan)} — also used by the public join page. */
+    public static boolean pricesPerMember(Boolean autoCalculateTotal, BigDecimal pricePerMember) {
+        return !Boolean.FALSE.equals(autoCalculateTotal) && pricePerMember != null && pricePerMember.signum() > 0;
     }
 
     public BigDecimal memberPriceForIndex(MembershipPlan plan, int index) {
-        BigDecimal base = plan.getPricePerMember() != null ? plan.getPricePerMember() : BigDecimal.ZERO;
-        Integer max = plan.getMaxFamilyMembers();
-        if (max == null || max <= 0 || index < max) return base;
-        BigDecimal extra = plan.getAdditionalMemberPrice();
-        return extra != null ? extra : base;
+        return memberPriceForIndex(plan.getPricePerMember(), plan.getMaxFamilyMembers(), plan.getAdditionalMemberPrice(), index);
+    }
+
+    /** Field-level form of {@link #memberPriceForIndex(MembershipPlan, int)}. */
+    public static BigDecimal memberPriceForIndex(BigDecimal pricePerMember, Integer maxFamilyMembers,
+                                                 BigDecimal additionalMemberPrice, int index) {
+        BigDecimal base = pricePerMember != null ? pricePerMember : BigDecimal.ZERO;
+        if (maxFamilyMembers == null || maxFamilyMembers <= 0 || index < maxFamilyMembers) return base;
+        return additionalMemberPrice != null ? additionalMemberPrice : base;
     }
 
     /**
@@ -1096,11 +1104,15 @@ public class MemberService {
      * API directly. adultCount includes the head.
      */
     public void enforceFamilyMemberCaps(MembershipPlan plan, long adultCount, long childCount) {
+        enforceFamilyMemberCaps(plan.getMaxAdultMembers(), plan.getMaxChildMembers(), plan.getMaxFamilyMembers(),
+                plan.getAllowAdditionalMembers(), adultCount, childCount);
+    }
+
+    /** Field-level form of {@link #enforceFamilyMemberCaps(MembershipPlan, long, long)} — also used by the public join page. */
+    public static void enforceFamilyMemberCaps(Integer maxAdults, Integer maxChildren, Integer maxTotal,
+                                               Boolean allowAdditionalMembers, long adultCount, long childCount) {
         long totalCount = adultCount + childCount;
-        boolean allowExtra = !Boolean.FALSE.equals(plan.getAllowAdditionalMembers());
-        Integer maxAdults = plan.getMaxAdultMembers();
-        Integer maxChildren = plan.getMaxChildMembers();
-        Integer maxTotal = plan.getMaxFamilyMembers();
+        boolean allowExtra = !Boolean.FALSE.equals(allowAdditionalMembers);
         if (maxAdults != null && maxAdults > 0 && adultCount > maxAdults) {
             throw new IllegalArgumentException("This family plan allows a maximum of " + maxAdults + " adult member(s).");
         }

@@ -17,8 +17,9 @@ import java.util.List;
  * time). Readers only count events up to now, so a session later this month counts once its
  * time arrives; cancelling it reverses the credit.
  *
- *  - PT_SESSION_DELIVERED: a PT session someone booked (a booking that isn't cancelled, awaiting
- *    payment approval or waitlisted) — an unbooked PT slot is not a session delivered.
+ *  - PT_SESSION_DELIVERED: a PT session with a member who came — checked in, or a no-show
+ *    (the trainer was there), unless the member used a package that doesn't count no-shows.
+ *    The same rule decides when a package session is used, so the two always agree.
  *  - CLASS_TAUGHT: a class (not PT, not facility time) held with at least one such booking.
  *  - CLASS_ATTENDEE: members checked in to that class.
  */
@@ -26,6 +27,10 @@ import java.util.List;
 public class SessionDeriver implements SourceDeriver {
 
     static final String ACTIVE_BOOKING = "LOWER(COALESCE(b.status, '')) NOT IN ('cancelled', 'pending_approval', 'waitlisted')";
+
+    /** Booking {@code b} (package {@code e}, may be null) was delivered — see PT_SESSION_DELIVERED. */
+    static final String DELIVERED = "(b.checked_in_at IS NOT NULL OR LOWER(COALESCE(b.status, '')) = 'checked-in' " +
+            "OR (LOWER(COALESCE(b.status, '')) = 'no-show' AND (e.id IS NULL OR e.no_show_policy <> 'not_counted')))";
 
     @PersistenceContext
     private EntityManager em;
@@ -46,7 +51,9 @@ public class SessionDeriver implements SourceDeriver {
         List<?> rows = em.createNativeQuery(
                         "SELECT s.type, s.status, s.date, s.start_time, s.trainer_id, s.branch_id, " +
                         "(SELECT COUNT(*) FROM bookings b WHERE b.session_id = s.id AND " + ACTIVE_BOOKING + "), " +
-                        "(SELECT COUNT(*) FROM bookings b WHERE b.session_id = s.id AND b.checked_in_at IS NOT NULL AND " + ACTIVE_BOOKING + ") " +
+                        "(SELECT COUNT(*) FROM bookings b WHERE b.session_id = s.id AND b.checked_in_at IS NOT NULL AND " + ACTIVE_BOOKING + "), " +
+                        "(SELECT COUNT(*) FROM bookings b LEFT JOIN package_enrolments e ON e.id = b.enrolment_id " +
+                        "WHERE b.session_id = s.id AND " + ACTIVE_BOOKING + " AND " + DELIVERED + ") " +
                         "FROM training_sessions s WHERE s.id = :id")
                 .setParameter("id", id).getResultList();
         if (rows.isEmpty()) return List.of();
@@ -66,6 +73,7 @@ public class SessionDeriver implements SourceDeriver {
 
         List<Credit> out = new ArrayList<>();
         if ("pt".equals(type)) {
+            if (Rows.integer(r[8]) <= 0) return List.of();
             out.add(new Credit(Metric.PT_SESSION_DELIVERED, trainerId, branchId, when, 1, null));
         } else {
             out.add(new Credit(Metric.CLASS_TAUGHT, trainerId, branchId, when, 1, null));

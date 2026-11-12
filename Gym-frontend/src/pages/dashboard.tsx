@@ -90,11 +90,16 @@ import {
   UserX,
   Timer,
   Gauge,
-  BarChart3
+  BarChart3,
+  LineChart as LineChartIcon,
+  FileBarChart
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isToday, isYesterday } from 'date-fns';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { RevenueDashboard } from '../components/dashboard/RevenueDashboard';
+import { BusinessInsights } from '../components/dashboard/BusinessInsights';
+import { SalesReports } from '../components/dashboard/SalesReports';
+import { useRevenuePeriod } from '../components/dashboard/RevenuePeriod';
 import { SubscriptionCards } from '../components/dashboard/SubscriptionCards';
 
 // Interface for navigation with params
@@ -123,6 +128,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeDashboardTab, setActiveDashboardTab] = useState('overview');
   const [revenueRefreshKey, setRevenueRefreshKey] = useState(0);
+  // Revenue, Business Insights and Sales Reports share one period so switching tabs keeps it
+  const revenuePeriod = useRevenuePeriod(revenueRefreshKey, activeDashboardTab !== 'overview');
 
   // Data states
   const [kpiData, setKpiData] = useState<KPIData | null>(null);
@@ -609,9 +616,9 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               </span>
             </div>
             
-            {/* Only drives the Overview tab — the Revenue tab has its own period buttons,
+            {/* Only drives the Overview tab — the other tabs have their own period buttons,
                 so showing this there made the two disagree. */}
-            {activeDashboardTab !== 'revenue' && (
+            {activeDashboardTab === 'overview' && (
             <Select value={dateFilter} onValueChange={setDateFilter} open={periodSelectOpen} onOpenChange={setPeriodSelectOpen}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue />
@@ -636,10 +643,12 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
             {activeDashboardTab === 'overview' && (
               <ReportActions report={buildOverviewReport} disabled={!kpiData} size="default" menuLabel={`Dashboard · ${periodLabel}`} />
             )}
-            <Button variant="outline" className={dashboardHeaderActionButton} onClick={() => setPeriodSelectOpen(true)}>
-              <Filter className="mr-2 h-4 w-4" />
-              Filter
-            </Button>
+            {activeDashboardTab === 'overview' && (
+              <Button variant="outline" className={dashboardHeaderActionButton} onClick={() => setPeriodSelectOpen(true)}>
+                <Filter className="mr-2 h-4 w-4" />
+                Filter
+              </Button>
+            )}
           </div>
         </div>
 
@@ -712,14 +721,22 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
 
       {/* Main Dashboard Tabs */}
       <Tabs value={activeDashboardTab} onValueChange={setActiveDashboardTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-2 h-11">
+        <TabsList className="flex w-full max-w-3xl h-11 overflow-x-auto">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Gauge className="h-4 w-4" />
             Overview
           </TabsTrigger>
           <TabsTrigger value="revenue" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Revenue Dashboard
+            Revenue
+          </TabsTrigger>
+          <TabsTrigger value="insights" className="flex items-center gap-2">
+            <LineChartIcon className="h-4 w-4" />
+            Business Insights
+          </TabsTrigger>
+          <TabsTrigger value="sales-reports" className="flex items-center gap-2">
+            <FileBarChart className="h-4 w-4" />
+            Sales Reports
           </TabsTrigger>
         </TabsList>
 
@@ -1453,7 +1470,17 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
 
         {/* Revenue Dashboard Tab Content */}
         <TabsContent value="revenue" className="mt-0">
-          <RevenueDashboard refreshKey={revenueRefreshKey} />
+          <RevenueDashboard period={revenuePeriod} />
+        </TabsContent>
+
+        {/* Whole-gym period comparison */}
+        <TabsContent value="insights" className="mt-0">
+          <BusinessInsights period={revenuePeriod} />
+        </TabsContent>
+
+        {/* Best sellers, top members, staff, day & hour patterns */}
+        <TabsContent value="sales-reports" className="mt-0">
+          <SalesReports period={revenuePeriod} />
         </TabsContent>
       </Tabs>
     </div>

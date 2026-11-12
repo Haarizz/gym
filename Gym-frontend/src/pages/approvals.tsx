@@ -436,7 +436,7 @@ export function Approvals() {
         <div>
           <h1 className={styles.title}>Approvals</h1>
           <div className={styles.subtitle}>
-            App purchases paid by Cash, Credit or Mixed payment, and membership applications from your share link, wait here until staff approve them
+            App purchases paid by Cash, Credit or Mixed payment, and membership applications (from your share link or registered at the desk) wait here until staff approve them
           </div>
         </div>
         <div className={styles.actions}>
@@ -455,7 +455,7 @@ export function Approvals() {
         <Kpi icon={Hourglass} tone={waiting ? 'amber' : 'green'} label="Waiting now" value={fmtInt(waiting)}
           hint={waiting ? (oldest ? `oldest ${oldest.text}${lateCount ? ` · ${lateCount} over a day` : ''}` : 'requests to review') : 'all caught up'} />
         <Kpi icon={UserCheck} tone="blue" label="Memberships" value={fmtInt(totalItems)} hint="app access locked until approved" onClick={() => chooseTab('members')} />
-        <Kpi icon={FileText} tone="blue" label="Applications" value={fmtInt(applications.length)} hint={`${fmtInt(applications.filter(a => a.payment_status === 'PAID').length)} paid online · from your share link`} onClick={() => chooseTab('applications')} />
+        <Kpi icon={FileText} tone="blue" label="Applications" value={fmtInt(applications.length)} hint={`${fmtInt(applications.filter(a => a.payment_status === 'PAID').length)} paid online · share link & desk`} onClick={() => chooseTab('applications')} />
         <Kpi icon={CalendarCheck} tone="violet" label="Bookings" value={fmtInt(bookingApprovals.length)} hint="seats held until approved" onClick={() => chooseTab('bookings')} />
         <Kpi icon={PackagePlus} tone="teal" label="Add-ons" value={fmtInt(addonApprovals.length)} hint="inactive until approved" onClick={() => chooseTab('addons')} />
         <Kpi icon={Wallet} tone="green" label="Received, to confirm" value={money(received)} hint={`cash and payments to verify${partialNote}`} />

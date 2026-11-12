@@ -48,6 +48,8 @@ const ledger = {
           PT_SESSION_DELIVERED: "दिए गए PT सत्र",
           CLASS_TAUGHT: "ली गई कक्षाएँ",
           CLASS_ATTENDEE: "कक्षा उपस्थित",
+          PT_SALE: "PT बिक्री",
+          PT_REVENUE: "अर्जित PT राजस्व",
           REVENUE_TOTAL: "राजस्व",
         },
         units: {
@@ -57,6 +59,7 @@ const ledger = {
           PT_SESSION_DELIVERED: "सत्र",
           CLASS_TAUGHT: "कक्षा",
           CLASS_ATTENDEE: "उपस्थित",
+          PT_SALE: "बिक्री",
         },
       },
       monthlyComparisonTitle: 'मासिक तुलना',

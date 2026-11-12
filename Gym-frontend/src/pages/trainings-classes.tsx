@@ -7,6 +7,7 @@ import { TimeSlotSelect12h } from "../components/shared/time-select-12h";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { TrainingSessionsTab } from "../components/trainings/TrainingSessionsTab";
+import { TrainingPackagesTab } from "../components/trainings/TrainingPackagesTab";
 import { SessionDetailDialog } from "../components/trainings/SessionDetailDialog";
 import ts from "../components/trainings/trainings.module.css";
 import {
@@ -26,7 +27,10 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
@@ -62,6 +66,8 @@ import {
 import { toast } from "sonner";
 import { trainingService, TrainingSessionApi } from "../utils/supabase/training-service";
 import { staffService, Staff } from "../utils/supabase/staff-service";
+import { addonPlansService, AddonPlan } from "../utils/supabase/addon-plans-service";
+import { packageService, TrainingPackage } from "../utils/supabase/package-service";
 
 const classTypes = [
   { id: "class", name: "Group Class", color: "var(--gb-primary-deep)", icon: Users },
@@ -118,13 +124,17 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
   const [filterTrainer, setFilterTrainer] = useState("all");
   const [isStaffView, setIsStaffView] = useState(false);
   // "sessions" = Training Sessions management table; "classes" = calendar / list
-  const [pageTab, setPageTab] = useState<"sessions" | "classes">("sessions");
+  const [pageTab, setPageTab] = useState<"sessions" | "classes" | "packages">("sessions");
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [detail, setDetail] = useState<{ id: string; remind: boolean } | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [trainers, setTrainers] = useState<TrainerProfile[]>([]);
   const [sessions, setSessions] = useState<TrainingSessionApi[]>([]);
+  const [addonPlans, setAddonPlans] = useState<AddonPlan[]>([]);
+  const [ptPackages, setPtPackages] = useState<TrainingPackage[]>([]);
+  // "Start from" picker in Create Session: "package:<id>" / "addon:<id>" / "session:<id>" / "".
+  const [templateKey, setTemplateKey] = useState("");
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [classToDelete, setClassToDelete] = useState<ClassItem | null>(null);
@@ -252,6 +262,80 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
       description: "",
     });
     setEditingClassId(null);
+    setTemplateKey("");
+  };
+
+  // Most recent session per name — the "Recent sessions" templates, and where an add-on
+  // pick looks for the trainer / room / capacity / times it doesn't carry itself.
+  const latestSessionByName = useMemo(() => {
+    const map = new Map<string, TrainingSessionApi>();
+    [...sessions]
+      .sort((a, b) => `${b.date} ${b.startTime}`.localeCompare(`${a.date} ${a.startTime}`))
+      .forEach((s) => {
+        const key = (s.name || "").trim().toLowerCase();
+        if (key && !map.has(key)) map.set(key, s);
+      });
+    return map;
+  }, [sessions]);
+  const recentTemplates = useMemo(() => Array.from(latestSessionByName.values()).slice(0, 20), [latestSessionByName]);
+
+  // Copy everything but the date (staff pick the new day themselves).
+  const sessionFields = (source: TrainingSessionApi) => ({
+    name: source.name || "",
+    type: source.type || "class",
+    trainerId: source.trainerId ? String(source.trainerId) : "",
+    startTime: formatTime(source.startTime),
+    endTime: formatTime(source.endTime),
+    location: source.location || "",
+    capacity: String(source.capacity ?? ""),
+    price: String(source.price ?? ""),
+    description: source.description || "",
+  });
+
+  const applyTemplate = (key: string) => {
+    setTemplateKey(key);
+    const [kind, id] = key.split(":");
+    if (kind === "session") {
+      const source = sessions.find((s) => String(s.id) === id);
+      if (source) setNewClassData((prev) => ({ ...prev, ...sessionFields(source) }));
+      return;
+    }
+    if (kind === "package") {
+      const pkg = ptPackages.find((p) => String(p.id) === id);
+      if (!pkg) return;
+      const previous = latestSessionByName.get(pkg.name.trim().toLowerCase());
+      // The package price covers every session — a single slot is priced at the per-session rate.
+      const perSession = pkg.plan_type === "sessions" && pkg.session_count
+        ? Math.round((pkg.price / pkg.session_count) * 100) / 100
+        : undefined;
+      setNewClassData((prev) => ({
+        ...prev,
+        ...(previous ? sessionFields(previous) : {}),
+        name: pkg.name,
+        type: "pt",
+        trainerId: pkg.default_trainer_id ? String(pkg.default_trainer_id) : previous?.trainerId ? String(previous.trainerId) : prev.trainerId,
+        capacity: previous ? String(previous.capacity ?? 1) : "1",
+        price: perSession !== undefined ? String(perSession) : previous ? String(previous.price ?? 0) : prev.price,
+        description: pkg.description || previous?.description || "",
+      }));
+      return;
+    }
+    if (kind === "addon") {
+      const addon = addonPlans.find((a) => String(a.id) === id);
+      if (!addon) return;
+      const previous = latestSessionByName.get(addon.name.trim().toLowerCase());
+      const type = addon.category === "Training" ? "pt" : addon.category === "Classes" ? "class" : undefined;
+      setNewClassData((prev) => ({
+        ...prev,
+        // Run this add-on before? Reuse that session's trainer, room, capacity and times.
+        ...(previous ? sessionFields(previous) : {}),
+        name: addon.name,
+        type: type || previous?.type || prev.type,
+        price: String(addon.price ?? 0),
+        description: addon.description || previous?.description || "",
+        ...(type === "pt" && !previous ? { capacity: "1" } : {}),
+      }));
+    }
   };
 
   const fetchTrainers = async () => {
@@ -278,6 +362,9 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
     const load = async () => {
       try {
         await Promise.all([fetchTrainers(), fetchSessions()]);
+        // Templates only — the page still works if the add-on catalog can't load.
+        addonPlansService.getAll(true).then(setAddonPlans).catch(() => setAddonPlans([]));
+        packageService.list(true).then(setPtPackages).catch(() => setPtPackages([]));
       } catch (error: any) {
         toast.error(error?.message || "Failed to load trainings data");
       }
@@ -293,18 +380,8 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
     const source = sessions.find((s) => String(s.id) === String(fromId));
     resetNewClassForm();
     if (source) {
-      setNewClassData((prev) => ({
-        ...prev,
-        name: source.name || "",
-        type: source.type || "class",
-        trainerId: source.trainerId ? String(source.trainerId) : "",
-        startTime: formatTime(source.startTime),
-        endTime: formatTime(source.endTime),
-        location: source.location || "",
-        capacity: String(source.capacity ?? ""),
-        price: String(source.price ?? ""),
-        description: source.description || "",
-      }));
+      setNewClassData((prev) => ({ ...prev, ...sessionFields(source) }));
+      setTemplateKey(`session:${source.id}`);
     }
     setShowAddDialog(true);
     // Consume the request so a refresh or Back doesn't reopen the form.
@@ -837,9 +914,14 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
         <button type="button" role="tab" className={ts.pageTab} data-active={pageTab === "sessions"} aria-selected={pageTab === "sessions"} onClick={() => setPageTab("sessions")}>
           <CheckCircle2 /> Training Sessions
         </button>
+        <button type="button" role="tab" className={ts.pageTab} data-active={pageTab === "packages"} aria-selected={pageTab === "packages"} onClick={() => setPageTab("packages")}>
+          <Dumbbell /> PT Packages
+        </button>
       </div>
 
-      {pageTab === "sessions" ? (
+      {pageTab === "packages" ? (
+        <TrainingPackagesTab />
+      ) : pageTab === "sessions" ? (
         <TrainingSessionsTab
           sessions={sessions}
           loading={sessionsLoading}
@@ -1024,6 +1106,56 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
           </DialogHeader>
           
           <div className="space-y-6">
+            {!editingClassId && (ptPackages.length > 0 || addonPlans.length > 0 || recentTemplates.length > 0) && (
+              <div>
+                <Label htmlFor="session-template" className="block mb-2">Start from (optional)</Label>
+                <Select value={templateKey} onValueChange={applyTemplate}>
+                  <SelectTrigger id="session-template" className="border-primary/20">
+                    <SelectValue placeholder="Pick a PT package, add-on or past session to fill the form" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ptPackages.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>PT packages</SelectLabel>
+                        {ptPackages.map((p) => (
+                          <SelectItem key={`package:${p.id}`} value={`package:${p.id}`}>
+                            {p.name}
+                            {p.default_trainer_name ? ` · ${p.default_trainer_name}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {ptPackages.length > 0 && (addonPlans.length > 0 || recentTemplates.length > 0) && <SelectSeparator />}
+                    {addonPlans.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Add-ons</SelectLabel>
+                        {addonPlans.map((a) => (
+                          <SelectItem key={`addon:${a.id}`} value={`addon:${a.id}`}>
+                            {a.name} · {formatPrice(a.price)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {addonPlans.length > 0 && recentTemplates.length > 0 && <SelectSeparator />}
+                    {recentTemplates.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Recent sessions</SelectLabel>
+                        {recentTemplates.map((s) => (
+                          <SelectItem key={`session:${s.id}`} value={`session:${s.id}`}>
+                            {s.name}
+                            {s.trainerName ? ` · ${s.trainerName}` : ""}
+                            {s.startTime ? ` · ${formatTime12h(s.startTime)}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Fills name, type, price and details — plus trainer, room, capacity and times when it has run before. You can still change anything.
+                </p>
+              </div>
+            )}
             <div>
               <Label htmlFor="class-name" className="block mb-2">Class Name</Label>
               <Input

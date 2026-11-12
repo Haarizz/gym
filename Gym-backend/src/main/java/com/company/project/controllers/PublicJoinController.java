@@ -88,18 +88,28 @@ public class PublicJoinController {
     }
 
     private <T> T inTenant(String tenantSlug, Long branchId, Supplier<T> work) {
-        // Drop any OSIV EntityManager already bound to this request so the tenant
-        // work below opens a fresh one on the tenant's DataSource (same step as
-        // PublicWalkInController / MobileDiscoveryController).
-        if (TransactionSynchronizationManager.hasResource(entityManagerFactory)) {
-            EntityManagerHolder emHolder = (EntityManagerHolder) TransactionSynchronizationManager.unbindResource(entityManagerFactory);
-            EntityManagerFactoryUtils.closeEntityManager(emHolder.getEntityManager());
-        }
+        // The request's open-in-view EntityManager may already be pinned to the global DB
+        // (activeTenant ran first), so set it aside and give the tenant work a fresh one.
+        // Afterwards put the original back: OpenEntityManagerInViewInterceptor unbinds it
+        // when the request ends and throws "No value for key ... bound to thread" if it's
+        // gone (same pattern as MobileDiscoveryController.inTenant).
+        EntityManagerHolder requestEmHolder = TransactionSynchronizationManager.hasResource(entityManagerFactory)
+                ? (EntityManagerHolder) TransactionSynchronizationManager.unbindResource(entityManagerFactory)
+                : null;
         try {
             TenantContextHolder.setCurrentTenant(tenantSlug);
             BranchContextHolder.setActiveBranchId(branchId);
+            TransactionSynchronizationManager.bindResource(entityManagerFactory,
+                    new EntityManagerHolder(entityManagerFactory.createEntityManager()));
             return work.get();
         } finally {
+            if (TransactionSynchronizationManager.hasResource(entityManagerFactory)) {
+                EntityManagerHolder tenantEmHolder = (EntityManagerHolder) TransactionSynchronizationManager.unbindResource(entityManagerFactory);
+                EntityManagerFactoryUtils.closeEntityManager(tenantEmHolder.getEntityManager());
+            }
+            if (requestEmHolder != null) {
+                TransactionSynchronizationManager.bindResource(entityManagerFactory, requestEmHolder);
+            }
             BranchContextHolder.clear();
             TenantContextHolder.clear();
         }

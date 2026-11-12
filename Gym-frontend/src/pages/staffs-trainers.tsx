@@ -27,7 +27,6 @@ import {
   Filter,
   Download,
   Upload,
-  Settings,
   Plus,
   MoreVertical,
   Eye,
@@ -391,10 +390,6 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
           <Button variant="outline" size="sm" onClick={() => onNavigate?.('targets-overview')}>
             <Gauge className="h-4 w-4 mr-2" />
             Targets Overview
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => onNavigate?.('set-targets', { tab: 'plans' })}>
-            <Settings className="h-4 w-4 mr-2" />
-            Incentive Plans
           </Button>
           <PermissionGate permission="STAFF_CREATE">
             <Button onClick={() => setFormMode({ mode: 'add' })}>

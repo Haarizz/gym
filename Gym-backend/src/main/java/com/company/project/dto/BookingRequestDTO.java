@@ -42,6 +42,17 @@ public class BookingRequestDTO {
     public Long getRewardPassId() { return rewardPassId; }
     public void setRewardPassId(Long rewardPassId) { this.rewardPassId = rewardPassId; }
 
+    // A member's PT booking uses one of their training packages when one fits (V130):
+    // enrolmentId picks which; skipPackage books (and charges) the session on its own instead.
+    private Long enrolmentId;
+    private Boolean skipPackage;
+
+    public Long getEnrolmentId() { return enrolmentId; }
+    public void setEnrolmentId(Long enrolmentId) { this.enrolmentId = enrolmentId; }
+
+    public Boolean getSkipPackage() { return skipPackage; }
+    public void setSkipPackage(Boolean skipPackage) { this.skipPackage = skipPackage; }
+
     // ── Payment for a priced session (mobile member self-booking) ──
 
     // A promotion or shareable referral coupon code; the server prices and spends it.

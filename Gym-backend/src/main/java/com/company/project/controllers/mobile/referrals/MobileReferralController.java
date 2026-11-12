@@ -1,5 +1,7 @@
 package com.company.project.controllers.mobile.referrals;
 
+import com.company.project.config.OsivSuspension;
+
 import com.company.project.dto.MyReferralClaimDTO;
 import com.company.project.dto.ReferralRewardResponseDTO;
 import com.company.project.entities.Member;
@@ -95,20 +97,17 @@ public class MobileReferralController {
                 return ResponseEntity.badRequest().body(Map.of("error", "Invalid referral code"));
             }
 
-            // Unbind OSIV EntityManager so the next JPA operation creates a NEW one with the tenant connection!
-            if (org.springframework.transaction.support.TransactionSynchronizationManager.hasResource(entityManagerFactory)) {
-                org.springframework.orm.jpa.EntityManagerHolder emHolder = (org.springframework.orm.jpa.EntityManagerHolder) org.springframework.transaction.support.TransactionSynchronizationManager.unbindResource(entityManagerFactory);
-                org.springframework.orm.jpa.EntityManagerFactoryUtils.closeEntityManager(emHolder.getEntityManager());
-            }
+            // Set aside the OSIV EntityManager so the next JPA operation creates a NEW one with the tenant connection.
+            try (OsivSuspension ignored = OsivSuspension.suspend(entityManagerFactory)) {
+                com.company.project.security.TenantContextHolder.setCurrentTenant(tenantSlug);
 
-            com.company.project.security.TenantContextHolder.setCurrentTenant(tenantSlug);
-            
-            MobileReferralAttribution attribution = referralService.claimCodeInTenant(userId, code.trim());
-            return ResponseEntity.ok(Map.of(
-                    "status", attribution.getStatus(),
-                    "message", "Referral code claimed successfully",
-                    "tenantSlug", tenantSlug
-            ));
+                MobileReferralAttribution attribution = referralService.claimCodeInTenant(userId, code.trim());
+                return ResponseEntity.ok(Map.of(
+                        "status", attribution.getStatus(),
+                        "message", "Referral code claimed successfully",
+                        "tenantSlug", tenantSlug
+                ));
+            }
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (IllegalStateException e) {

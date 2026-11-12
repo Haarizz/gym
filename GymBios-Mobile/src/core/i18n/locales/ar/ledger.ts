@@ -48,6 +48,8 @@ const ledger = {
           PT_SESSION_DELIVERED: "جلسات التدريب الشخصي المنفذة",
           CLASS_TAUGHT: "الحصص المقدَّمة",
           CLASS_ATTENDEE: "حضور الحصص",
+          PT_SALE: "مبيعات التدريب الشخصي",
+          PT_REVENUE: "إيرادات التدريب الشخصي المكتسبة",
           REVENUE_TOTAL: "الإيرادات",
         },
         units: {
@@ -57,6 +59,7 @@ const ledger = {
           PT_SESSION_DELIVERED: "جلسة",
           CLASS_TAUGHT: "حصة",
           CLASS_ATTENDEE: "حاضر",
+          PT_SALE: "عملية بيع",
         },
       },
       monthlyComparisonTitle: 'المقارنة الشهرية',

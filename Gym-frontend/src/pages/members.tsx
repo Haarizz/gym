@@ -17,7 +17,6 @@ import { Calendar as CalendarComponent } from "../components/ui/calendar";
 import { Checkbox } from "../components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "../components/ui/dropdown-menu";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../components/ui/tooltip";
-import { MemberApprovalModal } from "../components/shared/member-approval-modal";
 import { MemberReceipts } from "./member-receipts";
 import { rewardService, walletService, type ReferralReward, type Wallet as RewardWallet } from "../utils/supabase/reward-service";
 import {
@@ -396,9 +395,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [planComparisonOpen, setPlanComparisonOpen] = useState(false);
 
   // Pending approvals states
-  const [pendingMembers, setPendingMembers] = useState<any[]>([]);
-  const [selectedDraftForApproval, setSelectedDraftForApproval] = useState<any | null>(null);
-  const [showApprovalModal, setShowApprovalModal] = useState(false);
 
   // Status counts fetched independently (unfiltered) so KPI cards are always accurate
   const [statusCounts, setStatusCounts] = useState<{
@@ -562,25 +558,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     staffService.getStaff({}, 1, 500).then(res => setStaffOptions(res.items)).catch(() => { });
   }, []);
 
-  // Load pending members from sessionStorage
-  useEffect(() => {
-    const loadPendingMembers = () => {
-      const stored = sessionStorage.getItem('pendingMembers');
-      if (stored) {
-        try {
-          setPendingMembers(JSON.parse(stored));
-        } catch (error) {
-          console.error('Error loading pending members:', error);
-        }
-      }
-    };
-
-    loadPendingMembers();
-
-    // Listen for updates
-    window.addEventListener('pendingMembersUpdated', loadPendingMembers);
-    return () => window.removeEventListener('pendingMembersUpdated', loadPendingMembers);
-  }, []);
 
 
   const getStatusBadgeClass = (status: string) => {
@@ -995,67 +972,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     onNavigate?.('member-history-analytics', { memberId: member.id });
   };
 
-  // Pending approval handlers
-  const handleApproveClick = (draft: any) => {
-    setSelectedDraftForApproval(draft);
-    setShowApprovalModal(true);
-  };
-
-  const handleApproveMember = (approvalData: any) => {
-    // Remove from pending list
-    const updated = pendingMembers.filter(m => m.memberId !== approvalData.memberId);
-    setPendingMembers(updated);
-    sessionStorage.setItem('pendingMembers', JSON.stringify(updated));
-
-    // Save to active members (simulated)
-    const existingMembers = JSON.parse(sessionStorage.getItem('activeMembers') || '[]');
-    existingMembers.push(approvalData);
-    sessionStorage.setItem('activeMembers', JSON.stringify(existingMembers));
-
-    // Notify other components
-    window.dispatchEvent(new Event('pendingMembersUpdated'));
-
-    // Refresh members list
-    loadMembers();
-    loadStatusCounts();
-  };
-
-  const handleRejectDraft = (draftId: string) => {
-    const updated = pendingMembers.filter(m => m.memberId !== draftId);
-    setPendingMembers(updated);
-    sessionStorage.setItem('pendingMembers', JSON.stringify(updated));
-
-    // Notify other components
-    window.dispatchEvent(new Event('pendingMembersUpdated'));
-  };
-
-  // Combine regular members with pending members for display. The drafts are
-  // client-side only, so the server's status filter never sees them — hide them
-  // unless the filter would include a "Pending Approval" row.
-  const combinedMembers = React.useMemo(() => {
-    // Drafts are merged in client-side, so they'd ignore the server-side More Filters.
-    const showPending = (selectedStatus === 'all' || selectedStatus === 'pending_approval') && activeMoreFilterCount === 0;
-    const pending = (showPending ? pendingMembers : []).map(pm => ({
-      id: pm.memberId,
-      name: pm.fullName,
-      email: pm.email,
-      phone: pm.mobile,
-      member_id: pm.memberId,
-      membership_plan: pm.planName,
-      membership_type: pm.planName,
-      membership_status: 'pending_approval' as const,
-      membership_start_date: '',
-      membership_end_date: '',
-      membership_fee: pm.planPrice,
-      payment_status: 'pending' as const,
-      join_date: pm.requestedDate,
-      total_visits: 0,
-      isPending: true,
-      draftData: pm
-    }));
-
-    return [...pending, ...members];
-  }, [pendingMembers, members, selectedStatus, activeMoreFilterCount]);
 
   // Renewals & Upgrades helper functions
   const handleRenewalSearch = (value: string) => {
@@ -1602,12 +1518,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center space-x-2">
                   <span>Member Directory</span>
-                  {pendingMembers.length > 0 && (
-                    <Badge className="bg-amber-500 text-white flex items-center space-x-1">
-                      <Bell className="h-3 w-3" />
-                      <span>{pendingMembers.length} Pending</span>
-                    </Badge>
-                  )}
                 </CardTitle>
               </div>
             </CardHeader>
@@ -1757,7 +1667,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {combinedMembers.length === 0 ? (
+                  {members.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={10} className="text-center py-8">
                         <p className="text-muted-foreground">No members found.</p>
@@ -1768,7 +1678,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    combinedMembers.map((member) => {
+                    members.map((member) => {
                       const planDetails = getPlanDetails(member);
                       const amountDue = getAmountDue(member);
                       const membershipCategory = getMembershipCategory(member);
@@ -1933,94 +1843,54 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                             <span className="text-slate-600 font-medium">{getTotalVisits(member)}</span>
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
-                            {member.membership_status === 'pending_approval' && (member as any).isPending ? (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                    <span className="sr-only">Open menu</span>
-                                    <MoreVertical className="h-4 w-4 text-slate-500" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent side="left" align="start" className="w-48">
-                                  <DropdownMenuItem
-                                    className="text-[#2B7A78] cursor-pointer"
-                                    onClick={() => handleApproveClick((member as any).draftData)}
-                                  >
-                                    <UserCheck className="h-4 w-4 mr-2" />
-                                    Approve to On-board
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Actions">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreVertical className="h-4 w-4 text-slate-500" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => openMemberHistory(member)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Profile
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => setAnalyticsMember(member)}>
+                                  <BarChart3 className="h-4 w-4 mr-2" />
+                                  Analytics
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
+                                  onClick={() => navigate(`/members/edit/${getMemberId(member)}`)}
+                                >
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Edit Member
+                                </DropdownMenuItem>
+                                {isFamilyHeadBillingHead(member) && member.membership_status !== 'pending_approval' && (
+                                  <DropdownMenuItem className="cursor-pointer" onClick={() => openFamilyRenewalDialog(member)}>
+                                    <FaArrowsRotate className="h-4 w-4 mr-2" />
+                                    Renew Family
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="cursor-pointer"
-                                    onClick={() => handleApproveClick((member as any).draftData)}
-                                  >
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View Details
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="text-red-600 cursor-pointer"
-                                    onClick={() => {
-                                      if (confirm('Are you sure you want to reject this draft request?')) {
-                                        handleRejectDraft((member as any).draftData.memberId);
-                                        toast.error('Draft request rejected');
-                                      }
-                                    }}
-                                  >
-                                    <XCircle className="h-4 w-4 mr-2" />
-                                    Reject / Delete Draft
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            ) : (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Actions">
-                                    <span className="sr-only">Open menu</span>
-                                    <MoreVertical className="h-4 w-4 text-slate-500" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                  <DropdownMenuItem className="cursor-pointer" onClick={() => openMemberHistory(member)}>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View Profile
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="cursor-pointer" onClick={() => setAnalyticsMember(member)}>
-                                    <BarChart3 className="h-4 w-4 mr-2" />
-                                    Analytics
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="cursor-pointer"
-                                    onClick={() => navigate(`/members/edit/${getMemberId(member)}`)}
-                                  >
-                                    <Pencil className="h-4 w-4 mr-2" />
-                                    Edit Member
-                                  </DropdownMenuItem>
-                                  {isFamilyHeadBillingHead(member) && member.membership_status !== 'pending_approval' && (
-                                    <DropdownMenuItem className="cursor-pointer" onClick={() => openFamilyRenewalDialog(member)}>
-                                      <FaArrowsRotate className="h-4 w-4 mr-2" />
-                                      Renew Family
-                                    </DropdownMenuItem>
-                                  )}
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="cursor-pointer"
-                                    disabled={!member.email || member.email.includes('@family.local')}
-                                    onClick={() => { window.location.href = `mailto:${member.email}`; }}
-                                  >
-                                    <Mail className="h-4 w-4 mr-2" />
-                                    Send Email
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="cursor-pointer"
-                                    disabled={!member.phone}
-                                    onClick={() => { window.location.href = `tel:${member.phone}`; }}
-                                  >
-                                    <Phone className="h-4 w-4 mr-2" />
-                                    Call
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
+                                  disabled={!member.email || member.email.includes('@family.local')}
+                                  onClick={() => { window.location.href = `mailto:${member.email}`; }}
+                                >
+                                  <Mail className="h-4 w-4 mr-2" />
+                                  Send Email
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
+                                  disabled={!member.phone}
+                                  onClick={() => { window.location.href = `tel:${member.phone}`; }}
+                                >
+                                  <Phone className="h-4 w-4 mr-2" />
+                                  Call
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       );
@@ -3674,14 +3544,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         </Dialog>
       )}
 
-      {/* Member Approval Modal */}
-      <MemberApprovalModal
-        open={showApprovalModal}
-        onOpenChange={setShowApprovalModal}
-        draftData={selectedDraftForApproval}
-        onApprove={handleApproveMember}
-        onReject={handleRejectDraft}
-      />
     </div>
   );
 }

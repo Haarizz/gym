@@ -4,9 +4,10 @@ import {
   ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  CalendarCheck, ChevronRight, Download, Info, LayoutGrid, Loader2, Megaphone, RefreshCw,
+  CalendarCheck, ChevronRight, Download, Dumbbell, Info, LayoutGrid, Loader2, Megaphone, RefreshCw, Repeat,
   ShoppingCart, Snowflake, Target, UserPlus, Users, Wallet,
 } from "lucide-react";
+import { CampaignsSection, RenewalsSection, TrainingSection } from "./InsightSections";
 import { Button } from "../ui/button";
 import { CurrencyGlyph } from "../../utils/currency";
 import {
@@ -30,305 +31,36 @@ import rs from "./RevenueReports.module.css";
 import { ReportActions, type ReportDocument, type ValueFormat, chartFromRows, col, tableSection } from "../report-export";
 import styles from "./RevenueOperations.module.css";
 
-// Current period in the theme colour, comparison period in neutral grey (same as the revenue charts)
-const CURRENT_COLOR = "var(--gb-primary-deep)";
-const COMPARE_COLOR = "#94A3B8";
-const GOOD_COLOR = "#1baf7a";
-const BAD_COLOR = "#e34948";
-const TARGET_COLOR = "#eb6834";
-
-const num = (v: unknown) => {
-  const n = typeof v === "number" ? v : Number(v ?? 0);
-  return Number.isFinite(n) ? n : 0;
-};
-
-function Money({ value, digits = 2 }: { value: unknown; digits?: number }) {
-  return (
-    <span className={rs.money}>
-      <CurrencyGlyph />
-      {num(value).toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })}
-    </span>
-  );
-}
-
-/** A metric value in its unit; null = not measurable (e.g. a rate with nothing to measure). */
-function formatValue(v: number | null | undefined, format: OpsFormat): React.ReactNode {
-  if (v === null || v === undefined || !Number.isFinite(v)) return "—";
-  switch (format) {
-    case "money": return <Money value={v} />;
-    case "percent": return `${v.toFixed(1)}%`;
-    case "days": return `${v.toLocaleString(undefined, { maximumFractionDigits: v < 10 ? 1 : 0 })} day${Math.round(v * 10) === 10 ? "" : "s"}`;
-    case "hours": return v < 1 ? `${Math.round(v * 60)} min` : `${v.toFixed(1)} h`;
-    case "minutes": return `${Math.round(v)} min`;
-    case "decimal": return v.toLocaleString(undefined, { maximumFractionDigits: 1 });
-    default: return Math.round(v).toLocaleString();
-  }
-}
-
-function formatPlain(v: number | null, format: OpsFormat) {
-  if (v === null || !Number.isFinite(v)) return "";
-  if (format === "money") return v.toFixed(2);
-  if (format === "count") return String(Math.round(v));
-  return v.toFixed(1);
-}
-
-/** Rates move in percentage points; everything else in % change. */
-function MetricChange({ m }: { m: Pick<OpsMetric, "current" | "previous" | "format" | "goodWhenUp"> }) {
-  // Nothing to compare when either side isn't measurable
-  if (m.current === null || m.previous === null) return <span className={`${styles.pts} ${styles.ptsFlat}`}>—</span>;
-  if (m.format === "percent") {
-    const diff = num(m.current) - num(m.previous);
-    if (Math.abs(diff) < 0.05) return <span className={`${styles.pts} ${styles.ptsFlat}`}>±0 pts</span>;
-    const good = diff > 0 === m.goodWhenUp;
-    return (
-      <span className={`${styles.pts} ${good ? styles.ptsUp : styles.ptsDown}`}>
-        {diff > 0 ? "+" : "−"}{Math.abs(diff).toFixed(1)} pts
-      </span>
-    );
-  }
-  return <ChangeBadge current={num(m.current)} previous={num(m.previous)} goodWhenUp={m.goodWhenUp} />;
-}
-
-// ── Chart tooltip ───────────────────────────────────────────────────────────
-
-const ValueTooltip = ({ active, payload, label, format = "count", suffix }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className={rs.tooltip}>
-      <p className={rs.tooltipTitle}>{label ?? payload[0]?.payload?.name}</p>
-      {payload.map((p: any) => (
-        <p key={p.dataKey} style={{ color: p.color }}>
-          {p.name}: {p.value === null || p.value === undefined ? "—" : formatValue(num(p.value), format)}{suffix ?? ""}
-        </p>
-      ))}
-    </div>
-  );
-};
-
-// ── Building blocks ─────────────────────────────────────────────────────────
-
-function Panel({ title, description, actions, children }: {
-  title: string; description?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode;
-}) {
-  return (
-    <section className={rs.panel}>
-      <div className={styles.panelHeadRow}>
-        <div>
-          <h3>{title}</h3>
-          {description && <p>{description}</p>}
-        </div>
-        {actions}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-/** Metric tiles: value, change badge, comparison value. */
-function MetricTiles({ metrics, compareLabel }: { metrics: OpsMetric[]; compareLabel: string }) {
-  return (
-    <div className={rs.tiles}>
-      {metrics.map((m) => (
-        <div key={m.key} className={rs.tile}>
-          <div className={rs.tileHead}>{m.label}</div>
-          <div className={rs.tileValue}>{formatValue(m.current, m.format)}</div>
-          <div className={rs.tileSub}>
-            <MetricChange m={m} /> {compareLabel.toLowerCase()}: {formatValue(m.previous, m.format)}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** Grouped bars: this period vs the comparison period, per row. */
-function CompareBars({ rows, compareName, money = false, horizontal = false, height }: {
-  rows: OpsRow[]; compareName: string; money?: boolean; horizontal?: boolean; height?: number;
-}) {
-  const data = rows.map((r) => ({
-    name: r.name,
-    current: money ? num(r.amount) : num(r.current),
-    previous: money ? num(r.previousAmount) : num(r.previous),
-  }));
-  if (data.every((d) => d.current === 0 && d.previous === 0)) {
-    return <p className={rs.empty}>Nothing recorded in either period.</p>;
-  }
-  const format: OpsFormat = money ? "money" : "count";
-  if (horizontal) {
-    return (
-      <ResponsiveContainer width="100%" height={height ?? Math.max(200, data.length * 46 + 40)}>
-        <BarChart data={data} layout="vertical" margin={{ left: 4, right: 16 }} barGap={2}>
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-          <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={money} />
-          <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 12 }} />
-          <Tooltip content={<ValueTooltip format={format} />} />
-          <Legend />
-          <Bar dataKey="current" name="This period" fill={CURRENT_COLOR} radius={[0, 4, 4, 0]} isAnimationActive={false} />
-          <Bar dataKey="previous" name={compareName} fill={COMPARE_COLOR} radius={[0, 4, 4, 0]} isAnimationActive={false} />
-        </BarChart>
-      </ResponsiveContainer>
-    );
-  }
-  return (
-    <ResponsiveContainer width="100%" height={height ?? 260}>
-      <BarChart data={data} margin={{ left: 0, right: 8 }} barGap={2}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey="name" tick={{ fontSize: 12 }} interval={0} />
-        <YAxis tick={{ fontSize: 12 }} width={money ? 64 : 40} allowDecimals={money} />
-        <Tooltip content={<ValueTooltip format={format} />} />
-        <Legend />
-        <Bar dataKey="current" name="This period" fill={CURRENT_COLOR} radius={[4, 4, 0, 0]} isAnimationActive={false} />
-        <Bar dataKey="previous" name={compareName} fill={COMPARE_COLOR} radius={[4, 4, 0, 0]} isAnimationActive={false} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-/** Table of rows with both periods; optional money column and lead conversion rate. */
-function RowsTable({ rows, compareLabel, money = false, conversion = false, unit = "" , empty }: {
-  rows: OpsRow[]; compareLabel: string; money?: boolean; conversion?: boolean; unit?: string; empty?: string;
-}) {
-  if (rows.length === 0) return <p className={rs.empty}>{empty ?? "Nothing recorded in either period."}</p>;
-  const value = (r: OpsRow, prev = false) => (money ? num(prev ? r.previousAmount : r.amount) : num(prev ? r.previous : r.current));
-  const total = rows.reduce((s, r) => s + value(r), 0);
-  const prevTotal = rows.reduce((s, r) => s + value(r, true), 0);
-  const show = (v: number) => (money ? <Money value={v} /> : v.toLocaleString());
-  const rate = (c?: number, t?: number) => (num(t) > 0 ? `${((num(c) / num(t)) * 100).toFixed(0)}%` : "—");
-  return (
-    <div className={rs.tableWrap}>
-      <table className={rs.table}>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th className={rs.num}>This period</th>
-            <th className={rs.num}>{compareLabel}</th>
-            <th className={rs.num}>Change</th>
-            {conversion && <th className={rs.num}>Converted</th>}
-            <th className={rs.shareCol}>Share</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => {
-            const share = total > 0 ? (value(r) / total) * 100 : 0;
-            return (
-              <tr key={r.name}>
-                <td className={rs.name} title={r.name}>{r.name}</td>
-                <td className={rs.num}>
-                  {show(value(r))}
-                  {money && <div className={rs.muted}>{num(r.current).toLocaleString()} {unit}</div>}
-                </td>
-                <td className={rs.num}>
-                  {show(value(r, true))}
-                  {money && <div className={rs.muted}>{num(r.previous).toLocaleString()} {unit}</div>}
-                </td>
-                <td className={rs.num}><ChangeBadge current={value(r)} previous={value(r, true)} /></td>
-                {conversion && (
-                  <td className={rs.num}>
-                    {num(r.converted)} <span className={rs.muted}>({rate(r.converted, r.current)})</span>
-                    <div className={rs.muted}>was {num(r.previousConverted)} ({rate(r.previousConverted, r.previous)})</div>
-                  </td>
-                )}
-                <td className={rs.shareCol}>
-                  <div className={rs.shareBar}><span style={{ width: `${Math.min(100, share)}%` }} /></div>
-                  <span className={rs.muted}>{share.toFixed(1)}%</span>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td>Total</td>
-            <td className={rs.num}>{show(total)}</td>
-            <td className={rs.num}>{show(prevTotal)}</td>
-            <td className={rs.num}><ChangeBadge current={total} previous={prevTotal} /></td>
-            {conversion && <td />}
-            <td />
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  );
-}
-
-const TREND_LABELS: Record<OpsTrendKey, string> = {
-  checkIns: "Check-ins",
-  bookings: "Bookings",
-  leads: "New leads",
-  conversions: "Lead conversions",
-  freezes: "Freezes started",
-  posSales: "POS sales",
-  posNet: "POS net sales",
-  joins: "New members",
-};
-
-const TREND_TITLES: Record<RevenueGranularity, string> = {
-  hourly: "by hour", daily: "by day", weekly: "by week", monthly: "by month",
-};
-
-/** Line chart of one trend series, comparison period dotted; a picker when several are offered. */
-function TrendPanel({ trend, keys, compareName, granularity, title }: {
-  trend: OpsTrendPoint[]; keys: OpsTrendKey[]; compareName: string; granularity: RevenueGranularity; title?: string;
-}) {
-  const [key, setKey] = useState<OpsTrendKey>(keys[0]);
-  const active = keys.includes(key) ? key : keys[0];
-  const money = active === "posNet";
-  const data = trend.map((p) => ({ label: p.label, current: num(p[active]), previous: p[`${active}Prev`] }));
-  const hasPrev = data.some((d) => num(d.previous) > 0);
-  return (
-    <Panel
-      title={title ?? `${TREND_LABELS[active]} ${TREND_TITLES[granularity]}`}
-      description={`This period vs ${compareName.toLowerCase()} (dotted), lined up bucket by bucket`}
-      actions={keys.length > 1 ? (
-        <div className={styles.seriesSwitch} role="group" aria-label="Series">
-          {keys.map((k) => (
-            <button key={k} type="button" aria-pressed={k === active} onClick={() => setKey(k)}>{TREND_LABELS[k]}</button>
-          ))}
-        </div>
-      ) : undefined}
-    >
-      <ResponsiveContainer width="100%" height={280}>
-        <LineChart data={data} margin={{ left: 0, right: 12 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="label" tick={{ fontSize: 12 }} minTickGap={16} />
-          <YAxis tick={{ fontSize: 12 }} width={money ? 64 : 40} allowDecimals={money} />
-          <Tooltip content={<ValueTooltip format={money ? "money" : "count"} />} />
-          <Legend />
-          {hasPrev && (
-            <Line type="monotone" dataKey="previous" name={compareName} stroke={COMPARE_COLOR} strokeWidth={2}
-              strokeDasharray="2 4" dot={false} isAnimationActive={false} connectNulls />
-          )}
-          <Line type="monotone" dataKey="current" name="This period" stroke={CURRENT_COLOR} strokeWidth={2}
-            dot={data.length <= 31 ? { r: 3, fill: CURRENT_COLOR } : false} isAnimationActive={false} />
-        </LineChart>
-      </ResponsiveContainer>
-    </Panel>
-  );
-}
+import {
+  BAD_COLOR, COMPARE_COLOR, CURRENT_COLOR, CompareBars, GOOD_COLOR, MetricChange, MetricTiles, Money, Panel, RowsTable,
+  TARGET_COLOR, TREND_LABELS, TrendPanel, ValueTooltip, formatValue, num,
+} from "./InsightBlocks";
 
 // ── Areas ───────────────────────────────────────────────────────────────────
 
 type Section = "overview" | "revenue" | "targets" | OpsArea;
 
-const AREAS: { key: OpsArea | "revenue"; label: string; icon: React.ElementType; headline: string[] }[] = [
+/** Summary cards. `key` groups metrics; `section` is the sub-tab its details live in. */
+const AREAS: { key: OpsArea | "revenue"; section?: Section; label: string; icon: React.ElementType; headline: string[] }[] = [
   { key: "revenue", label: "Revenue", icon: Wallet, headline: ["collection", "net", "transactions", "avgTransaction"] },
   { key: "members", label: "Members", icon: UserPlus, headline: ["joins", "renewals", "ending", "renewalRatio"] },
   { key: "attendance", label: "Attendance", icon: Users, headline: ["checkIns", "uniqueVisitors", "dailyCheckIns", "visitsPerMember"] },
-  { key: "bookings", label: "Bookings", icon: CalendarCheck, headline: ["bookings", "showRate", "utilisation", "cancelRate"] },
+  { key: "bookings", section: "training", label: "Training & Classes", icon: CalendarCheck, headline: ["bookings", "showRate", "utilisation", "cancelRate"] },
   { key: "pos", label: "POS", icon: ShoppingCart, headline: ["posNet", "posSales", "posBasket", "posMargin"] },
-  { key: "crm", label: "CRM & Leads", icon: Megaphone, headline: ["leads", "conversions", "conversionRate", "followUpsDone"] },
+  { key: "crm", section: "campaigns", label: "Campaigns & Leads", icon: Megaphone, headline: ["leads", "conversions", "conversionRate", "followUpsDone"] },
   { key: "freeze", label: "Freezes", icon: Snowflake, headline: ["freezesStarted", "frozenDays", "unfreezes", "freezeCharges"] },
 ];
 
 const SECTIONS: { key: Section; label: string; icon: React.ElementType }[] = [
-  { key: "overview", label: "Overview", icon: LayoutGrid },
+  { key: "overview", label: "Summary", icon: LayoutGrid },
   { key: "revenue", label: "Revenue", icon: Wallet },
   { key: "targets", label: "Targets", icon: Target },
   { key: "members", label: "Members", icon: UserPlus },
+  { key: "renewals", label: "Renewals & Upgrades", icon: Repeat },
+  { key: "training", label: "Training & Classes", icon: Dumbbell },
+  { key: "campaigns", label: "Campaigns", icon: Megaphone },
   { key: "attendance", label: "Attendance", icon: Users },
-  { key: "bookings", label: "Bookings", icon: CalendarCheck },
   { key: "pos", label: "POS", icon: ShoppingCart },
-  { key: "crm", label: "CRM & Leads", icon: Megaphone },
   { key: "freeze", label: "Freezes", icon: Snowflake },
 ];
 
@@ -797,6 +529,12 @@ export function ComparisonHub({ summary, from, to, granularity, compare, refresh
       : <p className={rs.empty}>Revenue comparison isn't available yet.</p>;
   } else if (section === "targets") {
     body = <TargetsSection from={from} to={to} compare={compare} refreshKey={refreshKey} compareName={compareName} />;
+  } else if (section === "campaigns" || section === "renewals" || section === "training") {
+    // Each loads its own figures; leads and bookings come from the operations comparison
+    const props = { from, to, compare, refreshKey, compareName, compareLabel, ops };
+    body = section === "campaigns" ? <CampaignsSection {...props} />
+      : section === "renewals" ? <RenewalsSection {...props} />
+      : <TrainingSection {...props} />;
   } else if (loading && !ops) {
     body = <div className={styles.loading}><Loader2 className="h-4 w-4 animate-spin" />Loading comparisons…</div>;
   } else if (error && !ops) {
@@ -829,7 +567,7 @@ export function ComparisonHub({ summary, from, to, granularity, compare, refresh
                     <div key={area.key} className={styles.areaCard}>
                       <div className={styles.areaHead}>
                         <h4 className={styles.areaTitle}><area.icon size={15} />{area.label}</h4>
-                        <button type="button" className={styles.areaLink} onClick={() => setSection(area.key)}
+                        <button type="button" className={styles.areaLink} onClick={() => setSection(area.section ?? area.key)}
                           aria-label={`${area.label} details`} title="Details"><ChevronRight size={14} /></button>
                       </div>
                       {ms.map((m) => (
@@ -888,31 +626,6 @@ export function ComparisonHub({ summary, from, to, granularity, compare, refresh
         );
         break;
       }
-      case "crm":
-        body = (
-          <>
-            <MetricTiles metrics={of("crm")} compareLabel={compareLabel} />
-            <div className={rs.grid2}>
-              <TrendPanel trend={ops.trend} keys={["leads", "conversions"]} granularity={g} compareName={compareName} />
-              <Panel title="Lead Pipeline" description="Current status of the leads created in each period">
-                <CompareBars rows={ops.crm.byStatus} compareName={compareName} />
-              </Panel>
-              <Panel title="Lead Sources" description="Where leads came from, with how many converted">
-                <RowsTable rows={ops.crm.bySource} compareLabel={compareLabel} conversion />
-              </Panel>
-              <Panel title="Leads by Staff" description="Assigned staff, with conversions">
-                <RowsTable rows={ops.crm.byStaff} compareLabel={compareLabel} conversion />
-              </Panel>
-              <Panel title="Lead Sources Compared">
-                <CompareBars rows={ops.crm.bySource} compareName={compareName} horizontal />
-              </Panel>
-              <Panel title="Member Enquiries" description="Enquiries members raised, by category">
-                <RowsTable rows={ops.crm.enquiryCategories} compareLabel={compareLabel} empty="No member enquiries in either period." />
-              </Panel>
-            </div>
-          </>
-        );
-        break;
       case "pos":
         body = (
           <>
@@ -971,31 +684,6 @@ export function ComparisonHub({ summary, from, to, granularity, compare, refresh
           </>
         );
         break;
-      case "bookings":
-        body = (
-          <>
-            <MetricTiles metrics={of("bookings")} compareLabel={compareLabel} />
-            <div className={rs.grid2}>
-              <TrendPanel trend={ops.trend} keys={["bookings"]} granularity={g} compareName={compareName} />
-              <Panel title="Booking Status" description="Bookings on sessions dated in each period">
-                <CompareBars rows={ops.bookings.byStatus} compareName={compareName} horizontal />
-              </Panel>
-              <Panel title="Top Sessions" description="Seat-holding bookings per session name">
-                <CompareBars rows={ops.bookings.topSessions} compareName={compareName} horizontal />
-              </Panel>
-              <Panel title="Bookings by Trainer">
-                <RowsTable rows={ops.bookings.byTrainer} compareLabel={compareLabel} />
-              </Panel>
-              <Panel title="Classes vs Personal Training">
-                <CompareBars rows={ops.bookings.byType} compareName={compareName} />
-              </Panel>
-              <Panel title="Bookings by Day of Week">
-                <CompareBars rows={ops.bookings.byWeekday} compareName={compareName} />
-              </Panel>
-            </div>
-          </>
-        );
-        break;
       case "members":
         body = (
           <>
@@ -1018,7 +706,7 @@ export function ComparisonHub({ summary, from, to, granularity, compare, refresh
   return (
     <div className={rs.stack}>
       {nav}
-      {loading && ops && section !== "targets" && section !== "revenue" && (
+      {loading && ops && section !== "targets" && section !== "revenue" && section !== "campaigns" && section !== "renewals" && section !== "training" && (
         <div className={rs.muted}><Loader2 className="inline h-3 w-3 animate-spin" /> Updating…</div>
       )}
       {body}

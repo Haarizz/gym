@@ -69,6 +69,16 @@ export interface CreateAddonRequest {
   // Which staff member actually handled this sale — credited toward their
   // revenue target regardless of which account is logged in.
   processed_by_staff_id?: number;
+  // Promotion code taken off `amount` server-side before the wallet and payment.
+  // Only promotions with Add-ons in their Applicable Services are accepted.
+  promo_code?: string;
+}
+
+/** A promotion code priced on an add-on sale (GET /member-addons/validate-code). */
+export interface AddonPromoQuote {
+  code: string;
+  name: string;
+  discount_amount: number;
 }
 
 class AddonsService {
@@ -99,6 +109,17 @@ class AddonsService {
       throw new Error(err.message || `Failed to create addon: ${response.status}`);
     }
     return response.json();
+  }
+
+  /** Checks a promo code for this member and add-on price, without spending it. */
+  async validatePromoCode(code: string, amount: number, memberDbId: number): Promise<AddonPromoQuote> {
+    const params = new URLSearchParams({ code, amount: String(amount), memberDbId: String(memberDbId) });
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/member-addons/validate-code?${params.toString()}`
+    );
+    if (!response.ok) throw new Error(await this.errorMessage(response, 'Invalid promotion code'));
+    const data = await response.json();
+    return { code: data.code ?? code, name: data.name ?? code, discount_amount: Number(data.discount_amount ?? 0) };
   }
 
   async getAddonReceipt(id: string): Promise<Receipt> {

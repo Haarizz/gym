@@ -1,5 +1,7 @@
 package com.company.project.controllers;
 
+import com.company.project.config.OsivSuspension;
+
 import com.company.project.controlplane.entities.Tenant;
 import com.company.project.controlplane.repositories.TenantRepository;
 import com.company.project.controlplane.service.LeadFormRateLimiter;
@@ -14,9 +16,6 @@ import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.orm.jpa.EntityManagerFactoryUtils;
-import org.springframework.orm.jpa.EntityManagerHolder;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -92,14 +91,9 @@ public class PublicWalkInController {
     }
 
     private <T> T inTenant(String tenantSlug, Long branchId, Supplier<T> work) {
-        // Drop any OSIV EntityManager already bound to this request so the tenant
-        // work below opens a fresh one on the tenant's DataSource (same step as
-        // PublicLeadFormController / MobileDiscoveryController).
-        if (TransactionSynchronizationManager.hasResource(entityManagerFactory)) {
-            EntityManagerHolder emHolder = (EntityManagerHolder) TransactionSynchronizationManager.unbindResource(entityManagerFactory);
-            EntityManagerFactoryUtils.closeEntityManager(emHolder.getEntityManager());
-        }
-        try {
+        // Set aside the request's OSIV EntityManager so the tenant work below opens a
+        // fresh one on the tenant's DataSource (see OsivSuspension).
+        try (OsivSuspension ignored = OsivSuspension.suspend(entityManagerFactory)) {
             TenantContextHolder.setCurrentTenant(tenantSlug);
             BranchContextHolder.setActiveBranchId(branchId);
             return work.get();

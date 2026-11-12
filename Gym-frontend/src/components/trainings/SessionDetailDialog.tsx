@@ -311,6 +311,7 @@ export function SessionDetailDialog({ sessionId, open, onOpenChange, onChanged, 
                                     <span className={s.pill} data-tone={st.tone}>
                                       {p.status === "waitlisted" && p.waitlistPosition ? `Waitlisted #${p.waitlistPosition}` : st.label}
                                     </span>
+                                    {p.enrolmentId && <p className={s.sub}>PT package</p>}
                                   </td>
                                   <td className={s.when}>{p.status === "checked-in" ? clockTime(p.checkedInAt) || "—" : "—"}</td>
                                   <td>
@@ -488,7 +489,8 @@ function AddParticipant({ sessionId, full, excludeIds, onClose, onBooked }: {
     setBooking(m.id);
     try {
       const created = await bookingService.createBooking({ sessionId: Number(sessionId), memberId: Number(m.id), waitlist: full });
-      toast.success(created.status === "waitlisted" ? `${m.name} added to the waitlist` : `${m.name} booked`);
+      toast.success(created.status === "waitlisted" ? `${m.name} added to the waitlist`
+        : created.packageName ? `${m.name} booked — uses a session of ${created.packageName}` : `${m.name} booked`);
       await onBooked();
     } catch (e: any) {
       toast.error(e?.message || "Couldn't book the member");

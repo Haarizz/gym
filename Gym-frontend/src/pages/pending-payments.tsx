@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -11,7 +11,7 @@ import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import {
-  AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Ban, CalendarClock, FileText, Hourglass, Loader2, Search, Wallet,
+  AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Ban, CalendarClock, FileText, Hourglass, Loader2, Search, Wallet,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import bs from './billing.module.css';
@@ -72,9 +72,19 @@ function fmtDate(value: string | null | undefined) {
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+// Server timestamps (e.g. written_off_at) are UTC without an offset — read them as UTC so they
+// show in local time. Date-only values (due dates, filter bounds) stay local days.
+function utcStamp(value: string) {
+  return /[zZ]|[+-]\d\d:?\d\d$/.test(value) ? value : `${value}Z`;
+}
+
+function fmtStampDate(value: string | null | undefined) {
+  return value ? fmtDate(utcStamp(value)) : '—';
+}
+
 function fmtTime(value: string | null | undefined) {
   if (!value) return '';
-  const d = new Date(value);
+  const d = new Date(utcStamp(value));
   return isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
@@ -149,14 +159,20 @@ function PeriodPicker({ preset, onPreset, custom, onCustom }: {
   );
 }
 
+/** Billing › Pending Payments tab: open dues, write-offs, write-off history and report. */
 export function PendingPayments() {
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { activeBranchId } = useBranch();
   const { formatCurrency } = useCurrency();
 
-  const tab: Tab = params.get('tab') === 'history' ? 'history' : params.get('tab') === 'report' ? 'report' : 'dues';
-  const setTab = (t: Tab) => setParams(t === 'dues' ? {} : { tab: t }, { replace: true });
+  // Inner view lives in ?view= so it doesn't clash with Billing's own ?tab=.
+  const view = params.get('view');
+  const tab: Tab = view === 'history' ? 'history' : view === 'report' ? 'report' : 'dues';
+  const setTab = (t: Tab) => setParams(prev => {
+    const next = new URLSearchParams(prev);
+    if (t === 'dues') next.delete('view'); else next.set('view', t);
+    return next;
+  }, { replace: true });
 
   // Bumped after a write-off so every tab reloads.
   const [refreshKey, setRefreshKey] = useState(0);
@@ -395,17 +411,8 @@ export function PendingPayments() {
   );
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2"><Hourglass className="h-7 w-7 text-amber-600" />Pending Payments</h1>
-          <p className="text-muted-foreground">Open dues across members. Write off an uncollectable due; it is recorded in the Write-off History.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setTab('report')}><FileText className="mr-2 h-4 w-4" />Write-off Report</Button>
-          <Button variant="outline" onClick={() => navigate('/billing')}><ArrowLeft className="mr-2 h-4 w-4" />Billing</Button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <p className="text-sm text-muted-foreground">Open dues across members. Write off an uncollectable due; it is recorded in the Write-off History.</p>
 
       <div className={bs.statGrid4}>
         {statCard({
@@ -613,7 +620,7 @@ export function PendingPayments() {
                           {history.items.map(w => (
                             <TableRow key={w.id} className="hover:bg-slate-50/50 transition-colors">
                               <TableCell>
-                                <div className={bs.when}>{fmtDate(w.written_off_at)}</div>
+                                <div className={bs.when}>{fmtStampDate(w.written_off_at)}</div>
                                 <div className={bs.whenSub}>{fmtTime(w.written_off_at)}</div>
                               </TableCell>
                               <TableCell>

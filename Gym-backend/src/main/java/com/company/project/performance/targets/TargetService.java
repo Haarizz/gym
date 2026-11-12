@@ -114,8 +114,17 @@ public class TargetService {
                         && Objects.equals(t.getRole() == null ? null : t.getRole().toLowerCase(), fRole == null ? null : fRole.toLowerCase()))
                 .findFirst().orElse(null);
         if (lines.isEmpty()) {
-            if (target != null) repository.delete(target);
-            return null;
+            // An earlier repeating target would come back once this month's is deleted, so an
+            // empty repeating target is kept as "no goals from this month on" instead.
+            boolean earlierRepeats = repository.findApplicableTo(month.atDay(1)).stream()
+                    .anyMatch(t -> t.getScope().equals(scope) && Objects.equals(t.getStaffId(), fStaff)
+                            && Objects.equals(t.getBranchId(), fBranch)
+                            && Objects.equals(t.getRole() == null ? null : t.getRole().toLowerCase(), fRole == null ? null : fRole.toLowerCase())
+                            && t.isRepeatMonthly() && t.getPeriodStart().isBefore(month.atDay(1)));
+            if (!earlierRepeats) {
+                if (target != null) repository.delete(target);
+                return null;
+            }
         }
         if (target == null) {
             target = new Target();
@@ -126,7 +135,7 @@ public class TargetService {
             target.setPeriodStart(month.atDay(1));
             target.setPeriodEnd(month.atEndOfMonth());
         }
-        target.setRepeatMonthly(Boolean.TRUE.equals(req.repeatMonthly()));
+        target.setRepeatMonthly(lines.isEmpty() || Boolean.TRUE.equals(req.repeatMonthly()));
         // Update matching lines in place. Clearing and re-adding would fail on uq_target_line,
         // because Hibernate flushes the new inserts before the orphan deletes.
         Iterator<TargetLine> it = target.getLines().iterator();

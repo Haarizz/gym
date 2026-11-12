@@ -105,6 +105,37 @@ public class MobileMemberStaffService {
                 .collect(Collectors.toList());
     }
 
+    /** Public-profile extras per active staff member of a branch (for the public join page). */
+    public record PublicTrainerExtras(java.time.LocalDate joinDate, List<String> certifications,
+                                      List<Long> ratingDistribution, List<String> topTags) {}
+
+    /**
+     * Join date, certification names, rating distribution and top review tags for each active
+     * staff member of the branch — the same fields the member app's trainer profile shows,
+     * minus anything tied to individual reviewers. Caller must have set the tenant context.
+     */
+    public Map<Long, PublicTrainerExtras> getPublicTrainerExtras(Long branchId) {
+        Map<Long, long[]> counts = countsByStaff(branchId);
+        Map<Long, PublicTrainerExtras> out = new HashMap<>();
+        for (Staff s : activeStaff(branchId)) {
+            Map<String, Long> tagCounts = new HashMap<>();
+            for (StaffRating r : staffRatingRepository.findByBranchIdAndStaffIdOrderByUpdatedAtDesc(branchId, s.getId())) {
+                if (r.getTags() != null) r.getTags().forEach(t -> tagCounts.merge(t, 1L, Long::sum));
+            }
+            List<String> topTags = tagCounts.entrySet().stream()
+                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                    .limit(5).map(Map.Entry::getKey).collect(Collectors.toList());
+            List<String> certs = s.getCertifications().stream()
+                    .map(StaffCertification::getCertName)
+                    .filter(n -> n != null && !n.isBlank())
+                    .collect(Collectors.toList());
+            long[] c = counts.getOrDefault(s.getId(), new long[5]);
+            out.put(s.getId(), new PublicTrainerExtras(s.getJoinDate(), certs,
+                    Arrays.stream(c).boxed().collect(Collectors.toList()), topTags));
+        }
+        return out;
+    }
+
     public MemberStaffProfileDTO getProfile(UserDetailsImpl principal, Long staffId) {
         Member member = requireMember(principal);
         Staff staff = requireStaff(member.getBranchId(), staffId);

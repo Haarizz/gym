@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
+@EntityListeners(com.company.project.performance.events.PerformanceSourceListener.class)
 @Table(name = "member_addons")
 public class MemberAddon extends BaseEntity {
 

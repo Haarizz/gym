@@ -27,7 +27,6 @@ import { Notifications } from "./pages/notifications";
 import { Members } from "./pages/members";
 import { MemberConnect } from "./pages/member-connect";
 import { Billing } from "./pages/billing";
-import { PendingPayments } from "./pages/pending-payments";
 import { TrainingStreams } from "./pages/training-streams";
 import { Attendance } from "./pages/attendance";
 import { CheckIn } from "./pages/check-in";
@@ -212,7 +211,6 @@ import {
   Star,
   Inbox,
   ShieldAlert,
-  Hourglass,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
@@ -287,13 +285,6 @@ const menuItems = [
         icon: Receipt,
         id: "billing",
         path: "/billing",
-        permission: "BILLING_VIEW",
-      },
-      {
-        title: "Pending Payments",
-        icon: Hourglass,
-        id: "pending-payments",
-        path: "/pending-payments",
         permission: "BILLING_VIEW",
       },
       {
@@ -1342,8 +1333,8 @@ export default function App() {
       <Route path="/members/edit/:memberId" element={<AddMember onNavigate={handleNavClick} />} />
       <Route path="/add-member" element={<AddMemberRedirect />} />
       <Route path="/billing" element={<Billing onNavigate={handleNavClick} />} />
-      <Route path="/pending-payments" element={<PendingPayments />} />
-      <Route path="/write-off-history" element={<Navigate to="/pending-payments?tab=history" replace />} />
+      <Route path="/pending-payments" element={<Navigate to="/billing?tab=pending" replace />} />
+      <Route path="/write-off-history" element={<Navigate to="/billing?tab=pending&view=history" replace />} />
       <Route path="/create-receipt" element={<CreateReceipt onNavigate={handleNavClick} />} />
       <Route path="/manage-plans" element={<ManagePlans />} />
       <Route path="/attendance" element={<Attendance onNavigate={handleNavClick} />} />

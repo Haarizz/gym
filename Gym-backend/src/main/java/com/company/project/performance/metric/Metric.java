@@ -20,6 +20,17 @@ public enum Metric {
     PT_SESSION_DELIVERED("PT sessions delivered", Audience.TRAINER, true, false, false),
     CLASS_TAUGHT("Classes taught", Audience.TRAINER, true, false, false),
     CLASS_ATTENDEE("Class attendees", Audience.TRAINER, true, false, false),
+    /**
+     * PT sold: training packages and normal paid PT session bookings. Count, and money received,
+     * on the payment date, to the trainer (part of total revenue). This is what PT targets track.
+     */
+    PT_SALE("PT sales", Audience.TRAINER, true, true, true),
+    /**
+     * The PT money commission is paid on: for a package, all of it when paid ("on booking"), or
+     * share by share as sessions/days are used ("on completion"); for a normal paid PT booking,
+     * all of it when paid. Not part of total revenue — the money is already counted as PT_SALE.
+     */
+    PT_REVENUE("PT earned for commission", Audience.TRAINER, false, true, false),
     REVENUE_TOTAL("Total revenue", Audience.BOTH, false, true, false);
 
     public enum Audience { STAFF, TRAINER, BOTH }

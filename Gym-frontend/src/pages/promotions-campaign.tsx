@@ -235,6 +235,30 @@ function SpecificMemberBadges({ ids }: { ids: string[] }) {
   );
 }
 
+/** Copies the code, with a fallback where the async Clipboard API is missing or blocked. */
+async function copyPromoCode(code: string) {
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable');
+    await navigator.clipboard.writeText(code);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = code;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    // Inside the flyer dialog: appending to body would be outside the focus trap
+    (document.activeElement?.parentElement ?? document.body).appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    if (!ok) {
+      toast.error('Could not copy the promo code');
+      return;
+    }
+  }
+  toast.success('Promo code copied to clipboard!');
+}
+
 export function PromotionsCampaign() {
   const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const [activeTab, setActiveTab] = useState('overview');
@@ -2384,19 +2408,21 @@ export function PromotionsCampaign() {
                   Share via WhatsApp
                 </button>
 
-                <Button
-                  variant="outline"
-                  className="w-full mt-3"
-                  onClick={() => {
-                    if (flyerPromotion.code) {
-                      navigator.clipboard.writeText(flyerPromotion.code);
-                      toast.success('Promo code copied to clipboard!');
-                    }
-                  }}
-                >
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy Promo Code
-                </Button>
+                {flyerPromotion.code ? (
+                  <Button
+                    variant="outline"
+                    className="w-full mt-3"
+                    onClick={() => copyPromoCode(flyerPromotion.code!)}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Promo Code
+                  </Button>
+                ) : (
+                  // Without a code the button used to render and silently do nothing
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    This promotion has no promo code to copy.
+                  </p>
+                )}
               </div>
 
               {/* Footer */}

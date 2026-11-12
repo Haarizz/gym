@@ -14,6 +14,29 @@ export interface ShareLink {
   branch_name?: string;
 }
 
+/** A Family / Couple plan's household rules. Caps are null when the plan doesn't limit them. */
+export interface PortfolioHousehold {
+  kind: 'couple' | 'family';
+  max_adults?: number | null;
+  max_children?: number | null;
+  max_members?: number | null;
+  allow_additional_members: boolean;
+  /** Set when priced per person (applicant included); otherwise effective_price covers everyone. */
+  price_per_member?: number | null;
+  additional_member_price?: number | null;
+}
+
+/** Someone joining with the applicant on a Family / Couple plan. */
+export interface ApplicationFamilyMember {
+  name: string;
+  relationship: string;
+  gender?: string;
+  date_of_birth?: string | null;
+  minor?: boolean;
+  phone?: string | null;
+  email?: string | null;
+}
+
 export interface PortfolioPlan {
   id: number;
   name: string;
@@ -24,8 +47,10 @@ export interface PortfolioPlan {
   effective_price: number;
   offer_label?: string | null;
   features: string[];
-  /** False for Family / Couple plans, which are set up at reception. */
+  /** False for plans that can only be set up at reception. */
   joinable: boolean;
+  /** Set for Family / Couple plans: who can join and how the household is priced. */
+  household?: PortfolioHousehold | null;
 }
 
 export interface PortfolioStream {
@@ -44,6 +69,7 @@ export interface PortfolioSession {
   id: string;
   name: string;
   type: string;
+  trainer_id?: number | null;
   trainer_name?: string;
   date?: string;
   start_time?: string;
@@ -70,6 +96,11 @@ export interface PortfolioTrainer {
   photo_url?: string;
   average_rating?: number | null;
   rating_count: number;
+  join_date?: string | null;
+  certifications?: string[];
+  /** Ratings per star: index 0 = 1 star … index 4 = 5 stars. */
+  rating_distribution?: number[];
+  top_tags?: string[];
 }
 
 export interface PublicPortfolio {
@@ -91,6 +122,8 @@ export interface PublicPortfolio {
   programs: PortfolioSession[];
   facilities: PortfolioFacility[];
   trainers: PortfolioTrainer[];
+  /** Branch Access Type: who may join, by gender. */
+  access?: 'MIXED' | 'LADIES_ONLY' | 'MEN_ONLY';
 }
 
 export type ApplicationPaymentMethod = 'CASH' | 'ONLINE';
@@ -110,6 +143,8 @@ export interface PublicApplicationRequest {
   card?: { number: string; exp_month: number; exp_year: number; cvc: string; name_on_card?: string };
   accept_terms: boolean;
   website?: string; // honeypot
+  /** Family / Couple plans only. */
+  family_members?: ApplicationFamilyMember[];
 }
 
 export interface ApplicationReceipt {
@@ -164,6 +199,29 @@ export interface MembershipApplication {
   member_id?: number;
   member_code?: string;
   created_at: string;
+  /** SHARE_LINK (visitor on the public link) or DESK (raised by staff for a walk-in). */
+  source?: 'SHARE_LINK' | 'DESK';
+  /** Staff user who raised a DESK application. */
+  submitted_by?: string;
+  reg_doc_number?: string;
+  medical_conditions?: string;
+  /** The rest of the household on a Family / Couple plan. */
+  family_members?: ApplicationFamilyMember[];
+}
+
+/** Staff raise an application for a walk-in (Service Portfolios → Choose Plan → New Member). Always cash at reception. */
+export interface DeskApplicationRequest {
+  full_name: string;
+  phone: string;
+  email: string;
+  gender: string;
+  date_of_birth: string;
+  address?: string;
+  reg_doc_number?: string;
+  medical_conditions?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  plan_id: number;
 }
 
 // The public page is opened by strangers — never attach a stored session token,
@@ -191,6 +249,8 @@ export const servicePortfolioService = {
 
   listApplications: async (status: 'pending' | 'decided' = 'pending'): Promise<MembershipApplication[]> =>
     (await api.get<MembershipApplication[]>('/members/applications', { params: { status } })).data,
+  createDeskApplication: async (data: DeskApplicationRequest): Promise<ApplicationReceipt> =>
+    (await api.post<ApplicationReceipt>('/members/applications', data)).data,
   countPending: async (): Promise<number> =>
     (await api.get<{ pending: number }>('/members/applications/count')).data.pending ?? 0,
   approve: async (id: number, cashReceived: boolean): Promise<MembershipApplication> =>

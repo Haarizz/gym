@@ -18,7 +18,9 @@ public class SourceLabels {
             "receipt", "SELECT id, COALESCE(plan_name, receipt_no), member_name FROM receipts WHERE id IN (:ids)",
             "sale", "SELECT id, transaction_number, member_name FROM sale_transactions WHERE id IN (:ids)",
             "lead", "SELECT id, TRIM(first_name || ' ' || COALESCE(last_name, '')), NULL FROM leads WHERE id IN (:ids)",
-            "session", "SELECT id, name, NULL FROM training_sessions WHERE id IN (:ids)");
+            "session", "SELECT id, name, NULL FROM training_sessions WHERE id IN (:ids)",
+            "enrolment", "SELECT e.id, e.package_name, m.name FROM package_enrolments e " +
+                    "LEFT JOIN members m ON m.id = e.member_id WHERE e.id IN (:ids)");
 
     @PersistenceContext
     private EntityManager em;

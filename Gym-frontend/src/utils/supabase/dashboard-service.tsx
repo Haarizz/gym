@@ -128,6 +128,22 @@ export const dashboardService = {
     return apiCall(`/dashboard/revenue-targets?${params.toString()}`) as Promise<ApiResponse<TargetsComparison>>;
   },
 
+  // Business Insights › Campaigns / Renewals & Upgrades / Training & Classes (loaded when opened)
+  async getCampaignInsights(from: string, to: string, compare: RevenueCompareMode = 'previous') {
+    const params = new URLSearchParams({ from, to, compare });
+    return apiCall(`/dashboard/insights/campaigns?${params.toString()}`) as Promise<ApiResponse<CampaignInsights>>;
+  },
+
+  async getRenewalInsights(from: string, to: string, compare: RevenueCompareMode = 'previous') {
+    const params = new URLSearchParams({ from, to, compare });
+    return apiCall(`/dashboard/insights/renewals?${params.toString()}`) as Promise<ApiResponse<RenewalInsights>>;
+  },
+
+  async getTrainingInsights(from: string, to: string, compare: RevenueCompareMode = 'previous') {
+    const params = new URLSearchParams({ from, to, compare });
+    return apiCall(`/dashboard/insights/training?${params.toString()}`) as Promise<ApiResponse<TrainingInsights>>;
+  },
+
   // Update KPI data
   async updateKPI(period: string, kpiData: any) {
     return apiCall('/dashboard/update-kpi', {
@@ -351,7 +367,7 @@ export interface RevenueInsights {
 
 // ── Revenue Dashboard › Comparison (operations + targets) ──
 
-export type OpsArea = 'freeze' | 'crm' | 'pos' | 'attendance' | 'bookings' | 'members';
+export type OpsArea = 'freeze' | 'crm' | 'pos' | 'attendance' | 'bookings' | 'members' | 'campaigns' | 'renewals' | 'training';
 export type OpsFormat = 'count' | 'money' | 'percent' | 'days' | 'hours' | 'minutes' | 'decimal';
 
 export interface OpsMetric {
@@ -443,4 +459,166 @@ export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+// ── Business Insights › Campaigns, Renewals & Upgrades, Training & Classes ──
+
+/** The period both sides cover; same windows as the rest of Business Insights. */
+export interface InsightWindow {
+  from: string;
+  to: string;
+  toDate: boolean;
+  previousFrom: string;
+  previousTo: string;
+  compare: RevenueCompareMode;
+  label: string;
+  metrics: OpsMetric[];
+}
+
+export interface CampaignRow {
+  id: number;
+  name: string;
+  platform: string | null;
+  status: string | null;
+  owner: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  budget: number | null;
+  spentAllTime: number;
+  /** % of budget spent so far (all time) */
+  budgetUsed: number | null;
+  spend: number;
+  previousSpend: number;
+  leads: number;
+  previousLeads: number;
+  converted: number;
+  previousConverted: number;
+  targetLeads: number | null;
+  targetConversions: number | null;
+  /** Paid by converted leads in their first 90 days */
+  revenue: number;
+  previousRevenue: number;
+  costPerLead: number | null;
+  costPerConversion: number | null;
+}
+
+export interface PromotionRow extends OpsRow {
+  code: string | null;
+  type: string | null;
+  status: string | null;
+  usageLimit: number | null;
+  members: number;
+  /** Redeemed by members who joined within 30 days before */
+  newMembers: number;
+  savings: number;
+  previousSavings: number;
+}
+
+export interface CampaignInsights extends InsightWindow {
+  campaigns: CampaignRow[];
+  funnel: OpsRow[];
+  spendByCategory: OpsRow[];
+  promotions: PromotionRow[];
+  referralFunnel: OpsRow[];
+  topReferrers: OpsRow[];
+  messages: OpsRow[];
+}
+
+export interface PlanChangeRow extends OpsRow {
+  kind: 'Upgrade' | 'Downgrade' | string;
+  /** Total price difference vs the plan before */
+  difference: number;
+}
+
+export interface PlanRenewalRow {
+  name: string;
+  activeMembers: number;
+  newSales: number;
+  renewals: number;
+  upgradesIn: number;
+  downgradesIn: number;
+  ended: number;
+  renewed: number;
+  renewalRate: number | null;
+  previousRenewalRate: number | null;
+}
+
+export interface LapsedMemberRow {
+  memberId: number;
+  name: string | null;
+  phone: string | null;
+  plan: string | null;
+  endedOn: string;
+  value: number;
+  status: 'Lapsed' | 'Not renewed yet' | string;
+  lastVisit: string | null;
+}
+
+export interface DueMemberRow {
+  memberId: number;
+  name: string | null;
+  phone: string | null;
+  plan: string | null;
+  endsOn: string;
+  daysLeft: number;
+  value: number | null;
+  lastVisit: string | null;
+}
+
+export interface RenewalInsights extends InsightWindow {
+  outcomes: OpsRow[];
+  timing: OpsRow[];
+  planChanges: PlanChangeRow[];
+  plans: PlanRenewalRow[];
+  lapsedMembers: LapsedMemberRow[];
+  lapsedTotal: number;
+  dueSoon: { in7: number; in14: number; in30: number; members: DueMemberRow[] };
+}
+
+export interface TrainerRow {
+  name: string;
+  clients: number;
+  ptSessions: number;
+  previousPtSessions: number;
+  classes: number;
+  previousClasses: number;
+  noShows: number;
+  packagesSold: number;
+  packageRevenue: number;
+  rating: number | null;
+  reviews: number;
+  switchedAway: number;
+  switchedIn: number;
+}
+
+export interface ClassRow extends OpsRow {
+  type: string | null;
+  booked: number;
+  previousBooked: number;
+  avgBooked: number | null;
+  fill: number | null;
+  previousFill: number | null;
+  full: number;
+  noShowRate: number | null;
+  cancelRate: number | null;
+  rating: number | null;
+}
+
+export interface HeatCell {
+  /** 1 = Monday … 7 = Sunday */
+  day: number;
+  dayName: string;
+  hour: number;
+  sessions: number;
+  seats: number;
+  booked: number;
+  fill: number | null;
+}
+
+export interface TrainingInsights extends InsightWindow {
+  trainers: TrainerRow[];
+  classes: ClassRow[];
+  packages: OpsRow[];
+  packageMix: OpsRow[];
+  heatmap: HeatCell[];
 }
