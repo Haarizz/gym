@@ -27,9 +27,8 @@ import styles from './FaceDeviceConfiguration.module.css';
  * have their face removed.
  */
 
-const browserZone = (() => {
-  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; }
-})();
+/** New devices default to UAE time (the gyms are in the UAE), not the browser's zone. */
+const DEFAULT_ZONE = 'Asia/Dubai';
 
 const zoneList: string[] = (() => {
   try { return (Intl as any).supportedValuesOf?.('timeZone') ?? []; } catch { return []; }
@@ -71,7 +70,7 @@ const reportTimeLabel = (hhmm: string) => {
 
 const emptyForm = (): FormState => ({
   name: '', middlewareUrl: '', deviceKey: '', secret: '',
-  timeZone: browserZone, reportEmails: '',
+  timeZone: DEFAULT_ZONE, reportEmails: '',
   enabled: true, autoSync: true,
 });
 
@@ -137,7 +136,7 @@ export function FaceDeviceConfiguration() {
     const body: FaceDeviceRequest = {
       name: form.name.trim(), middlewareUrl: form.middlewareUrl.trim(),
       deviceKey: form.deviceKey.trim(), secret: form.secret.trim() || undefined,
-      timeZone: form.timeZone.trim() || browserZone, reportEmails: form.reportEmails.trim(),
+      timeZone: form.timeZone.trim() || DEFAULT_ZONE, reportEmails: form.reportEmails.trim(),
       enabled: form.enabled, autoSync: form.autoSync,
     };
     setSaving(true);
