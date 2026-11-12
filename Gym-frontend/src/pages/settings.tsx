@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import {
   Settings as SettingsIcon, Coins, Check, Building, MapPin, Mail, Phone, UploadCloud, Building2, Image as ImageIcon, Hash, MapPinned, Stamp,
-  AlertTriangle, LayoutDashboard, Receipt, CreditCard, BarChart3, Percent, FileText, Languages,
+  AlertTriangle, LayoutDashboard, Receipt, CreditCard, BarChart3, Percent, FileText, Languages, ShieldCheck,
 } from "lucide-react";
 import { useCurrency, CURRENCIES, CurrencyCode, CurrencyGlyph } from "../utils/currency";
 import { useBranch } from "../utils/branch-context";
@@ -21,9 +21,10 @@ import { SettingsSaveBar } from "../components/settings/SettingsSaveBar";
 import { BranchTaxSettings } from "../components/settings/BranchTaxSettings";
 import { BranchTermsSettings } from "../components/settings/BranchTermsSettings";
 import { EmailSettings } from "../components/settings/EmailSettings";
+import { PaymentTermsSettings } from "../components/payment-terms/PaymentTermsSettings";
 import "../styles/settings-page.css";
 
-const SETTINGS_TABS = ["currency", "company", BRANCH_SETTINGS_TAB, "tax", "terms", "email"] as const;
+const SETTINGS_TABS = ["currency", "company", BRANCH_SETTINGS_TAB, "tax", "payment-terms", "terms", "email"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 const CURRENCY_USAGES = [
@@ -254,6 +255,7 @@ export function AppSettings({ embedded = false }: { embedded?: boolean } = {}) {
     { value: "company", label: "Company Details", hint: "Name, contact & logo", icon: Building },
     { value: BRANCH_SETTINGS_TAB, label: "Branch Settings", hint: "Profile, images & policies", icon: Building2 },
     { value: "tax", label: "Tax Configuration", hint: "Default VAT & purchase tax", icon: Percent },
+    { value: "payment-terms", label: "Payment Terms", hint: "Accepted before each payment", icon: ShieldCheck },
     { value: "terms", label: "Terms & Conditions", hint: "Shown in the mobile app", icon: FileText },
     { value: "email", label: "Email", hint: "SMTP for reports & emails", icon: Mail },
   ] as const;
@@ -612,6 +614,11 @@ export function AppSettings({ embedded = false }: { embedded?: boolean } = {}) {
         {/* Tax Configuration */}
         <TabsContent value="tax">
           {settingsBranchId != null && <BranchTaxSettings branchId={settingsBranchId} readOnly={isAllBranches} />}
+        </TabsContent>
+
+        {/* Payment Terms — accepted in a dialog before desk payments (not the POS) */}
+        <TabsContent value="payment-terms">
+          {settingsBranchId != null && <PaymentTermsSettings branchId={settingsBranchId} readOnly={isAllBranches} />}
         </TabsContent>
 
         {/* Branch Terms & Conditions */}

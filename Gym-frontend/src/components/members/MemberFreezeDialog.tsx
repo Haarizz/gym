@@ -15,6 +15,7 @@ import {
   StaffFreezeOptions, canSubmitStaffFreeze, freezeAddonRuleText, staffFreezeDays, freezeUntilForApi, useFreezeAllowance,
 } from './StaffFreezeOptions';
 import s from './MemberFreezeDialog.module.css';
+import { askPaymentTerms } from '../payment-terms/PaymentTermsDialog';
 
 type Tone = 'green' | 'blue' | 'red' | 'amber' | 'gray';
 
@@ -95,6 +96,11 @@ export function MemberFreezeDialog({
       if (fStart < today) { toast.error('Freeze start date cannot be in the past'); return; }
       if (startOfDay(endDate) <= fStart) { toast.error('Freeze end date must be after the start date'); return; }
     }
+    if (!(await askPaymentTerms('freeze', {
+      memberDbId,
+      memberName: member.name,
+      detail: `Freeze · ${days} day${days === 1 ? '' : 's'}`,
+    }))) return;
     setSaving(true);
     try {
       await membersService.freezeMember(String(memberDbId), {

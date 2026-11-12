@@ -97,6 +97,7 @@ import { resolveBackendImageUrl } from '../utils/resolve-image-url';
 import type { CreditCustomer } from '../payments/modals/CreditModal';
 import { ReportActions, type ReportDocument, col, kpiSection, moneyCol, tableSection } from "../components/report-export";
 import { NewMembersTab } from "../components/members/NewMembersTab";
+import { askPaymentTerms } from "../components/payment-terms/PaymentTermsDialog";
 
 const membershipPlans = [
   {
@@ -344,6 +345,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
   const handleRenewFamily = async () => {
     if (!familyRenewalHead) return;
+    if (!(await askPaymentTerms('renewal', {
+      memberDbId: familyRenewalHead.id,
+      memberName: familyRenewalHead.name,
+      detail: 'Family renewal',
+    }))) return;
     setIsRenewingFamily(true);
     try {
       await membersService.renewFamily(familyRenewalHead.id, {
@@ -1108,6 +1114,15 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       return;
     }
     changeConfirmedRef.current = false;
+
+    // GymOS › Settings › Payment Terms for this kind of payment (renewal / upgrade / downgrade).
+    const termsKind = operationType === 'upgrade' ? 'upgrade' : operationType === 'downgrade' ? 'downgrade' : 'renewal';
+    if (!(await askPaymentTerms(termsKind, {
+      memberDbId: selectedMemberForRenewal.id,
+      memberName: selectedMemberForRenewal.name,
+      amount: totalAmount,
+      detail: selectedNewPlan.name,
+    }))) return;
 
     // Compute new end date from plan duration
     const computeEndDate = (durationValue: string, durationType: string): string => {

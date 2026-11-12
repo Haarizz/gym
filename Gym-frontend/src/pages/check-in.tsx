@@ -35,6 +35,7 @@ import { WalkInQr } from '../components/shared/WalkInQr';
 import { useDebouncedValue } from '../utils/use-debounced-value';
 import a from './attendance.module.css';
 import c from './check-in.module.css';
+import { askPaymentTerms } from '../components/payment-terms/PaymentTermsDialog';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -541,6 +542,11 @@ export function CheckIn() {
       });
       return;
     }
+    if (!(await askPaymentTerms('day_pass', {
+      memberName: visitorName,
+      amount: walkInCharge,
+      detail: selectedPlanDetails?.name ?? 'Day pass',
+    }))) return;
     try {
       setGrantingAccess(true);
       const lines = walkInPaymentManager.paymentLines;

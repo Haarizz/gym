@@ -49,6 +49,7 @@ import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
 import { buildPaymentPayload } from '../payments/paymentPayload';
 import { toLegacyPayment } from '../payments/legacyPaymentBridge';
 import { PAYMENT_TYPES } from '../payments/paymentModel';
+import { askPaymentTerms } from '../components/payment-terms/PaymentTermsDialog';
 
 interface CreateReceiptProps {
   onNavigate?: (section: string, params?: Record<string, any>) => void;
@@ -252,6 +253,13 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
       .map(b => ({ receipt_id: Number(b.id), pay_amount: parseFloat(paymentAmounts[b.id]) }));
 
     if (billPayments.length === 0) { toast.error("No payment amounts entered"); return; }
+
+    if (!(await askPaymentTerms('dues', {
+      memberDbId: selectedMember.id,
+      memberName: selectedMember.name,
+      amount: billPayments.reduce((sum, b) => sum + b.pay_amount, 0),
+      detail: billPayments.length === 1 ? 'Outstanding bill' : `${billPayments.length} outstanding bills`,
+    }))) return;
 
     setSubmitting(true);
     try {

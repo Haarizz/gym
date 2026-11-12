@@ -36,6 +36,7 @@ import {
 import { format, differenceInDays } from "date-fns";
 import { ReportActions, type ReportDocument, kpiSection, tableFromMatrix } from "../components/report-export";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { askPaymentTerms } from "../components/payment-terms/PaymentTermsDialog";
 
 interface FreezeUnfreezeProps {
   onNavigate?: (section: string) => void;
@@ -194,6 +195,11 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
       toast.error('End date must be after the start date');
       return;
     }
+    if (!(await askPaymentTerms('freeze', {
+      memberDbId: selectedMember.id,
+      memberName: selectedMember.name,
+      detail: 'Membership freeze',
+    }))) return;
     setIsSubmitting(true);
     try {
       // The end date is old-GymBios "To" (the day the member is back); the API wants the last frozen day.
