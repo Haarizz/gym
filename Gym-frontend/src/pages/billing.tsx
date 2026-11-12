@@ -58,6 +58,7 @@ import { membersService } from '../utils/supabase/members-service';
 import type { Member } from '../utils/supabase/members-service';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { downloadReceiptInvoice, downloadPaymentReceipt } from '../utils/receipt-invoice';
+import { EmailReceiptDialog } from '../components/billing/EmailReceiptDialog';
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
 import { accountHeadsService, type AccountHead } from '../utils/supabase/account-heads-service';
 import type { SalesInvoice } from '../utils/supabase/sales-invoice-service';
@@ -184,6 +185,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
 
   // Send receipt dialog
   const [sendingReceipt, setSendingReceipt] = useState<Receipt | null>(null);
+  // Billing › Email receipt / Email invoice
+  const [emailing, setEmailing] = useState<{ receipt: Receipt; document: 'RECEIPT' | 'INVOICE' } | null>(null);
   const [sendChannels, setSendChannels] = useState<string[]>([]);
 
   // Send reminder dialog
@@ -990,6 +993,12 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                                   <Printer className="h-4 w-4 mr-2 text-teal-600" /> Print receipt
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => setEmailing({ receipt, document: 'RECEIPT' })}>
+                                  <Mail className="h-4 w-4 mr-2 text-blue-600" /> Email receipt
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setEmailing({ receipt, document: 'INVOICE' })}>
+                                  <Mail className="h-4 w-4 mr-2 text-purple-600" /> Email {invoiceLabel.toLowerCase()}
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => { setSendingReceipt(receipt); setSendChannels([]); }}>
                                   <Send className="h-4 w-4 mr-2 text-green-600" /> Send to member
                                 </DropdownMenuItem>
@@ -1423,7 +1432,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                             <TableCell>
                               <Badge variant="outline"
                                 className={`text-xs ${line.type.startsWith('Sales') ? 'border-purple-300 text-purple-700 bg-purple-50'
-                                  : line.type === 'Write-off' ? 'border-amber-200 text-amber-800 bg-amber-50' : ''}`}>
+                                  : line.type === 'Write-off' ? 'border-amber-200 text-amber-800 bg-amber-50'
+                                  : line.type === 'Refund' ? 'border-red-200 text-red-700 bg-red-50' : ''}`}>
                                 {line.type}
                               </Badge>
                             </TableCell>
@@ -1441,10 +1451,10 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                               )}
                             </TableCell>
                             <TableCell className="text-right font-medium">
-                              {line.debit > 0 ? <><CurrencyGlyph /> {line.debit.toLocaleString()}</> : '-'}
+                              {line.debit !== 0 ? <>{line.debit < 0 && '−'}<CurrencyGlyph /> {Math.abs(line.debit).toLocaleString()}</> : '-'}
                             </TableCell>
-                            <TableCell className={`text-right font-medium ${line.type === 'Write-off' ? 'text-slate-500' : 'text-green-600'}`}>
-                              {line.credit > 0 ? <><CurrencyGlyph /> {line.credit.toLocaleString()}</> : '-'}
+                            <TableCell className={`text-right font-medium ${line.type === 'Write-off' ? 'text-slate-500' : line.type === 'Refund' ? 'text-red-600' : 'text-green-600'}`}>
+                              {line.credit !== 0 ? <>{line.credit < 0 && '−'}<CurrencyGlyph /> {Math.abs(line.credit).toLocaleString()}</> : '-'}
                             </TableCell>
                             <TableCell className={`text-right font-bold ${line.balance > 0 ? 'text-red-600' : ''}`}>
                               <CurrencyGlyph /> {line.balance.toLocaleString()}
@@ -1713,13 +1723,20 @@ export function Billing({ onNavigate }: BillingProps = {}) {
               <Button variant="outline" onClick={() => handleDownloadReceipt(selectedReceipt)}>
                 <Download className="mr-2 h-4 w-4" />Receipt
               </Button>
-              <Button onClick={() => { setSendingReceipt(selectedReceipt); setSendChannels([]); setSelectedReceipt(null); }}>
-                <Send className="mr-2 h-4 w-4" />Send Receipt
+              <Button onClick={() => { setEmailing({ receipt: selectedReceipt, document: 'RECEIPT' }); setSelectedReceipt(null); }}>
+                <Mail className="mr-2 h-4 w-4" />Email
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
+
+      {/* ── Email receipt / invoice ── */}
+      <EmailReceiptDialog
+        receipt={emailing?.receipt ?? null}
+        document={emailing?.document ?? 'RECEIPT'}
+        onClose={() => setEmailing(null)}
+      />
 
       {/* ── Send Receipt Dialog ── */}
       <Dialog open={!!sendingReceipt} onOpenChange={() => { setSendingReceipt(null); setSendChannels([]); }}>
@@ -1734,7 +1751,6 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           </DialogHeader>
           <div className="space-y-3 py-4">
             {[
-              { ch: 'Email',     icon: <Mail className="h-5 w-5 text-blue-600" />,        info: sendingReceipt?.member_id },
               { ch: 'SMS',       icon: <MessageSquare className="h-5 w-5 text-green-600" />, info: sendingReceipt?.member_phone },
               { ch: 'WhatsApp',  icon: <Phone className="h-5 w-5 text-green-700" />,       info: sendingReceipt?.member_phone },
               { ch: 'Print',     icon: <Printer className="h-5 w-5 text-gray-600" />,      info: 'Print a copy' },

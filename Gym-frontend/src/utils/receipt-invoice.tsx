@@ -620,6 +620,18 @@ async function printSavedReceipt(receipt: Receipt, currencyCode: string, build: 
   }
 }
 
+export type ReceiptDocumentKind = "RECEIPT" | "INVOICE";
+
+/**
+ * The exact printable HTML of a saved receipt's payment Receipt or Tax Invoice — what Print
+ * shows — plus the company details and colours it used (Billing › Email uses it for the PDF).
+ */
+export async function buildSavedReceiptDocument(receipt: Receipt, currencyCode: string, kind: ReceiptDocumentKind) {
+  const [company, vatRate, colors] = await Promise.all([getCompanyDetails(), getVatRate(), getReceiptColors()]);
+  const build = kind === "INVOICE" ? buildReceiptInvoiceHtml : buildPaymentReceiptFromReceipt;
+  return { html: build(receipt, currencyCode, company, vatRateFor(company, vatRate), colors), company, colors };
+}
+
 /** Prints the Tax Invoice (original layout). */
 export function downloadReceiptInvoice(receipt: Receipt, currencyCode: string) {
   return printSavedReceipt(receipt, currencyCode, buildReceiptInvoiceHtml);
