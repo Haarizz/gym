@@ -80,7 +80,7 @@ import type { ReceiptStats } from "./member-receipts";
 import { FaCircleCheck, FaCircleArrowUp, FaCircleArrowDown, FaArrowsRotate, FaArrowUp, FaArrowDown, FaArrowRight } from 'react-icons/fa6';
 import { toast } from 'sonner';
 import { membersService, Member } from '../utils/supabase/members-service';
-import { plansService, Plan, planOfferPrice } from '../utils/supabase/plans-service';
+import { plansService, Plan } from '../utils/supabase/plans-service';
 import { addonsService } from '../utils/supabase/addons-service';
 import { authService } from '../utils/supabase/auth-service';
 import { receiptsService, Receipt as ApiReceipt } from '../utils/supabase/receipts-service';
@@ -318,8 +318,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
   // API Plans for Renewals tab
   const [apiPlans, setApiPlans] = useState<Plan[]>([]);
-  // Every plan, inactive ones too: an expired member's renewal price comes from their plan.
-  const [allPlans, setAllPlans] = useState<Plan[]>([]);
 
   // Active add-ons per member (member_db_id -> add-on names), shown as
   // "+ addon" under Plan Type in the member directory table.
@@ -432,12 +430,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
       const filters = {
         search: searchTerm || undefined,
-        // "Renewal due" = expired members (their renewal price shows in the Amount Due column).
-        status: moreFilters.dues === 'renewal' ? 'expired' : selectedStatus !== 'all' ? selectedStatus : undefined,
+        status: selectedStatus !== 'all' ? selectedStatus : undefined,
         membership_type: moreFilters.membershipType !== 'all' ? moreFilters.membershipType : undefined,
         plan: moreFilters.plan !== 'all' ? moreFilters.plan : undefined,
         expiring_within: moreFilters.expiring !== 'any' ? Number(moreFilters.expiring) : undefined,
-        dues: moreFilters.dues === 'due' || moreFilters.dues === 'clear' ? moreFilters.dues : undefined,
+        dues: moreFilters.dues !== 'all' ? (moreFilters.dues as 'due' | 'clear') : undefined,
       };
 
       const pagination = {
@@ -536,11 +533,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   // Every plan (inactive ones too — members can still be on them) for the Plan filter
   useEffect(() => {
     plansService.getPlans()
-      .then((plans) => {
-        setAllPlans(plans);
-        setFilterPlanNames(
-          Array.from(new Set(plans.map((p) => p.name).filter(Boolean))).sort((a, b) => a.localeCompare(b)));
-      })
+      .then((plans) => setFilterPlanNames(
+        Array.from(new Set(plans.map((p) => p.name).filter(Boolean))).sort((a, b) => a.localeCompare(b))))
       .catch(() => { });
   }, []);
 
@@ -975,17 +969,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       return getMembershipFee(member);
     }
     return 0;
-  };
-
-  // What an expired member pays to renew their plan today (offer price when one is running).
-  // Shown in the Amount Due column as "Renewal due" — it's not a bill, so it never touches
-  // outstanding_balance, statements or receivables. Dependents renew through their head.
-  const getRenewalDue = (member: Member): number => {
-    if (getComputedStatus(member) !== 'Expired' || isBilledToGuardian(member)) return 0;
-    const name = member.membership_plan;
-    const plan = apiPlans.find(p => p.name === name) || allPlans.find(p => p.name === name);
-    const price = plan ? planOfferPrice(plan) : getDisplayFee(member);
-    return Math.max(0, Number(price) || 0);
   };
 
   // Members billed to their family head don't carry their own balance — every
@@ -1662,7 +1645,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                         <SelectContent>
                           <SelectItem value="all">All Members</SelectItem>
                           <SelectItem value="due">Has amount due</SelectItem>
-                          <SelectItem value="renewal">Renewal due (expired)</SelectItem>
                           <SelectItem value="clear">No dues</SelectItem>
                         </SelectContent>
                       </Select>
@@ -1857,8 +1839,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                               const salesDue = Number((member as any).sales_invoice_due) || 0;
                               const guardian = isBilledToGuardian(member);
                               const total = (guardian ? 0 : amountDue) + salesDue;
-                              const renewalDue = getRenewalDue(member);
-                              const renewalTitle = 'Membership expired: this is the plan price to renew. It becomes a bill only when the desk renews the member.';
                               return (
                                 <div>
                                   {guardian && (
@@ -1866,21 +1846,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                       Billed to: {(member as any).family_head_name || member.family_head_id || 'guardian'}
                                     </span>
                                   )}
-                                  {(!guardian || salesDue > 0) && (total > 0 || renewalDue === 0) && (
+                                  {(!guardian || salesDue > 0) && (
                                     <span className={`font-medium ${total > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                                       {`${currencyPrefix}${total.toFixed(2)}`}
                                     </span>
                                   )}
-                                  {renewalDue > 0 && (total > 0 ? (
-                                    <span className="text-xs font-medium text-amber-600" style={{ display: 'block' }} title={renewalTitle}>
-                                      + Renewal {currencyPrefix}{renewalDue.toFixed(2)}
-                                    </span>
-                                  ) : (
-                                    <span title={renewalTitle} style={{ display: 'block' }}>
-                                      <span className="font-medium text-amber-600">{`${currencyPrefix}${renewalDue.toFixed(2)}`}</span>
-                                      <span className="text-xs text-amber-600" style={{ display: 'block' }}>Renewal due</span>
-                                    </span>
-                                  ))}
                                   {salesDue > 0 && (
                                     <span className="text-xs text-muted-foreground" style={{ display: 'block' }}
                                       title="Unpaid balance on sales invoices — collect it from Sales & Purchases › Sales Invoice">
