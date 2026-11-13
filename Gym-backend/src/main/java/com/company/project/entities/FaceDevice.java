@@ -48,7 +48,7 @@ public class FaceDevice extends BaseEntity implements BranchAware {
     private int verifyStyle = 1;
 
     @Column(name = "time_zone", nullable = false)
-    private String timeZone = "UTC";
+    private String timeZone = "Asia/Dubai";
 
     @Column(name = "photo_base_url")
     private String photoBaseUrl;

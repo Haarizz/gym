@@ -21,8 +21,9 @@ export function buildMemberStatementReport(s: MemberStatement, from?: string, to
       description: l.description + (l.minor_charges?.length ? ` (Incl. ${l.minor_charges.map((m) => `${m.name}: ${money(Number(m.amount))}`).join(", ")})` : ""),
       method: l.payment_method || "",
       status: l.status || "",
-      debit: l.debit > 0 ? l.debit : null,
-      credit: l.credit > 0 ? l.credit : null,
+      // Refunds carry negative amounts (they take a cancelled bill off both columns).
+      debit: l.debit !== 0 ? l.debit : null,
+      credit: l.credit !== 0 ? l.credit : null,
       balance: l.balance,
     })),
     { _kind: "total", date: null, doc: "", type: "", description: "Totals", debit: s.total_billed, credit: s.total_paid, balance: s.closing_balance },

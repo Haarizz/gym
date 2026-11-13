@@ -56,6 +56,10 @@ public class AddonPaymentService {
     private final FinancialEventService financialEventService;
     private final NotificationService notificationService;
 
+    // Billing › Refunds: money already refunded on the add-on's receipt isn't refunded again on cancel.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.company.project.repositories.CreditNoteRepository creditNoteRepository;
+
     public AddonPaymentService(DiscountCodeService discountCodeService,
                                WalletService walletService,
                                ReceiptService receiptService,
@@ -315,6 +319,13 @@ public class AddonPaymentService {
         if (receipt != null) {
             paid = money(receipt.getTotalPaidToDate() != null ? receipt.getTotalPaidToDate() : receipt.getPaidAmount());
             BigDecimal unpaid = money(receipt.getAmount()).subtract(paid);
+            if (creditNoteRepository != null) {
+                BigDecimal alreadyRefunded = creditNoteRepository.findByLinkedReceiptId(receipt.getId()).stream()
+                        .filter(MemberRefundService::counts)
+                        .map(n -> n.getTotalAmount() != null ? n.getTotalAmount() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                paid = money(paid.subtract(alreadyRefunded).max(BigDecimal.ZERO));
+            }
             if (unpaid.signum() > 0) writeOffOutstanding(payer, unpaid);
             receipt.setStatus("Cancelled");
             receiptRepository.save(receipt);

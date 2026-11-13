@@ -1,0 +1,54 @@
+/* Billing › Email receipt / invoice dialog. The dialog portals out of the page, so tones are
+   declared here with fallbacks rather than relying on page-level tokens. */
+
+[data-tone] { --tone: var(--primary); }
+[data-tone="green"] { --tone: #15803d; }
+[data-tone="red"]   { --tone: #dc2626; }
+[data-tone="amber"] { --tone: #b45309; }
+:global(.dark) [data-tone="green"] { --tone: #4ade80; }
+:global(.dark) [data-tone="red"]   { --tone: #f87171; }
+:global(.dark) [data-tone="amber"] { --tone: #fbbf24; }
+
+.dialog { width: calc(100vw - 2rem); max-height: 92vh; overflow-y: auto; }
+.title { display: flex; align-items: center; gap: 0.5rem; }
+.titleIcon { width: 1.15rem; height: 1.15rem; color: var(--primary); }
+.loading { display: flex; align-items: center; gap: 0.5rem; padding: 2rem 0; justify-content: center; color: var(--muted-foreground); }
+
+.body { display: flex; flex-direction: column; gap: 0.9rem; min-width: 0; }
+.field { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.labelRow { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.hint { font-size: 0.75rem; color: var(--muted-foreground); line-height: 1.4; }
+.hint[data-tone] { color: var(--tone); }
+.textarea { font-size: 0.875rem; line-height: 1.5; min-height: 14rem; resize: vertical; }
+.reset { background: none; border: 0; padding: 0; font-size: 0.75rem; color: var(--primary); cursor: pointer; text-decoration: underline; }
+.inlineIcon { width: 0.95rem; height: 0.95rem; flex-shrink: 0; }
+
+.segment {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 10px;
+  background: var(--muted); border: 1px solid var(--border);
+}
+.segmentBtn {
+  display: flex; align-items: center; justify-content: center; gap: 0.4rem; border: 0; cursor: pointer;
+  border-radius: 7px; padding: 0.45rem 0.6rem; font-size: 0.85rem; font-weight: 500;
+  background: transparent; color: var(--muted-foreground);
+}
+.segmentBtn[data-active] { background: var(--card); color: var(--foreground); box-shadow: 0 1px 3px rgb(0 0 0 / 0.12); }
+.segmentBtn:disabled { cursor: not-allowed; opacity: 0.7; }
+
+.attachment {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.55rem 0.75rem;
+  border: 1px dashed var(--border); border-radius: 0.6rem; color: var(--muted-foreground);
+}
+.attachmentName { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 0.85rem; color: var(--foreground); font-weight: 500; }
+
+.note {
+  display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.6rem 0.75rem; border-radius: 0.6rem; font-size: 0.85rem;
+  background: color-mix(in srgb, var(--tone) 10%, transparent); color: var(--foreground);
+}
+.note > svg { color: var(--tone); flex-shrink: 0; margin-top: 0.1rem; }
+.link { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--primary); font-weight: 600; text-decoration: underline; }
+
+.history { display: flex; flex-direction: column; gap: 0.3rem; border-top: 1px solid var(--border); padding-top: 0.7rem; }
+.historyTitle { font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; }
+.historyRow { display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.78rem; color: var(--muted-foreground); line-height: 1.4; }
+.historyRow > svg { color: var(--tone); margin-top: 0.1rem; }

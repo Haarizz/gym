@@ -23,12 +23,18 @@ public class AttendanceController {
     private final WalkInRegistrationService walkInRegistrationService;
     private final CheckInSettingsService checkInSettingsService;
     private final com.company.project.services.payments.StripePaymentService stripePaymentService;
+    private final com.company.project.services.AttendanceDayReportService dayReportService;
+    private final com.company.project.services.AttendanceRangeReportService rangeReportService;
 
     public AttendanceController(AttendanceService attendanceService,
                                 WalkInRegistrationService walkInRegistrationService,
                                 CheckInSettingsService checkInSettingsService,
-                                com.company.project.services.payments.StripePaymentService stripePaymentService) {
+                                com.company.project.services.payments.StripePaymentService stripePaymentService,
+                                com.company.project.services.AttendanceDayReportService dayReportService,
+                                com.company.project.services.AttendanceRangeReportService rangeReportService) {
         this.stripePaymentService = stripePaymentService;
+        this.dayReportService = dayReportService;
+        this.rangeReportService = rangeReportService;
         this.attendanceService = attendanceService;
         this.walkInRegistrationService = walkInRegistrationService;
         this.checkInSettingsService = checkInSettingsService;
@@ -71,6 +77,31 @@ public class AttendanceController {
     @GetMapping("/stats")
     public ResponseEntity<AttendanceStatsDTO> getStats() {
         return ResponseEntity.ok(attendanceService.getStats());
+    }
+
+    /**
+     * One day at a glance (gym's own calendar day): every member, walk-in, trainer and staff
+     * visit, who is inside now and for how long, the hourly flow and the day's staff roster.
+     *
+     * GET /api/attendance/day-report?date=2026-11-12   (date defaults to today)
+     */
+    /**
+     * Attendance Reports for a date range (gym calendar days), compared with the previous period
+     * of the same length: daily trend, weekday × hour heatmap, stays, methods, member frequency,
+     * active members who didn't visit, staff & trainer presence.
+     *
+     * GET /api/attendance/range-report?from=2026-10-14&to=2026-11-12
+     */
+    @GetMapping("/range-report")
+    public ResponseEntity<com.company.project.services.AttendanceRangeReportService.RangeReport> getRangeReport(
+            @RequestParam(required = false) String from, @RequestParam(required = false) String to) {
+        return ResponseEntity.ok(rangeReportService.report(from, to));
+    }
+
+    @GetMapping("/day-report")
+    public ResponseEntity<com.company.project.services.AttendanceDayReportService.DayReport> getDayReport(
+            @RequestParam(required = false) String date) {
+        return ResponseEntity.ok(dayReportService.report(date));
     }
 
     /**

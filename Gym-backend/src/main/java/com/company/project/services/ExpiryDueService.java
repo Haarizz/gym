@@ -27,7 +27,7 @@ import java.util.Set;
  * price for the next period. Agreed rules:
  * <ul>
  *   <li>One due per expiry (members.expiry_due_raised_for), only for memberships that
- *       expire after V134 shipped — those already expired then were stamped and skipped.</li>
+ *       expire after V137 shipped — those already expired then were stamped and skipped.</li>
  *   <li>Amount = the plan's current price (with any running plan offer, as a renewal today
  *       would charge); a Family plan billed to the head is priced for the whole household.
  *       A deleted plan falls back to the member's last fee.</li>

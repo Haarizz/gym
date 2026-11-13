@@ -59,6 +59,12 @@ public class ReceiptService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ExpiryDueService expiryDueService;
 
+    /** Statement line type of a refund (credit note): money given back for a cancelled bill. */
+    public static final String STATEMENT_REFUND = "Refund";
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.company.project.repositories.CreditNoteRepository creditNoteRepository;
+
     public ReceiptService(ReceiptRepository receiptRepository,
                           MemberRepository memberRepository,
                           FinancialEventService financialEventService,
@@ -438,6 +444,38 @@ public class ReceiptService {
             row.setCredit(b.getWrittenOffAmount());
             row.setStatus(b.getStatus());
             allRows.add(row);
+        }
+
+        // Refunds (credit notes): the cancelled bill is no longer owed and the money went back,
+        // so the row takes the amount off both what was billed and what was paid — the balance
+        // doesn't move, and "paid" becomes what the gym actually kept. Drafts aren't issued yet,
+        // except imported ones (the old system had already paid them out).
+        if (creditNoteRepository != null && !member.isEffectivelyBilledToHead()) {
+            Map<Long, Receipt> byId = receipts.stream().collect(Collectors.toMap(Receipt::getId, r -> r, (x, y) -> x));
+            for (com.company.project.entities.CreditNote cn : creditNoteRepository.findByMemberDbIdOrderByDateAscIdAsc(memberDbId)) {
+                String st = cn.getStatus() == null ? "" : cn.getStatus().toUpperCase(java.util.Locale.ROOT);
+                boolean issued = "POSTED".equals(st)
+                        || ("DRAFT".equals(st) && LegacyImportLedgerService.IMPORT_MARKER.equals(cn.getCreatedBy()));
+                BigDecimal amt = cn.getTotalAmount() != null ? cn.getTotalAmount() : cn.getSubtotal();
+                if (!issued || amt == null || amt.signum() <= 0) continue;
+                Receipt bill = cn.getLinkedReceiptId() != null ? byId.get(cn.getLinkedReceiptId()) : null;
+                LocalDateTime when = cn.getCreatedAt() != null ? cn.getCreatedAt()
+                        : (cn.getDate() != null ? cn.getDate().atStartOfDay() : null);
+                com.company.project.dto.StatementLineDTO row = new com.company.project.dto.StatementLineDTO();
+                row.setId(cn.getId());
+                row.setDate(when != null ? when.format(stampFmt) : null);
+                row.setReceiptNo(cn.getVoucherNo());
+                row.setInvoiceNo(bill != null ? bill.getInvoiceNo() : null);
+                row.setType(STATEMENT_REFUND);
+                String what = bill != null && bill.getPlanName() != null ? bill.getPlanName() : null;
+                row.setDescription("Refund" + (what != null ? " — " + what + " cancelled" : "")
+                        + (cn.getReason() != null && !cn.getReason().isBlank() ? " · " + cn.getReason() : ""));
+                row.setDebit(amt.negate());
+                row.setCredit(amt.negate());
+                row.setPaymentMethod(cn.getRefundMethod());
+                row.setStatus("Refunded");
+                allRows.add(row);
+            }
         }
 
         allRows.addAll(salesRows);

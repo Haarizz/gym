@@ -143,34 +143,8 @@ public class EmailSettingsService {
         return new TestResult(ok, message, at.atOffset(ZoneOffset.UTC));
     }
 
-    /** Turns JavaMail's exception chain into something a gym owner can act on. */
     static String explain(Throwable e, EmailSettings s) {
-        String where = s.getHost() + ":" + s.getPort();
-        Throwable root = e;
-        for (Throwable t = e; t != null; t = t.getCause()) {
-            root = t;
-            String cls = t.getClass().getName();
-            if (cls.endsWith("AuthenticationFailedException")) {
-                return "The mail server rejected the username or password. Check them — for Gmail or Outlook use an "
-                        + "App Password, not your normal password. (" + nz(t.getMessage()) + ")";
-            }
-            if (t instanceof java.net.UnknownHostException) {
-                return "Mail server \"" + s.getHost() + "\" was not found. Check the SMTP host spelling.";
-            }
-            if (t instanceof javax.net.ssl.SSLException) {
-                return "The secure connection to " + where + " failed. Port 465 normally uses SSL and port 587 uses "
-                        + "STARTTLS — check the Security setting matches the port. (" + nz(t.getMessage()) + ")";
-            }
-            if (t instanceof java.net.SocketTimeoutException || t instanceof java.net.ConnectException) {
-                return "Couldn't connect to " + where + ". Check the host and port, and that this server is allowed "
-                        + "to make outgoing SMTP connections (some hosts block ports 25/465/587). (" + nz(t.getMessage()) + ")";
-            }
-            if (cls.endsWith("SendFailedException") || cls.endsWith("SMTPAddressFailedException")) {
-                return "The mail server refused the message: " + nz(t.getMessage())
-                        + ". Many servers only allow sending From the mailbox you log in with.";
-            }
-        }
-        return "Sending failed: " + nz(root.getMessage());
+        return MailErrors.explain(e, s.getHost(), s.getPort());
     }
 
     private static String testBody(EmailSettings s, LocalDateTime at, boolean withInvoice) {
@@ -218,10 +192,6 @@ public class EmailSettingsService {
 
     private static String blankToNull(String s) {
         return s == null || s.trim().isEmpty() ? null : s.trim();
-    }
-
-    private static String nz(String s) {
-        return s == null ? "" : s;
     }
 
     private static String esc(String s) {

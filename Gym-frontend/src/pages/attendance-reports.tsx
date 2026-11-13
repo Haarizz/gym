@@ -1,1411 +1,735 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Button } from "../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Badge } from "../components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Label } from "../components/ui/label";
-import { Separator } from "../components/ui/separator";
-import { Progress } from "../components/ui/progress";
-import { Calendar } from "../components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
-import { Switch } from "../components/ui/switch";
-import { Input } from "../components/ui/input";
-import { Skeleton } from "../components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import { motion } from "motion/react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
+  Bar, BarChart, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  Download,
-  Filter,
-  Users,
-  Clock,
-  TrendingUp,
-  Calendar as CalendarIcon,
-  AlertCircle,
-  Lightbulb,
-  FileText,
-  Mail,
-  Activity,
-  Dumbbell,
-  User,
-  Target,
-  BarChart3,
-  RefreshCw,
-  ArrowLeft,
-  Printer,
-  TableIcon,
+  AlertTriangle, ArrowLeft, BarChart3, Briefcase, CalendarDays, CheckCircle2, Clock, DoorOpen, Dumbbell, Footprints,
+  Info, Lightbulb, Mail, RefreshCw, Search, Settings2, Timer, TrendingUp, UserCheck, UserX, Users,
 } from "lucide-react";
-import { format, subDays } from "date-fns";
-import { DateRange } from "react-day-picker";
 import { toast } from "sonner";
+import { Button } from "../components/ui/button";
+import { Switch } from "../components/ui/switch";
+import { DatePickerField } from "../components/shared/DatePickerField";
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "../components/ui/breadcrumb";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
-import { authService } from "../utils/supabase/auth-service";
+  styles, usePalette, axisTick, Kpi, Panel, ChartTip, Legend, BarRows, Empty, SectionTabs, Seg, Status, Delta, pctChange,
+  fmtInt, fmtDate, isoDate,
+} from "../components/overview/overview-kit";
+import { ReportActions, type ReportDocument, chartFromRows, col, countCol, kpiSection, tableSection } from "../components/report-export";
+import { useBranch } from "../utils/branch-context";
 import { attendanceService } from "../utils/supabase/attendance-service";
 import {
-  ReportActions, useReportExporter, type ReportDocument, chartFromRows, col, countCol, kpiSection, pieSection, tableSection,
-} from "../components/report-export";
+  staffAttendanceService, type RangeAbsent, type RangeMember, type RangeReport, type RangeStaff,
+} from "../utils/supabase/staff-attendance-service";
+import a from "./attendance.module.css";
+import r from "./attendance-reports.module.css";
 
-const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+type Tab = "overview" | "members" | "team" | "times" | "patterns" | "settings";
+type Preset = "7d" | "30d" | "month" | "last-month" | "90d" | "year" | "custom";
+
+const PRESETS: [Preset, string][] = [
+  ["7d", "Last 7 days"], ["30d", "Last 30 days"], ["month", "This month"], ["last-month", "Last month"],
+  ["90d", "Last 90 days"], ["year", "This year"], ["custom", "Custom"],
+];
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const HEAT_LIGHT = ["#b7d3f6", "#86b6ef", "#5598e7", "#2a78d6", "#184f95"];
+const HEAT_DARK = ["#184f95", "#1c5cab", "#2a78d6", "#5598e7", "#9ec5f4"];
+
+function presetRange(p: Preset, today = new Date()): { from: string; to: string } {
+  const y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
+  switch (p) {
+    case "7d": return { from: isoDate(new Date(y, m, d - 6)), to: isoDate(today) };
+    case "month": return { from: isoDate(new Date(y, m, 1)), to: isoDate(today) };
+    case "last-month": return { from: isoDate(new Date(y, m - 1, 1)), to: isoDate(new Date(y, m, 0)) };
+    case "90d": return { from: isoDate(new Date(y, m, d - 89)), to: isoDate(today) };
+    case "year": return { from: isoDate(new Date(y, 0, 1)), to: isoDate(today) };
+    default: return { from: isoDate(new Date(y, m, d - 29)), to: isoDate(today) };
+  }
+}
+
+function fmtDur(min: number | null | undefined) {
+  const v = Math.max(0, Math.round(Number(min) || 0));
+  if (!v) return "—";
+  if (v < 60) return `${v}m`;
+  return `${Math.floor(v / 60)}h ${String(v % 60).padStart(2, "0")}m`;
+}
+const fmtHours = (min: number) => (min >= 60 ? `${fmtInt(Math.round(min / 60))}h` : fmtDur(min));
+const plural = (n: number, one: string, many = `${one}s`) => `${fmtInt(n)} ${n === 1 ? one : many}`;
+const hourShort = (h: number) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? "a" : "p"}`;
+const hourLong = (h: number) => `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? "AM" : "PM"}`;
+const fullDay = (d: string) => ({ Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" } as Record<string, string>)[d] || d;
+const shortDate = (iso?: string | null) => {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+};
+const initials = (name = "") => name.split(/\s+/).filter(Boolean).map(n => n[0]).join("").toUpperCase().slice(0, 2) || "?";
+
+function Photo({ name, url, tone }: { name: string; url?: string | null; tone: string }) {
+  const [broken, setBroken] = useState(false);
+  const cls = `${a.photo} ${a.photoSm}`;
+  return (
+    <span className={a.photoWrap} data-tone={tone}>
+      {url && !broken ? <img src={url} alt="" className={cls} onError={() => setBroken(true)} /> : <span className={cls} aria-hidden="true">{initials(name)}</span>}
+    </span>
+  );
+}
+
+function Fact({ label, value, tone }: { label: string; value: React.ReactNode; tone: string }) {
+  return (
+    <div className={a.teamFact} data-tone={tone}>
+      <div className={a.teamFactValue}>{value}</div>
+      <div className={a.teamFactLabel}>{label}</div>
+    </div>
+  );
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────────
 
 interface AttendanceReportsProps {
   onNavigate?: (section: string) => void;
 }
 
-interface DailySummaryRow {
-  date: string;
-  fullDate: string;
-  visits: number;
-  avgDuration: number;
-}
-
-interface ActivityRow {
-  type: string;
-  count: number;
-  percentage: number;
-}
-
-interface PeakHourRow {
-  hour: string;
-  label: string;
-  Mon: number; Tue: number; Wed: number; Thu: number; Fri: number; Sat: number; Sun: number;
-}
-
-interface FacilityRow {
-  name: string;
-  value: number;
-  count: number;
-  color: string;
-}
-
-interface MemberRow {
-  id: number;
-  name: string;
-  visits: number;
-  attendanceRate: number;
-}
-
-interface InsightRow {
-  id: number;
-  type: "success" | "warning" | "info";
-  title: string;
-  message: string;
-}
-
-interface MonthlyRow {
-  month: string;
-  visits: number;
-}
-
-interface ReportSummary {
-  totalVisits: number;
-  avgDailyVisits: number;
-  attendanceRate: number;
-  peakHour: string;
-  totalActiveMembers: number;
-  daysInRange: number;
-}
-
-interface ReportData {
-  dailySummary: DailySummaryRow[];
-  activityBreakdown: ActivityRow[];
-  peakHours: PeakHourRow[];
-  facilityBreakdown: FacilityRow[];
-  topConsistentMembers: MemberRow[];
-  irregularMembers: MemberRow[];
-  monthlyTrend: MonthlyRow[];
-  insights: InsightRow[];
-  summary: ReportSummary;
-}
-
-interface TrainerRow {
-  id: number;
-  name: string;
-  role: string;
-  department: string;
-  photoUrl: string;
-  sessions: number;
-  totalMinutes: number;
-  avgSessionMinutes: number;
-}
-
-// ── API helpers ───────────────────────────────────────────────────────────────
-
-async function fetchReport(startDate: string, endDate: string): Promise<ReportData> {
-  const res = await authService.makeAuthenticatedRequest(
-    `${BASE}/attendance/reports?startDate=${startDate}&endDate=${endDate}`
-  );
-  if (!res.ok) throw new Error(`Failed to load report: ${res.status}`);
-  return res.json();
-}
-
-async function fetchTrainerReport(startDate: string, endDate: string): Promise<TrainerRow[]> {
-  const res = await authService.makeAuthenticatedRequest(
-    `${BASE}/staff/attendance/reports?startDate=${startDate}&endDate=${endDate}`
-  );
-  if (!res.ok) throw new Error(`Failed to load trainer report: ${res.status}`);
-  return res.json();
-}
-
-// ── Export helpers ────────────────────────────────────────────────────────────
-
-function fmtDuration(mins: number): string {
-  if (!mins) return "—";
-  if (mins < 60) return `${mins}m`;
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
-}
-
-/** The full attendance report (every tab) for export / print. */
-function buildAttendanceReport(report: ReportData, trainers: TrainerRow[], startStr: string, endStr: string, trainerFilter: string): ReportDocument {
-  const s = report.summary;
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-  return {
-    title: "Attendance Report",
-    period: { from: startStr, to: endStr },
-    filters: [{ label: "Trainer", value: trainerFilter }],
-    sections: [
-      kpiSection([
-        { label: "Total visits", value: s.totalVisits, format: "integer" },
-        { label: "Avg daily visits", value: s.avgDailyVisits, format: "number" },
-        { label: "Attendance rate", value: s.attendanceRate, format: "percent" },
-        { label: "Peak hour", value: s.peakHour || "—" },
-        { label: "Active members", value: s.totalActiveMembers, format: "integer" },
-        { label: "Days in range", value: s.daysInRange, format: "integer" },
-      ], "Summary"),
-      chartFromRows("Daily visits", "bar", report.dailySummary, "date", [{ key: "visits", name: "Visits", color: "#2a78d6" }], { valueFormat: "integer" }),
-      tableSection("Daily summary", [col("fullDate", "Date", "date"), countCol("visits", "Visits"), col("avgDuration", "Avg duration", "duration", { total: "avg" })],
-        report.dailySummary.map((r) => ({ fullDate: r.fullDate || r.date, visits: r.visits, avgDuration: r.avgDuration > 0 ? r.avgDuration : null })), { totals: true }),
-      ...(report.monthlyTrend.length ? [
-        chartFromRows("Monthly trend", "line", report.monthlyTrend, "month", [{ key: "visits", name: "Visits", color: "#2a78d6" }], { valueFormat: "integer" }),
-      ] : []),
-      pieSection("Activity breakdown", report.activityBreakdown.map((a) => ({ label: a.type, value: a.count })), { valueFormat: "integer" }),
-      tableSection("Activity breakdown", [col("type", "Activity"), countCol("count", "Visits"), col("percentage", "Share", "percent", { total: "sum" })], report.activityBreakdown, { totals: true }),
-      tableSection("Peak hours by weekday", [col("label", "Hour"), ...days.map((d) => countCol(d, d))],
-        report.peakHours.map((p) => ({ label: p.label || p.hour, ...Object.fromEntries(days.map((d) => [d, p[d]])) })), { totals: true }),
-      pieSection("Facility usage", report.facilityBreakdown.filter((f) => f.count > 0).map((f) => ({ label: f.name, value: f.count })), { valueFormat: "integer" }),
-      tableSection("Facility usage", [col("name", "Facility"), countCol("count", "Visits"), col("value", "Share", "percent", { total: "sum" })],
-        report.facilityBreakdown.filter((f) => f.count > 0), { totals: true }),
-      tableSection("Most consistent members", [col("name", "Member"), countCol("visits", "Visits"), col("attendanceRate", "Attendance rate", "percent")], report.topConsistentMembers),
-      tableSection("Irregular members", [col("name", "Member"), countCol("visits", "Visits"), col("attendanceRate", "Attendance rate", "percent")], report.irregularMembers),
-      tableSection("Trainer sessions", [col("name", "Trainer"), col("role", "Role"), col("department", "Department"), countCol("sessions", "Sessions"),
-        col("totalMinutes", "Total time", "duration", { total: "sum" }), col("avgSessionMinutes", "Avg session", "duration")], trainers, { totals: true }),
-      ...(report.insights.length ? [tableSection("Insights", [col("title", "Insight"), col("message", "Detail", "text", { wrap: true })], report.insights)] : []),
-    ],
-  };
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 30),
-    to: new Date(),
-  });
-  const [activeTab, setActiveTab] = useState("overview");
-  const [automatedReports, setAutomatedReports] = useState(false);
-  const [reportRecipientEmail, setReportRecipientEmail] = useState("");
-  const [gymCapacity, setGymCapacity] = useState("150");
-  const [savingReportSettings, setSavingReportSettings] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [report, setReport] = useState<ReportData | null>(null);
-  const [trainers, setTrainers] = useState<TrainerRow[]>([]);
-  const [selectedTrainer, setSelectedTrainer] = useState("all");
-  const [sortField, setSortField] = useState<keyof DailySummaryRow>("fullDate");
-  const [sortAsc, setSortAsc] = useState(false);
+  const { activeBranchId } = useBranch();
+  const palette = usePalette();
+  const navigate = useNavigate();
+  const dark = palette.grid !== "#e9e8e3";
+  const heatRamp = dark ? HEAT_DARK : HEAT_LIGHT;
+
+  const [preset, setPreset] = useState<Preset>("30d");
+  const [range, setRange] = useState(() => presetRange("30d"));
+  const [report, setReport] = useState<RangeReport | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>("overview");
 
-  const startStr = dateRange?.from
-    ? format(dateRange.from, "yyyy-MM-dd")
-    : format(subDays(new Date(), 30), "yyyy-MM-dd");
-  const endStr = dateRange?.to
-    ? format(dateRange.to, "yyyy-MM-dd")
-    : format(new Date(), "yyyy-MM-dd");
+  const [memberQ, setMemberQ] = useState("");
+  const [memberSeg, setMemberSeg] = useState<"all" | "regular" | "new" | "once">("all");
+  const [memberSort, setMemberSort] = useState<"visits" | "stay" | "recent">("visits");
+  const [memberLimit, setMemberLimit] = useState(25);
+  const [absentQ, setAbsentQ] = useState("");
+  const [absentLimit, setAbsentLimit] = useState(25);
+  const [teamFilter, setTeamFilter] = useState<"all" | "trainer" | "staff">("all");
+  const [dailyAll, setDailyAll] = useState(false);
+  const [heatHover, setHeatHover] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
+  // Settings (weekly email + capacity) — unchanged behaviour, new home.
+  const [autoReports, setAutoReports] = useState(false);
+  const [recipient, setRecipient] = useState("");
+  const [capacity, setCapacity] = useState("150");
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
-      const [rep, tr] = await Promise.all([
-        fetchReport(startStr, endStr),
-        fetchTrainerReport(startStr, endStr),
-      ]);
-      setReport(rep);
-      setTrainers(tr);
+      setReport(await staffAttendanceService.getRangeReport(range.from, range.to));
+      setError(null);
     } catch (e: any) {
-      setError(e.message || "Failed to load report data");
-      toast.error("Failed to load report", { description: e.message });
+      setError(e?.message || "Could not load the report");
     } finally {
       setLoading(false);
     }
-  }, [startStr, endStr]);
-
-  useEffect(() => { loadData(); }, [loadData]);
+  }, [range.from, range.to]);
+  useEffect(() => { load(); }, [load, activeBranchId]);
 
   useEffect(() => {
-    attendanceService.getReportSettings()
-      .then(settings => {
-        setAutomatedReports(settings.enabled);
-        setReportRecipientEmail(settings.recipient_email || "");
-        if (settings.gym_capacity) setGymCapacity(String(settings.gym_capacity));
-      })
-      .catch(() => {});
+    attendanceService.getReportSettings().then(s => {
+      setAutoReports(!!s.enabled);
+      setRecipient(s.recipient_email || "");
+      if (s.gym_capacity) setCapacity(String(s.gym_capacity));
+    }).catch(() => { /* settings tab shows defaults */ });
   }, []);
 
-  const handleSaveGymCapacity = async () => {
-    const capacity = parseInt(gymCapacity, 10);
-    if (!capacity || capacity <= 0) {
-      toast.error("Enter a valid gym capacity");
-      return;
-    }
-    setSavingReportSettings(true);
+  const pickPreset = (p: Preset) => {
+    setPreset(p);
+    if (p !== "custom") setRange(presetRange(p));
+    setMemberLimit(25); setAbsentLimit(25);
+  };
+
+  const s = report?.summary;
+  const cur = s?.current, prev = s?.previous;
+  const openDay = (iso: string) => navigate(`/attendance?date=${iso}`);
+
+  // ── Derived ──────────────────────────────────────────────────────────────────
+  const daily = useMemo(() => (report?.daily ?? []).map(d => ({ ...d, tipLabel: `${fullDay(d.weekday)}, ${d.label}` })), [report?.daily]);
+
+  const heat = useMemo(() => {
+    const grid = report?.heatmap ?? WEEKDAYS.map(() => new Array(24).fill(0));
+    let max = 0, lo = 23, hi = 0;
+    grid.forEach(row => row.forEach((v, h) => { if (v > 0) { max = Math.max(max, v); lo = Math.min(lo, h); hi = Math.max(hi, h); } }));
+    if (max === 0) { lo = 6; hi = 22; }
+    const hours = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
+    const occ = (report?.weekdays ?? []).map(w => w.occurrences);
+    const slots = grid.flatMap((row, di) => row.map((v, h) => ({ day: WEEKDAYS[di], h, v }))).filter(x => x.v > 0).sort((x, y) => y.v - x.v).slice(0, 6);
+    return { grid, max, hours, occ, slots };
+  }, [report?.heatmap, report?.weekdays]);
+  const heatColor = (v: number) => (v <= 0 || heat.max <= 0 ? undefined : heatRamp[Math.max(0, Math.min(4, Math.floor((v / heat.max) * 5 - 1e-9)))]);
+
+  const hourly = useMemo(() => {
+    const h = report?.hourly ?? [];
+    return heat.hours.map(x => ({ label: hourLong(x), visits: h[x] ?? 0 }));
+  }, [report?.hourly, heat.hours]);
+
+  const members = useMemo(() => {
+    const q = memberQ.trim().toLowerCase();
+    let list = (report?.members ?? []).filter(m => !q || m.name.toLowerCase().includes(q) || (m.code || "").toLowerCase().includes(q) || (m.plan || "").toLowerCase().includes(q));
+    if (memberSeg === "regular") list = list.filter(m => m.per_week >= 2);
+    if (memberSeg === "new") list = list.filter(m => m.new_visitor);
+    if (memberSeg === "once") list = list.filter(m => m.visits === 1);
+    const sorted = [...list];
+    if (memberSort === "stay") sorted.sort((x, y) => y.avg_stay_minutes - x.avg_stay_minutes);
+    if (memberSort === "recent") sorted.sort((x, y) => (y.last_visit || "").localeCompare(x.last_visit || ""));
+    return sorted;
+  }, [report?.members, memberQ, memberSeg, memberSort]);
+  const memberCounts = useMemo(() => {
+    const all = report?.members ?? [];
+    return { all: all.length, regular: all.filter(m => m.per_week >= 2).length, new: all.filter(m => m.new_visitor).length, once: all.filter(m => m.visits === 1).length };
+  }, [report?.members]);
+
+  const absent = useMemo(() => {
+    const q = absentQ.trim().toLowerCase();
+    return (report?.not_visited ?? []).filter(m => !q || m.name.toLowerCase().includes(q) || (m.code || "").toLowerCase().includes(q) || (m.phone || "").includes(q));
+  }, [report?.not_visited, absentQ]);
+
+  const team = useMemo(() => (report?.staff ?? []).filter(t => teamFilter === "all" || (teamFilter === "trainer" ? t.trainer : !t.trainer)), [report?.staff, teamFilter]);
+  const teamTotals = useMemo(() => {
+    const all = report?.staff ?? [];
+    return {
+      trainers: all.filter(t => t.trainer && t.days_present > 0).length,
+      staff: all.filter(t => !t.trainer && t.days_present > 0).length,
+      minutes: all.reduce((n, t) => n + t.total_minutes, 0),
+      late: all.reduce((n, t) => n + (t.late_days ?? 0), 0),
+      absent: all.reduce((n, t) => n + (t.absent_days ?? 0), 0),
+    };
+  }, [report?.staff]);
+
+  const dailyRows = useMemo(() => [...(report?.daily ?? [])].filter(d => !d.future).reverse(), [report?.daily]);
+
+  // ── Settings actions ─────────────────────────────────────────────────────────
+  const saveCapacity = async () => {
+    const n = parseInt(capacity, 10);
+    if (!n || n <= 0) { toast.error("Enter a valid gym capacity"); return; }
+    setSavingSettings(true);
     try {
-      await attendanceService.updateReportSettings({ enabled: automatedReports, gym_capacity: capacity });
-      toast.success("Gym capacity updated", { description: `Occupancy on Check-In is now calculated out of ${capacity}.` });
+      await attendanceService.updateReportSettings({ enabled: autoReports, gym_capacity: n });
+      toast.success("Gym capacity saved", { description: `Check-In occupancy is now out of ${n}.` });
     } catch (e: any) {
-      toast.error("Failed to update gym capacity", { description: e?.message || "Please try again." });
-    } finally {
-      setSavingReportSettings(false);
-    }
+      toast.error("Couldn't save the capacity", { description: e?.message });
+    } finally { setSavingSettings(false); }
   };
-
-  const handleToggleAutomatedReports = async (checked: boolean) => {
-    if (checked && !reportRecipientEmail.trim()) {
-      toast.error("Enter a recipient email first");
-      return;
-    }
-    setSavingReportSettings(true);
+  const toggleAuto = async (on: boolean) => {
+    if (on && !recipient.trim()) { toast.error("Enter the email address first"); return; }
+    setSavingSettings(true);
     try {
-      await attendanceService.updateReportSettings({
-        enabled: checked,
-        recipient_email: reportRecipientEmail.trim() || undefined,
-      });
-      setAutomatedReports(checked);
-      toast[checked ? "success" : "info"](
-        checked ? "Automated Reports Enabled" : "Automated Reports Disabled",
-        {
-          description: checked
-            ? `A weekly attendance summary will be emailed to ${reportRecipientEmail.trim()} every Monday.`
-            : "Automated report delivery has been turned off.",
-        }
-      );
+      await attendanceService.updateReportSettings({ enabled: on, recipient_email: recipient.trim() || undefined });
+      setAutoReports(on);
+      toast.success(on ? "Weekly report turned on" : "Weekly report turned off",
+        { description: on ? `An attendance summary goes to ${recipient.trim()} every Monday.` : undefined });
     } catch (e: any) {
-      toast.error("Failed to update report settings", { description: e?.message || "Please try again." });
-    } finally {
-      setSavingReportSettings(false);
-    }
+      toast.error("Couldn't save the report settings", { description: e?.message });
+    } finally { setSavingSettings(false); }
   };
 
-  // ── Sorted summary table ──────────────────────────────────────────────────
-  const sortedSummary = useMemo(() => {
-    if (!report) return [];
-    return [...report.dailySummary].sort((a, b) => {
-      const av = a[sortField];
-      const bv = b[sortField];
-      if (typeof av === "number" && typeof bv === "number")
-        return sortAsc ? av - bv : bv - av;
-      return sortAsc
-        ? String(av).localeCompare(String(bv))
-        : String(bv).localeCompare(String(av));
-    });
-  }, [report, sortField, sortAsc]);
-
-  const handleSort = (field: keyof DailySummaryRow) => {
-    if (sortField === field) setSortAsc((p) => !p);
-    else { setSortField(field); setSortAsc(false); }
+  // ── Export ───────────────────────────────────────────────────────────────────
+  const buildReport = async (): Promise<ReportDocument> => {
+    const rep = report!;
+    const sm = rep.summary;
+    const c = sm.current, p = sm.previous;
+    const chg = (x: number, y: number) => { const v = pctChange(x, y); return v == null ? undefined : `${v > 0 ? "+" : ""}${v}% vs previous period`; };
+    return {
+      title: "Attendance Report",
+      orientation: "landscape",
+      period: { from: sm.from, to: sm.to },
+      filters: [{ label: "Compared with", value: `${fmtDate(sm.compare_from)} – ${fmtDate(sm.compare_to)}` }, { label: "Time zone", value: rep.time_zone }],
+      sections: [
+        kpiSection([
+          { label: "Visits", value: c.visits, format: "integer", hint: chg(c.visits, p.visits) },
+          { label: "Unique members", value: c.unique_members, format: "integer", hint: chg(c.unique_members, p.unique_members) },
+          { label: "Average per day", value: c.avg_per_day, format: "number" },
+          { label: "Average stay", value: c.avg_stay_minutes, format: "duration" },
+          { label: "Member reach", value: sm.reach_pct, format: "percent", hint: `${c.unique_members} of ${sm.active_members} active members` },
+          { label: "Walk-ins", value: c.walk_ins, format: "integer" },
+          { label: "New visitors", value: sm.new_visitors, format: "integer" },
+          { label: "Peak hour", value: sm.peak_hour || "—" },
+        ], "Summary"),
+        ...(rep.insights.length ? [tableSection("Insights", [col("title", "Insight"), col("text", "Detail", "text", { wrap: true })], rep.insights)] : []),
+        chartFromRows("Visits per day", "bar", rep.daily.filter(d => !d.future), "label", [
+          { key: "members", name: "Members", color: palette.s1 }, { key: "walk_ins", name: "Walk-ins", color: palette.s2 },
+        ], { valueFormat: "integer" }),
+        tableSection("Day by day", [
+          col("date", "Date", "date"), col("weekday", "Day"), countCol("visits", "Visits"), countCol("members", "Members"),
+          countCol("walk_ins", "Walk-ins"), countCol("unique_members", "Unique"), col("avg_stay_minutes", "Avg stay", "duration", { total: "avg" }),
+          countCol("previous_visits", "Previous period"),
+        ], rep.daily.filter(d => !d.future), { totals: true }),
+        tableSection("Busiest weekdays", [col("day", "Day"), countCol("visits", "Visits"), col("average", "Average per day", "number")], rep.weekdays),
+        tableSection("Check-ins by hour", [col("hour", "Hour"), ...WEEKDAYS.map(d => countCol(d, d)), countCol("total", "Total")],
+          Array.from({ length: 24 }, (_, h) => ({ hour: hourLong(h), ...Object.fromEntries(WEEKDAYS.map((d, i) => [d, rep.heatmap[i][h]])), total: rep.hourly[h] }))
+            .filter(row => row.total > 0), { totals: true }),
+        tableSection("Time spent", [col("label", "Stay"), countCol("count", "Visits"), col("pct", "Share", "percent")], rep.stay),
+        tableSection("Check-in method", [col("label", "Method"), countCol("count", "Visits"), col("pct", "Share", "percent")], rep.methods),
+        tableSection("Visits by plan", [col("label", "Plan"), countCol("count", "Visits"), col("pct", "Share", "percent")], rep.plans),
+        tableSection("Members who came in", [
+          col("code", "ID"), col("name", "Member"), col("plan", "Plan"), countCol("visits", "Visits"), countCol("days_visited", "Days"),
+          col("per_week", "Per week", "number"), col("avg_stay_minutes", "Avg stay", "duration"), col("total_minutes", "Total time", "duration"),
+          col("usual_time", "Usual time"), col("last_visit", "Last visit", "date"),
+        ], rep.members),
+        tableSection(`Active members who didn't come in (${sm.not_visited_count})`, [
+          col("code", "ID"), col("name", "Member"), col("phone", "Phone"), col("plan", "Plan"), col("last_visit", "Last visit", "date"),
+          col("days_since_last_visit", "Days since", "integer"), col("membership_ends", "Membership ends", "date"),
+        ], rep.not_visited),
+        ...(rep.staff.length ? [tableSection("Staff & trainers", [
+          col("name", "Name"), col("role", "Role"), countCol("days_present", "Days"), countCol("sessions", "Sessions"),
+          col("total_minutes", "Hours", "duration", { total: "sum" }), col("avg_minutes_per_day", "Per day", "duration"), col("usual_in", "Usual in"),
+          countCol("scheduled_days", "Scheduled"), countCol("late_days", "Late days"), countCol("absent_days", "Absent"),
+          col("punctuality_pct", "On time", "percent"),
+        ], rep.staff, { totals: true })] : []),
+      ],
+    };
   };
 
-  const filteredTrainers = useMemo(() => {
-    if (selectedTrainer === "all") return trainers;
-    return trainers.filter((t) => String(t.id) === selectedTrainer);
-  }, [trainers, selectedTrainer]);
-
-  // ── Export / print (shared engine) ───────────────────────────────────────
-  const exporter = useReportExporter();
-  const buildReport = () => {
-    if (!report) throw new Error("No data to export yet");
-    const trainerName = selectedTrainer === "all" ? "All trainers" : trainers.find((t) => String(t.id) === selectedTrainer)?.name ?? "All trainers";
-    return buildAttendanceReport(report, filteredTrainers, startStr, endStr, trainerName);
-  };
-  const handleExportPDF = () => exporter.run("pdf", buildReport);
-  const handleExportExcel = () => exporter.run("xlsx", buildReport);
-  const handlePrint = () => exporter.run("print", buildReport);
-  const handleDownloadReport = () => handleExportExcel();
-
-  // ── View Detailed Report (modal) ──────────────────────────────────────────
-  const handleViewDetailed = () => {
-    if (!report) { toast.error("No data to display"); return; }
-    setDetailOpen(true);
-  };
-
-  // ── Insight icon helper ───────────────────────────────────────────────────
-  const insightIcon = (type: string) => {
-    if (type === "success") return TrendingUp;
-    if (type === "warning") return AlertCircle;
-    return Lightbulb;
-  };
-
-  const summary = report?.summary;
-
-  const LoadSkeleton = () => (
-    <div className="space-y-4">
-      {[1, 2, 3].map((i) => (
-        <Skeleton key={i} className="h-24 w-full rounded-lg" />
-      ))}
-    </div>
-  );
+  // ── Render ───────────────────────────────────────────────────────────────────
+  const vs = s ? `vs ${fmtDate(s.compare_from)} – ${fmtDate(s.compare_to)}` : "";
 
   return (
-    <div className="min-h-screen bg-gray-50">
-
-      {/* ── Billing-style tab animation ─────────────────────────────────── */}
-      <style>{`
-        @keyframes tabSlideIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        [role="tabpanel"][data-state="active"] {
-          animation: tabSlideIn 0.22s ease-out;
-        }
-      `}</style>
-
-      {/* Gradient Header */}
-      <div className="bg-gradient-primary text-white py-8 px-6 shadow-lg">
-        <div className="max-w-7xl mx-auto">
-          {/* Back button */}
-          <button
-            onClick={() => onNavigate?.("attendance")}
-            className="flex items-center gap-2 text-white/80 hover:text-white mb-4 transition-colors text-sm font-medium group"
-          >
-            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
-            Back to Attendance
+    <div className={styles.root}>
+      {/* Header */}
+      <div className={styles.head}>
+        <div>
+          <button type="button" className={r.back} onClick={() => onNavigate ? onNavigate("attendance") : navigate("/attendance")}>
+            <ArrowLeft size={13} />Attendance
           </button>
-
-          <Breadcrumb className="mb-4">
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink
-                  onClick={() => onNavigate?.("community")}
-                  className="cursor-pointer text-white/80 hover:text-white"
-                >
-                  Community
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="text-white/60" />
-              <BreadcrumbItem>
-                <BreadcrumbLink
-                  onClick={() => onNavigate?.("attendance")}
-                  className="cursor-pointer text-white/80 hover:text-white"
-                >
-                  Attendance
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="text-white/60" />
-              <BreadcrumbItem>
-                <BreadcrumbPage className="text-white font-medium">Reports</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Attendance Reports</h1>
-              <p className="text-white/90">
-                Detailed attendance analytics based on real check-in data
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white"
-                  >
-                    <CalendarIcon className="h-4 w-4 mr-2" />
-                    {dateRange?.from
-                      ? dateRange.to
-                        ? `${format(dateRange.from, "LLL dd")} – ${format(dateRange.to, "LLL dd")}`
-                        : format(dateRange.from, "LLL dd, y")
-                      : "Pick a date range"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange?.from}
-                    selected={dateRange}
-                    onSelect={setDateRange}
-                    numberOfMonths={2}
-                  />
-                </PopoverContent>
-              </Popover>
-
-              <Button
-                onClick={loadData}
-                variant="outline"
-                className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white"
-                disabled={loading}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-                {loading ? "Loading…" : "Refresh"}
-              </Button>
-
-              <div className="rounded-lg bg-white p-0.5">
-                <ReportActions report={buildReport} disabled={!report || loading} size="default" menuLabel="Attendance report" />
-              </div>
-            </div>
+          <h1 className={styles.title}>Attendance Reports</h1>
+          <div className={styles.subtitle}>
+            <span>{fmtDate(range.from)} – {fmtDate(range.to)}</span>
+            {s && <span>· {s.days} days · compared with the {s.days} days before</span>}
+            {report?.time_zone && <span>· {report.time_zone.replace("_", " ")}</span>}
           </div>
+        </div>
+        <div className={styles.actions}>
+          <Button variant="outline" size="sm" onClick={load} aria-label="Refresh"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></Button>
+          <ReportActions report={buildReport} disabled={!report} menuLabel={`Attendance · ${range.from} – ${range.to}`} />
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-
-        {/* Error banner */}
-        {error && (
-          <Card className="border-red-200 bg-red-50">
-            <CardContent className="p-4 flex items-center gap-3">
-              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
-              <p className="text-red-700 text-sm">{error}</p>
-              <Button size="sm" variant="outline" onClick={loadData} className="ml-auto">
-                Retry
-              </Button>
-            </CardContent>
-          </Card>
+      {/* Period */}
+      <div className={`${styles.card} ${styles.filters}`}>
+        <div className={styles.chips} role="group" aria-label="Period">
+          {PRESETS.map(([p, label]) => (
+            <button key={p} type="button" className={styles.chip} data-active={preset === p} onClick={() => pickPreset(p)}>{label}</button>
+          ))}
+        </div>
+        {preset === "custom" && (
+          <div className={r.range}>
+            <div className={r.rangePick}><DatePickerField value={range.from} max={range.to} clearable={false} onChange={v => v && setRange(x => ({ ...x, from: v }))} /></div>
+            <span className={r.rangeSep}>to</span>
+            <div className={r.rangePick}><DatePickerField value={range.to} min={range.from} max={isoDate(new Date())} clearable={false} onChange={v => v && setRange(x => ({ ...x, to: v }))} /></div>
+          </div>
         )}
-
-        {/* KPI Summary Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
-        >
-          <Card className="border-primary/10 bg-white shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-gradient-light p-3 rounded-lg">
-                  <Users className="h-6 w-6 text-primary" />
-                </div>
-                <Badge className="bg-blue-100 text-blue-800 border-0">
-                  {summary ? `${summary.daysInRange}d` : "—"}
-                </Badge>
-              </div>
-              {loading ? (
-                <Skeleton className="h-9 w-24 mb-1" />
-              ) : (
-                <h3 className="text-3xl font-bold text-primary mb-1">
-                  {summary?.totalVisits.toLocaleString() ?? "—"}
-                </h3>
-              )}
-              <p className="text-sm text-gray-600">Total Check-ins</p>
-              <p className="text-xs text-gray-400 mt-1">
-                {summary ? `Avg ${summary.avgDailyVisits}/day` : ""}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-primary/10 bg-white shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-gradient-light p-3 rounded-lg">
-                  <Clock className="h-6 w-6 text-primary" />
-                </div>
-              </div>
-              {loading ? (
-                <Skeleton className="h-9 w-32 mb-1" />
-              ) : (
-                <h3 className="text-2xl font-bold text-primary mb-1">
-                  {summary?.peakHour ?? "—"}
-                </h3>
-              )}
-              <p className="text-sm text-gray-600">Peak Hour</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-primary/10 bg-white shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-gradient-light p-3 rounded-lg">
-                  <Activity className="h-6 w-6 text-primary" />
-                </div>
-              </div>
-              {loading ? (
-                <Skeleton className="h-9 w-20 mb-1" />
-              ) : (
-                <h3 className="text-3xl font-bold text-primary mb-1">
-                  {summary?.attendanceRate ?? 0}%
-                </h3>
-              )}
-              <p className="text-sm text-gray-600">Avg Attendance Rate</p>
-              {summary && (
-                <div className="mt-3">
-                  <div className="relative w-20 h-20 mx-auto">
-                    <svg className="transform -rotate-90" width="80" height="80">
-                      <circle cx="40" cy="40" r="32" stroke="#E5E7EB" strokeWidth="7" fill="none" />
-                      <circle
-                        cx="40" cy="40" r="32"
-                        stroke="#0047AB" strokeWidth="7" fill="none"
-                        strokeDasharray={`${Math.min(summary.attendanceRate, 100) / 100 * 201} 201`}
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-sm font-bold text-primary">{summary.attendanceRate}%</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-primary/10 bg-white shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-gradient-light p-3 rounded-lg">
-                  <Dumbbell className="h-6 w-6 text-primary" />
-                </div>
-              </div>
-              {loading ? (
-                <Skeleton className="h-9 w-20 mb-1" />
-              ) : (
-                <h3 className="text-3xl font-bold text-primary mb-1">
-                  {summary?.totalActiveMembers.toLocaleString() ?? "—"}
-                </h3>
-              )}
-              <p className="text-sm text-gray-600">Active Members</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Analytics Tabs — Billing module style */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="w-full flex">
-              <TabsTrigger value="overview" className="flex-1">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="member-trends" className="flex-1">
-                <Users className="h-4 w-4 mr-2" />
-                Member Trends
-              </TabsTrigger>
-              <TabsTrigger value="trainer-reports" className="flex-1">
-                <User className="h-4 w-4 mr-2" />
-                Trainer Reports
-              </TabsTrigger>
-              <TabsTrigger value="peak-hours" className="flex-1">
-                <Clock className="h-4 w-4 mr-2" />
-                Peak Hours
-              </TabsTrigger>
-              <TabsTrigger value="facility" className="flex-1">
-                <Target className="h-4 w-4 mr-2" />
-                Facility
-              </TabsTrigger>
-            </TabsList>
-
-            {/* ── Overview Tab ──────────────────────────────────────────────── */}
-            <TabsContent value="overview" className="space-y-6">
-              {loading ? (
-                <LoadSkeleton />
-              ) : (
-                <>
-                  <Card className="border-primary/10 shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-primary">Daily Check-ins Over Time</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <AreaChart data={report?.dailySummary ?? []}>
-                          <defs>
-                            <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#0047AB" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="#00c5cb" stopOpacity={0.1} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                          <XAxis dataKey="date" stroke="#555555" />
-                          <YAxis stroke="#555555" />
-                          <Tooltip contentStyle={{ background: "light-dark(white, var(--card))", border: "1px solid #0047AB20", borderRadius: "8px" }} />
-                          <Legend />
-                          <Area type="monotone" dataKey="visits" name="Check-ins" stroke="#0047AB" fill="url(#areaGradient)" strokeWidth={2} />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-
-                  {(report?.activityBreakdown?.length ?? 0) > 0 && (
-                    <Card className="border-primary/10 shadow-md">
-                      <CardHeader>
-                        <CardTitle className="text-primary">Attendance by Activity Type</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={report!.activityBreakdown}>
-                            <defs>
-                              <linearGradient id="classBarGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#0047AB" />
-                                <stop offset="100%" stopColor="#00c5cb" />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                            <XAxis dataKey="type" stroke="#555555" />
-                            <YAxis stroke="#555555" />
-                            <Tooltip contentStyle={{ background: "light-dark(white, var(--card))", border: "1px solid #0047AB20", borderRadius: "8px" }} />
-                            <Legend />
-                            <Bar dataKey="count" name="Visits" fill="url(#classBarGradient)" radius={[8, 8, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  <Card className="border-primary/10 shadow-md">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-primary">Summary Table</CardTitle>
-                        <span className="text-xs text-gray-400 flex items-center gap-1">
-                          <Filter className="h-3 w-3" /> Click headers to sort
-                        </span>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="overflow-x-auto rounded-lg border border-primary/10">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-gradient-light">
-                              {([
-                                { key: "fullDate" as keyof DailySummaryRow, label: "Date" },
-                                { key: "visits" as keyof DailySummaryRow, label: "Check-ins" },
-                                { key: "avgDuration" as keyof DailySummaryRow, label: "Avg Duration" },
-                              ]).map(({ key, label }) => (
-                                <TableHead
-                                  key={key}
-                                  className="text-primary cursor-pointer hover:bg-primary/10 select-none"
-                                  onClick={() => handleSort(key)}
-                                >
-                                  {label} {sortField === key ? (sortAsc ? "↑" : "↓") : ""}
-                                </TableHead>
-                              ))}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {sortedSummary.length === 0 ? (
-                              <TableRow>
-                                <TableCell colSpan={3} className="text-center text-gray-400 py-8">
-                                  No attendance data for this period
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              sortedSummary.map((row, i) => (
-                                <TableRow key={i} className="hover:bg-gray-50">
-                                  <TableCell className="font-medium">{row.date}</TableCell>
-                                  <TableCell className="text-green-600 font-semibold">{row.visits}</TableCell>
-                                  <TableCell>{row.avgDuration > 0 ? `${row.avgDuration} min` : "—"}</TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </>
-              )}
-            </TabsContent>
-
-            {/* ── Member Trends Tab ──────────────────────────────────────── */}
-            <TabsContent value="member-trends" className="space-y-6">
-              {loading ? (
-                <LoadSkeleton />
-              ) : (
-                <>
-                  {(report?.monthlyTrend?.length ?? 0) > 0 && (
-                    <Card className="border-primary/10 shadow-md">
-                      <CardHeader>
-                        <CardTitle className="text-primary">Monthly Visit Trend</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={250}>
-                          <LineChart data={report!.monthlyTrend}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                            <XAxis dataKey="month" stroke="#555555" />
-                            <YAxis stroke="#555555" />
-                            <Tooltip contentStyle={{ background: "light-dark(white, var(--card))", border: "1px solid #0047AB20", borderRadius: "8px" }} />
-                            <Line type="monotone" dataKey="visits" name="Visits" stroke="#0047AB" strokeWidth={3} dot={{ fill: "#0047AB", r: 5 }} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card className="border-primary/20 shadow-md">
-                      <CardHeader>
-                        <CardTitle className="text-primary flex items-center">
-                          <TrendingUp className="h-5 w-5 mr-2" />
-                          Top 5 Most Consistent Members
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {(report?.topConsistentMembers?.length ?? 0) === 0 ? (
-                          <p className="text-sm text-gray-400 text-center py-4">
-                            No member data for this period
-                          </p>
-                        ) : (
-                          <div className="space-y-4">
-                            {report!.topConsistentMembers.map((m, i) => (
-                              <div key={i} className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-3">
-                                    <div className="bg-gradient-light p-2 rounded-full">
-                                      <User className="h-4 w-4 text-primary" />
-                                    </div>
-                                    <div>
-                                      <p className="font-medium">{m.name}</p>
-                                      <p className="text-xs text-gray-500">{m.visits} visits</p>
-                                    </div>
-                                  </div>
-                                  <Badge className="bg-green-100 text-green-800">
-                                    {m.attendanceRate}%
-                                  </Badge>
-                                </div>
-                                <Progress value={Math.min(m.attendanceRate, 100)} className="h-2" />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-primary/20 shadow-md">
-                      <CardHeader>
-                        <CardTitle className="text-primary flex items-center">
-                          <AlertCircle className="h-5 w-5 mr-2" />
-                          Top 5 Irregular Members
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {(report?.irregularMembers?.length ?? 0) === 0 ? (
-                          <p className="text-sm text-gray-400 text-center py-4">
-                            No member data for this period
-                          </p>
-                        ) : (
-                          <div className="space-y-4">
-                            {report!.irregularMembers.map((m, i) => (
-                              <div key={i} className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-3">
-                                    <div className="bg-red-50 p-2 rounded-full">
-                                      <User className="h-4 w-4 text-red-600" />
-                                    </div>
-                                    <div>
-                                      <p className="font-medium">{m.name}</p>
-                                      <p className="text-xs text-gray-500">{m.visits} visits</p>
-                                    </div>
-                                  </div>
-                                  <Badge className="bg-red-100 text-red-800">
-                                    {m.attendanceRate}%
-                                  </Badge>
-                                </div>
-                                <Progress value={Math.min(m.attendanceRate, 100)} className="h-2" />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
-                </>
-              )}
-            </TabsContent>
-
-            {/* ── Trainer Reports Tab ──────────────────────────────────── */}
-            <TabsContent value="trainer-reports" className="space-y-6">
-              {loading ? (
-                <LoadSkeleton />
-              ) : (
-                <Card className="border-primary/10 shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-primary">Trainer / Staff Attendance</CardTitle>
-                        <CardDescription>Clock-in sessions for the selected period</CardDescription>
-                      </div>
-                      <div>
-                        <Label htmlFor="trainer-select" className="sr-only">Filter by Trainer</Label>
-                        <Select value={selectedTrainer} onValueChange={setSelectedTrainer}>
-                          <SelectTrigger className="w-[220px] border-primary/20">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Trainers / Staff</SelectItem>
-                            {trainers.map((t) => (
-                              <SelectItem key={t.id} value={String(t.id)}>
-                                {t.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto rounded-lg border border-primary/10">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-gradient-light">
-                            <TableHead className="text-primary">Name</TableHead>
-                            <TableHead className="text-primary">Role</TableHead>
-                            <TableHead className="text-primary">Sessions</TableHead>
-                            <TableHead className="text-primary">Total Hours</TableHead>
-                            <TableHead className="text-primary">Avg Session</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredTrainers.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={5} className="text-center text-gray-400 py-8">
-                                No trainer attendance data for this period
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            filteredTrainers.map((t) => (
-                              <TableRow key={t.id} className="hover:bg-gray-50">
-                                <TableCell>
-                                  <div className="flex items-center space-x-3">
-                                    {t.photoUrl ? (
-                                      <img
-                                        src={t.photoUrl}
-                                        alt={t.name}
-                                        className="h-8 w-8 rounded-full object-cover"
-                                      />
-                                    ) : (
-                                      <div className="bg-gradient-light p-2 rounded-full">
-                                        <User className="h-4 w-4 text-primary" />
-                                      </div>
-                                    )}
-                                    <span className="font-medium">{t.name}</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className="bg-blue-100 text-blue-800 border-0">
-                                    {t.role}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="font-semibold">{t.sessions}</TableCell>
-                                <TableCell>{fmtDuration(t.totalMinutes)}</TableCell>
-                                <TableCell>
-                                  <Badge
-                                    className={
-                                      t.avgSessionMinutes >= 240
-                                        ? "bg-green-100 text-green-800"
-                                        : "bg-yellow-100 text-yellow-800"
-                                    }
-                                  >
-                                    {fmtDuration(t.avgSessionMinutes)}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-
-            {/* ── Peak Hours Tab ────────────────────────────────────────── */}
-            <TabsContent value="peak-hours" className="space-y-6">
-              {loading ? (
-                <LoadSkeleton />
-              ) : (
-                <>
-                  <Card className="border-primary/10 shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-primary">Attendance Distribution by Hour</CardTitle>
-                      <CardDescription>
-                        Number of check-ins per hour across days of the week
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {(report?.peakHours?.length ?? 0) === 0 ? (
-                        <p className="text-sm text-gray-400 text-center py-12">
-                          No attendance data for this period
-                        </p>
-                      ) : (
-                        <ResponsiveContainer width="100%" height={400}>
-                          <BarChart data={report!.peakHours}>
-                            <defs>
-                              <linearGradient id="peakGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#0047AB" />
-                                <stop offset="100%" stopColor="#00c5cb" />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                            <XAxis dataKey="hour" stroke="#555555" />
-                            <YAxis stroke="#555555" />
-                            <Tooltip contentStyle={{ background: "light-dark(white, var(--card))", border: "1px solid #0047AB20", borderRadius: "8px" }} />
-                            <Legend />
-                            <Bar dataKey="Mon" fill="url(#peakGradient)" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="Wed" fill="#00c5cb" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="Fri" fill="#4CAF50" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="Sat" fill="#FFC107" radius={[4, 4, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {summary && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <Card className="border-primary/20 bg-green-50 shadow-md">
-                        <CardContent className="p-6">
-                          <div className="flex items-start space-x-3">
-                            <div className="bg-green-100 p-3 rounded-lg">
-                              <TrendingUp className="h-6 w-6 text-green-600" />
-                            </div>
-                            <div>
-                              <h4 className="font-semibold text-green-800 mb-1">Peak Traffic</h4>
-                              <p className="text-sm text-green-700">
-                                Busiest time window: {summary.peakHour}
-                              </p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="border-primary/20 bg-blue-50 shadow-md">
-                        <CardContent className="p-6">
-                          <div className="flex items-start space-x-3">
-                            <div className="bg-blue-100 p-3 rounded-lg">
-                              <Lightbulb className="h-6 w-6 text-blue-600" />
-                            </div>
-                            <div>
-                              <h4 className="font-semibold text-blue-800 mb-1">Avg Daily Visits</h4>
-                              <p className="text-sm text-blue-700">
-                                {summary.avgDailyVisits} visits/day over {summary.daysInRange} days
-                              </p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
-                </>
-              )}
-            </TabsContent>
-
-            {/* ── Facility Tab ─────────────────────────────────────────── */}
-            <TabsContent value="facility" className="space-y-6">
-              {loading ? (
-                <LoadSkeleton />
-              ) : (report?.facilityBreakdown?.filter((f) => f.count > 0).length ?? 0) === 0 ? (
-                <Card className="border-primary/10 shadow-md">
-                  <CardContent className="p-12 text-center">
-                    <p className="text-sm text-gray-400">
-                      No activity-type data for this period. Facility breakdown is derived from
-                      the activity type assigned at check-in.
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card className="border-primary/10 shadow-md">
-                      <CardHeader>
-                        <CardTitle className="text-primary">Facility Usage by Area</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <PieChart>
-                            <Pie
-                              data={report!.facilityBreakdown.filter((f) => f.count > 0)}
-                              cx="50%" cy="50%"
-                              labelLine={false}
-                              label={({ name, percent }) =>
-                                `${name}: ${(percent * 100).toFixed(0)}%`
-                              }
-                              outerRadius={100}
-                              dataKey="value"
-                            >
-                              {report!.facilityBreakdown
-                                .filter((f) => f.count > 0)
-                                .map((entry, i) => (
-                                  <Cell key={`cell-${i}`} fill={entry.color} />
-                                ))}
-                            </Pie>
-                            <Tooltip formatter={(v: number) => `${v}%`} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-primary/10 shadow-md">
-                      <CardHeader>
-                        <CardTitle className="text-primary">Area Breakdown</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {report!.facilityBreakdown
-                          .filter((f) => f.count > 0)
-                          .map((area, i) => (
-                            <div key={i} className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-3">
-                                  <div
-                                    className="w-4 h-4 rounded"
-                                    style={{ backgroundColor: area.color }}
-                                  />
-                                  <span className="font-medium">{area.name}</span>
-                                </div>
-                                <span className="text-sm text-gray-600">
-                                  {area.value}% ({area.count} visits)
-                                </span>
-                              </div>
-                              <Progress value={area.value} className="h-2" />
-                            </div>
-                          ))}
-                      </CardContent>
-                    </Card>
-                  </div>
-                </>
-              )}
-            </TabsContent>
-          </Tabs>
-        </motion.div>
-
-        {/* Insights & Recommendations */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          <Card className="border-primary/10 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-primary flex items-center space-x-2">
-                <Lightbulb className="h-5 w-5" />
-                <span>Insights &amp; Recommendations</span>
-              </CardTitle>
-              <CardDescription>
-                Automatically generated from real attendance patterns
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {loading ? (
-                <LoadSkeleton />
-              ) : (report?.insights?.length ?? 0) === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4">
-                  No insights available yet
-                </p>
-              ) : (
-                report!.insights.map((insight) => {
-                  const Icon = insightIcon(insight.type);
-                  return (
-                    <motion.div
-                      key={insight.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.1 * insight.id }}
-                      className={`p-4 rounded-lg border-l-4 ${
-                        insight.type === "success"
-                          ? "bg-green-50 border-green-500"
-                          : insight.type === "warning"
-                          ? "bg-yellow-50 border-yellow-500"
-                          : "bg-blue-50 border-blue-500"
-                      }`}
-                    >
-                      <div className="flex items-start space-x-3">
-                        <Icon
-                          className={`h-5 w-5 mt-0.5 ${
-                            insight.type === "success"
-                              ? "text-green-600"
-                              : insight.type === "warning"
-                              ? "text-yellow-600"
-                              : "text-blue-600"
-                          }`}
-                        />
-                        <div className="flex-1">
-                          <h4 className="font-semibold mb-1">{insight.title}</h4>
-                          <p className="text-sm text-gray-700">{insight.message}</p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Footer Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
-        >
-          <Card className="border-primary/10 shadow-lg">
-            <CardContent className="p-6 space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="flex-1">
-                  <h4 className="font-semibold text-primary mb-1">Gym Capacity</h4>
-                  <p className="text-sm text-gray-600">Used to calculate the Check-In page's live occupancy %</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min="1"
-                    value={gymCapacity}
-                    onChange={(e) => setGymCapacity(e.target.value)}
-                    style={{ maxWidth: '120px' }}
-                    disabled={savingReportSettings}
-                  />
-                  <Button variant="outline" className="border-primary/30" onClick={handleSaveGymCapacity} disabled={savingReportSettings}>
-                    Save
-                  </Button>
-                </div>
-              </div>
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                <div className="flex items-center space-x-4">
-                  <div className="bg-gradient-light p-3 rounded-lg">
-                    <Mail className="h-6 w-6 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-primary mb-1">
-                      Schedule Automated Reports
-                    </h4>
-                    <p className="text-sm text-gray-600 mb-2">
-                      Receive weekly attendance reports via email every Monday
-                    </p>
-                    <Input
-                      type="email"
-                      placeholder="recipient@example.com"
-                      value={reportRecipientEmail}
-                      onChange={(e) => setReportRecipientEmail(e.target.value)}
-                      className="max-w-xs"
-                      disabled={savingReportSettings}
-                    />
-                  </div>
-                  <Switch
-                    checked={automatedReports}
-                    disabled={savingReportSettings}
-                    onCheckedChange={handleToggleAutomatedReports}
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    variant="outline"
-                    className="border-primary/30"
-                    onClick={handleViewDetailed}
-                    disabled={!report}
-                  >
-                    <TableIcon className="h-4 w-4 mr-2" />
-                    View Detailed Report
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-primary/30"
-                    onClick={handleExportPDF}
-                    disabled={!report || !!exporter.busy}
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    {exporter.busy === "pdf" ? "Exporting…" : "Export PDF"}
-                  </Button>
-                  <Button
-                    className="btn-primary"
-                    onClick={handleDownloadReport}
-                    disabled={!report || !!exporter.busy}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    {exporter.busy === "xlsx" ? "Exporting…" : "Download Excel"}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
       </div>
 
-      {/* ── View Detailed Report Dialog ──────────────────────────────────── */}
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-primary flex items-center gap-2">
-              <TableIcon className="h-5 w-5" />
-              Detailed Attendance Report
-              <span className="text-sm font-normal text-gray-500 ml-2">
-                {startStr} – {endStr}
-              </span>
-            </DialogTitle>
-          </DialogHeader>
+      {error && !report && (
+        <div className={`${styles.card} ${styles.filters}`} style={{ color: "var(--destructive)" }}>
+          {error}<Button variant="outline" size="sm" onClick={load}>Try again</Button>
+        </div>
+      )}
 
-          {report && (
-            <div className="space-y-6">
-              {/* Summary */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { label: "Total Check-ins", value: report.summary.totalVisits.toLocaleString() },
-                  { label: "Avg Daily", value: String(report.summary.avgDailyVisits) },
-                  { label: "Attendance Rate", value: `${report.summary.attendanceRate}%` },
-                  { label: "Active Members", value: report.summary.totalActiveMembers.toLocaleString() },
-                ].map((kpi) => (
-                  <div key={kpi.label} className="bg-gradient-light rounded-lg p-4 text-center">
-                    <p className="text-2xl font-bold text-primary">{kpi.value}</p>
-                    <p className="text-xs text-gray-500 mt-1">{kpi.label}</p>
-                  </div>
-                ))}
-              </div>
+      <div className={loading && report ? styles.loadingVeil : undefined} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        {/* KPIs */}
+        <div className={styles.kpis}>
+          <Kpi icon={UserCheck} tone="blue" label="Visits" value={cur ? fmtInt(cur.visits) : "—"}
+            delta={cur && prev ? <Delta pct={pctChange(cur.visits, prev.visits)} /> : undefined}
+            hint={prev ? `${fmtInt(prev.visits)} before` : undefined} onClick={() => setTab("overview")} title="Daily trend" />
+          <Kpi icon={Users} tone="violet" label="Unique members" value={cur ? fmtInt(cur.unique_members) : "—"}
+            delta={cur && prev ? <Delta pct={pctChange(cur.unique_members, prev.unique_members)} /> : undefined}
+            hint={cur ? `${cur.visits_per_member} visits each` : undefined} onClick={() => setTab("members")} title="Members who came in" />
+          <Kpi icon={CalendarDays} tone="teal" label="Per day" value={cur ? cur.avg_per_day.toLocaleString(undefined, { maximumFractionDigits: 1 }) : "—"}
+            delta={cur && prev ? <Delta pct={pctChange(cur.avg_per_day, prev.avg_per_day)} /> : undefined}
+            hint={s?.busiest_date ? `best ${shortDate(s.busiest_date)} (${s.busiest_date_visits})` : undefined} />
+          <Kpi icon={Timer} tone="amber" label="Average stay" value={cur ? fmtDur(cur.avg_stay_minutes) : "—"}
+            delta={cur && prev ? <Delta pct={pctChange(cur.avg_stay_minutes, prev.avg_stay_minutes)} /> : undefined}
+            hint={cur ? `${fmtHours(cur.total_minutes)} in total` : undefined} onClick={() => setTab("patterns")} title="Time spent" />
+          <Kpi icon={DoorOpen} tone="green" label="Member reach" value={s ? `${s.reach_pct}%` : "—"}
+            hint={s ? `${fmtInt(cur!.unique_members)} of ${fmtInt(s.active_members)} active` : undefined}
+            onClick={() => setTab("members")} title="Active members who came in" />
+          <Kpi icon={Footprints} tone="orange" label="Walk-ins" value={cur ? fmtInt(cur.walk_ins) : "—"}
+            delta={cur && prev ? <Delta pct={pctChange(cur.walk_ins, prev.walk_ins)} /> : undefined}
+            hint={s ? plural(s.new_visitors, "first-time member") : undefined} />
+        </div>
 
-              <Separator />
+        <SectionTabs<Tab>
+          label="Report sections"
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { id: "overview", label: "Overview", icon: BarChart3 },
+            { id: "members", label: "Members", icon: Users, count: s?.not_visited_count },
+            { id: "team", label: "Staff & trainers", icon: Briefcase },
+            { id: "times", label: "Peak times", icon: Clock },
+            { id: "patterns", label: "Visit patterns", icon: Timer },
+            { id: "settings", label: "Settings", icon: Settings2 },
+          ]}
+        />
 
-              {/* Daily table — full, scrollable */}
-              <div>
-                <h3 className="font-semibold text-primary mb-3">Daily Breakdown</h3>
-                <div className="overflow-x-auto rounded-lg border border-primary/10 max-h-64 overflow-y-auto">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-10">
-                      <TableRow className="bg-gradient-light">
-                        <TableHead className="text-primary">Date</TableHead>
-                        <TableHead className="text-primary">Check-ins</TableHead>
-                        <TableHead className="text-primary">Avg Duration</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {report.dailySummary.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={3} className="text-center text-gray-400 py-6">
-                            No data
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        report.dailySummary.map((r, i) => (
-                          <TableRow key={i} className="hover:bg-gray-50">
-                            <TableCell>{r.date}</TableCell>
-                            <TableCell className="text-green-600 font-semibold">{r.visits}</TableCell>
-                            <TableCell>{r.avgDuration > 0 ? `${r.avgDuration} min` : "—"}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
+        {!report && loading && <div className={styles.card}><Empty icon={RefreshCw} title="Loading the report…" /></div>}
 
-              {/* Activity breakdown */}
-              {report.activityBreakdown.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-primary mb-3">Activity Breakdown</h3>
-                  <div className="overflow-x-auto rounded-lg border border-primary/10">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-gradient-light">
-                          <TableHead className="text-primary">Activity</TableHead>
-                          <TableHead className="text-primary">Visits</TableHead>
-                          <TableHead className="text-primary">Share</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {report.activityBreakdown.map((a, i) => (
-                          <TableRow key={i} className="hover:bg-gray-50">
-                            <TableCell>{a.type}</TableCell>
-                            <TableCell className="font-semibold">{a.count}</TableCell>
-                            <TableCell>
-                              <Badge className="bg-blue-100 text-blue-800">{a.percentage}%</Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+        {/* ── Overview ── */}
+        {report && tab === "overview" && (
+          <>
+            <Panel title="Visits per day" icon={TrendingUp} sub={`Members and walk-ins each day; the line is the same day of the previous period · click a day to open it`}
+              action={<Legend items={[{ label: "Members", color: palette.s1 }, { label: "Walk-ins", color: palette.s2 }, { label: "Previous period", color: "#a8a69f", line: true }]} />}>
+              {cur?.visits === 0 ? <Empty icon={UserCheck} title="No visits in this period" /> : (
+                <div className={r.chart}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={daily} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}
+                      onClick={(e: any) => { const d = e?.activePayload?.[0]?.payload; if (d && !d.future) openDay(d.date); }}>
+                      <CartesianGrid vertical={false} stroke={palette.grid} />
+                      <XAxis dataKey="label" tick={axisTick(palette)} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={18} />
+                      <YAxis allowDecimals={false} tick={axisTick(palette)} tickLine={false} axisLine={false} />
+                      <Tooltip content={<ChartTip />} cursor={{ fill: "color-mix(in srgb, currentColor 6%, transparent)" }} />
+                      <Bar dataKey="members" name="Members" stackId="v" fill={palette.s1} maxBarSize={26} cursor="pointer" />
+                      <Bar dataKey="walk_ins" name="Walk-ins" stackId="v" fill={palette.s2} radius={[4, 4, 0, 0]} maxBarSize={26} cursor="pointer" />
+                      <Line dataKey="previous_visits" name="Previous period" type="monotone" stroke="#a8a69f" strokeDasharray="4 4" strokeWidth={1.5} dot={false} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
                 </div>
               )}
+            </Panel>
 
-              {/* Trainer table */}
-              {trainers.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-primary mb-3">Trainer / Staff Sessions</h3>
-                  <div className="overflow-x-auto rounded-lg border border-primary/10">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-gradient-light">
-                          <TableHead className="text-primary">Name</TableHead>
-                          <TableHead className="text-primary">Role</TableHead>
-                          <TableHead className="text-primary">Sessions</TableHead>
-                          <TableHead className="text-primary">Total</TableHead>
-                          <TableHead className="text-primary">Avg</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {trainers.map((t) => (
-                          <TableRow key={t.id} className="hover:bg-gray-50">
-                            <TableCell className="font-medium">{t.name}</TableCell>
-                            <TableCell>
-                              <Badge className="bg-blue-100 text-blue-800 border-0">{t.role}</Badge>
-                            </TableCell>
-                            <TableCell>{t.sessions}</TableCell>
-                            <TableCell>{fmtDuration(t.totalMinutes)}</TableCell>
-                            <TableCell>{fmtDuration(t.avgSessionMinutes)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+            <div className={r.cols21}>
+              <Panel title="What stands out" icon={Lightbulb} sub={vs}>
+                {report.insights.length === 0 ? <Empty icon={Lightbulb} title="Nothing unusual" /> : (
+                  <div className={styles.insights}>
+                    {report.insights.map((i, idx) => {
+                      const Icon = i.tone === "good" ? CheckCircle2 : i.tone === "warning" ? AlertTriangle : Info;
+                      return (
+                        <div key={idx} className={styles.insight} data-type={i.tone === "good" ? "positive" : i.tone}>
+                          <span className={styles.insightIcon}><Icon size={15} /></span>
+                          <div>
+                            <div className={styles.insightTitle}>{i.title}</div>
+                            <div className={styles.insightDetail}>{i.text}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-              )}
+                )}
+              </Panel>
+              <Panel title="By weekday" icon={CalendarDays} sub="Average visits on each day of the week">
+                <BarRows fmt={n => n.toLocaleString(undefined, { maximumFractionDigits: 1 })} empty="No visits"
+                  rows={report.weekdays.map(w => ({
+                    key: w.day, label: fullDay(w.day), value: w.average, color: w.day === s?.busiest_weekday ? palette.s2 : palette.s1,
+                    meta: `${fmtInt(w.visits)} visits`,
+                  }))} />
+              </Panel>
+            </div>
 
-              <div className="flex justify-end gap-3 pt-2">
-                <Button variant="outline" onClick={() => setDetailOpen(false)}>
-                  Close
-                </Button>
-                <Button variant="outline" onClick={handlePrint} disabled={!!exporter.busy}>
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print
-                </Button>
-                <Button variant="outline" onClick={handleExportPDF} disabled={!!exporter.busy}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  PDF
-                </Button>
-                <Button className="btn-primary" onClick={handleExportExcel} disabled={!!exporter.busy}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Excel
-                </Button>
+            <Panel title="Day by day" icon={CalendarDays} sub="Newest first · compared with the same day of the previous period">
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead><tr><th>Date</th><th>Visits</th><th>Members</th><th>Walk-ins</th><th>Unique members</th><th>Avg stay</th><th>Previous</th><th>Change</th></tr></thead>
+                  <tbody>
+                    {(dailyAll ? dailyRows : dailyRows.slice(0, 14)).map(d => {
+                      const ch = d.previous_visits == null ? null : pctChange(d.visits, d.previous_visits);
+                      return (
+                        <tr key={d.date}>
+                          <td><button type="button" className={r.dayLink} onClick={() => openDay(d.date)}>{d.weekday}, {d.label}</button></td>
+                          <td className={r.num} style={{ fontWeight: 700 }}>{fmtInt(d.visits)}</td>
+                          <td className={r.num}>{fmtInt(d.members)}</td>
+                          <td className={r.num}>{fmtInt(d.walk_ins)}</td>
+                          <td className={r.num}>{fmtInt(d.unique_members)}</td>
+                          <td className={r.num}>{fmtDur(d.avg_stay_minutes)}</td>
+                          <td className={`${r.num} ${styles.muted}`}>{d.previous_visits ?? "—"}</td>
+                          <td className={r.num}>{ch == null ? <span className={styles.muted}>—</span> : <span className={ch >= 0 ? r.up : r.down}>{ch > 0 ? "+" : ""}{ch}%</span>}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {dailyRows.length > 14 && (
+                <div className={a.more}><Button variant="outline" size="sm" onClick={() => setDailyAll(v => !v)}>{dailyAll ? "Show fewer" : `Show all ${dailyRows.length} days`}</Button></div>
+              )}
+            </Panel>
+          </>
+        )}
+
+        {/* ── Members ── */}
+        {report && tab === "members" && (
+          <>
+            <div className={r.facts5}>
+              <Fact label="Members came in" value={fmtInt(cur!.unique_members)} tone="blue" />
+              <Fact label="Visits per member" value={cur!.visits_per_member} tone="violet" />
+              <Fact label="Regulars (2+/week)" value={fmtInt(memberCounts.regular)} tone="green" />
+              <Fact label="First-time members" value={fmtInt(s!.new_visitors)} tone="teal" />
+              <Fact label="Active, didn't come" value={fmtInt(s!.not_visited_count)} tone={s!.not_visited_count ? "red" : "gray"} />
+            </div>
+
+            <div className={r.cols21}>
+              <Panel title="Members who came in" icon={UserCheck} scope={String(memberCounts.all)} sub="Visits, time spent and usual time for every member who checked in">
+                <div className={a.toolbar} style={{ padding: 0 }}>
+                  <label className={a.search}><Search size={15} /><input value={memberQ} onChange={e => setMemberQ(e.target.value)} placeholder="Search name, ID or plan" aria-label="Search members" /></label>
+                  <div className={styles.chips} role="group" aria-label="Members">
+                    {([["all", "All"], ["regular", "Regulars"], ["new", "First-time"], ["once", "Came once"]] as const).map(([k, l]) => (
+                      <button key={k} type="button" className={styles.chip} data-active={memberSeg === k} onClick={() => setMemberSeg(k)}>
+                        {l}<span className={a.count}>{memberCounts[k]}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className={a.toolEnd}><Seg label="Sort" value={memberSort} onChange={setMemberSort} options={[["visits", "Most visits"], ["stay", "Longest stay"], ["recent", "Recent"]]} /></div>
+                </div>
+                {members.length === 0 ? <Empty icon={Users} title="No members match" /> : (
+                  <>
+                    <div className={styles.tableWrap}>
+                      <table className={styles.table}>
+                        <thead><tr><th>Member</th><th>Visits</th><th>Per week</th><th>Avg stay</th><th>Total</th><th>Usual time</th><th>Last visit</th></tr></thead>
+                        <tbody>
+                          {members.slice(0, memberLimit).map((m: RangeMember) => (
+                            <tr key={m.id}>
+                              <td>
+                                <div className={a.personCell}>
+                                  <Photo name={m.name} url={m.photo_url} tone="blue" />
+                                  <div className={a.who}>
+                                    <div className={a.name}>{m.name}{m.new_visitor && <span className={r.newTag}>New</span>}</div>
+                                    <div className={a.sub}>{[m.code, m.plan].filter(Boolean).join(" · ")}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className={r.num}><b>{m.visits}</b> <span className={styles.muted}>· {m.days_visited}d</span></td>
+                              <td className={r.num}>{m.per_week}</td>
+                              <td className={r.num}>{fmtDur(m.avg_stay_minutes)}</td>
+                              <td className={r.num}>{fmtDur(m.total_minutes)}</td>
+                              <td className={r.num}>{m.usual_time || "—"}</td>
+                              <td className={r.num}>{fmtDate(m.last_visit)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {members.length > memberLimit && <div className={a.more}><Button variant="outline" size="sm" onClick={() => setMemberLimit(n => n + 100)}>Show more ({members.length - memberLimit} left)</Button></div>}
+                  </>
+                )}
+              </Panel>
+
+              <Panel title="How often they came" icon={BarChart3} sub="Members by number of visits in this period">
+                <BarRows fmt={fmtInt} empty="No member visits"
+                  rows={report.frequency.map((f, i) => ({ key: f.label, label: f.label, value: f.count, color: [palette.s6, palette.s1, palette.s3, palette.s4, palette.s2][i], meta: `${f.pct}%` }))} />
+              </Panel>
+            </div>
+
+            <Panel title="Active members who didn't come in" icon={UserX} scope={String(s!.not_visited_count)}
+              sub="Valid membership, no visit in this period — longest away first. Call them before they lapse.">
+              <div className={a.toolbar} style={{ padding: 0 }}>
+                <label className={a.search}><Search size={15} /><input value={absentQ} onChange={e => setAbsentQ(e.target.value)} placeholder="Search name, ID or phone" aria-label="Search absent members" /></label>
+                {s!.not_visited_count > report.not_visited.length && <span className={styles.muted} style={{ fontSize: "var(--text-xs)" }}>Showing the {report.not_visited.length} longest away · export for the full list</span>}
+              </div>
+              {absent.length === 0 ? <Empty icon={CheckCircle2} title={s!.not_visited_count ? "No members match" : "Every active member came in"} /> : (
+                <>
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead><tr><th>Member</th><th>Phone</th><th>Last visit</th><th>Away</th><th>Membership ends</th></tr></thead>
+                      <tbody>
+                        {absent.slice(0, absentLimit).map((m: RangeAbsent) => (
+                          <tr key={m.id}>
+                            <td>
+                              <div className={a.personCell}>
+                                <Photo name={m.name} url={m.photo_url} tone="red" />
+                                <div className={a.who}><div className={a.name}>{m.name}</div><div className={a.sub}>{[m.code, m.plan].filter(Boolean).join(" · ")}</div></div>
+                              </div>
+                            </td>
+                            <td>{m.phone ? <a className={r.phone} href={`tel:${m.phone.replace(/\s+/g, "")}`}>{m.phone}</a> : <span className={styles.muted}>—</span>}</td>
+                            <td className={r.num}>{m.last_visit ? fmtDate(m.last_visit) : <span className={r.pill}>Never</span>}</td>
+                            <td className={r.num}>
+                              {m.days_since_last_visit == null ? "—"
+                                : m.days_since_last_visit >= 30 ? <Status kind="critical">{m.days_since_last_visit} days</Status>
+                                : m.days_since_last_visit >= 14 ? <Status kind="warning">{m.days_since_last_visit} days</Status>
+                                : <span className={r.pill}>{m.days_since_last_visit} days</span>}
+                            </td>
+                            <td className={r.num}>{m.membership_ends ? fmtDate(m.membership_ends) : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {absent.length > absentLimit && <div className={a.more}><Button variant="outline" size="sm" onClick={() => setAbsentLimit(n => n + 100)}>Show more ({absent.length - absentLimit} left)</Button></div>}
+                </>
+              )}
+            </Panel>
+          </>
+        )}
+
+        {/* ── Staff & trainers ── */}
+        {report && tab === "team" && (
+          <>
+            <div className={r.facts5}>
+              <Fact label="Trainers came in" value={teamTotals.trainers} tone="violet" />
+              <Fact label="Staff came in" value={teamTotals.staff} tone="teal" />
+              <Fact label="Hours on site" value={fmtHours(teamTotals.minutes)} tone="blue" />
+              <Fact label="Late arrivals" value={report.roster_included ? teamTotals.late : "—"} tone={teamTotals.late ? "amber" : "gray"} />
+              <Fact label="Absences" value={report.roster_included ? teamTotals.absent : "—"} tone={teamTotals.absent ? "red" : "gray"} />
+            </div>
+            <div className={r.cols21}>
+              <Panel title="Staff & trainers" icon={Briefcase} sub={report.roster_included ? "Clock-ins against each person's shifts" : "Clock-ins (lateness and absences are shown for periods up to 3 months)"}
+                action={<Seg label="Team" value={teamFilter} onChange={setTeamFilter} options={[["all", "Everyone"], ["trainer", "Trainers"], ["staff", "Staff"]]} />}>
+                {team.length === 0 ? <Empty icon={Briefcase} title="No staff or trainers clocked in" text="Staff clock in from the GymBios app or the check-in desk; shifts come from Shifts & Schedules." /> : (
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead><tr><th>Name</th><th>Days</th><th>Hours</th><th>Per day</th><th>Usual in</th>{report.roster_included && <><th>Late</th><th>Absent</th><th>On time</th></>}</tr></thead>
+                      <tbody>
+                        {team.map((t: RangeStaff) => (
+                          <tr key={t.id}>
+                            <td>
+                              <div className={a.personCell}>
+                                <Photo name={t.name} url={t.photo_url} tone={t.trainer ? "violet" : "teal"} />
+                                <div className={a.who}>
+                                  <div className={a.name}>{t.name}{t.open_now && <span className={r.newTag}>On duty</span>}</div>
+                                  <div className={a.sub}>{[t.code, t.role || (t.trainer ? "Trainer" : "Staff")].filter(Boolean).join(" · ")}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className={r.num}><b>{t.days_present}</b>{t.scheduled_days ? <span className={styles.muted}> / {t.scheduled_days}</span> : null}</td>
+                            <td className={r.num}>{fmtDur(t.total_minutes)}</td>
+                            <td className={r.num}>{fmtDur(t.avg_minutes_per_day)}</td>
+                            <td className={r.num}>{t.usual_in || "—"}</td>
+                            {report.roster_included && <>
+                              <td className={r.num}>{t.late_days ? <Status kind="warning">{t.late_days}× · {fmtDur(t.late_minutes)}</Status> : <span className={styles.muted}>—</span>}</td>
+                              <td className={r.num}>{t.absent_days ? <Status kind="critical">{t.absent_days}</Status> : <span className={styles.muted}>—</span>}</td>
+                              <td className={r.num}>{t.punctuality_pct == null ? "—" : `${t.punctuality_pct}%`}</td>
+                            </>}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Panel>
+              <Panel title="Hours on site" icon={Dumbbell} sub="Total clocked time per person">
+                <BarRows fmt={v => fmtDur(v)} empty="No clock-ins"
+                  rows={[...team].sort((x, y) => y.total_minutes - x.total_minutes).slice(0, 12).map(t => ({
+                    key: String(t.id), label: t.name, value: t.total_minutes, color: t.trainer ? palette.s4 : palette.s6, meta: plural(t.days_present, "day"),
+                  }))} />
+              </Panel>
+            </div>
+          </>
+        )}
+
+        {/* ── Peak times ── */}
+        {report && tab === "times" && (
+          <>
+            <Panel title="When members come in" icon={Clock} sub="Check-ins by weekday and hour · hover a cell for the numbers">
+              {heat.max === 0 ? <Empty icon={Clock} title="No visits in this period" /> : (
+                <>
+                  <div className={styles.heatWrap}>
+                    <div className={styles.heat} style={{ ["--cols" as any]: heat.hours.length }} onMouseLeave={() => setHeatHover(null)}
+                      role="img" aria-label={`Check-in heatmap. Busiest slot ${heat.slots[0] ? `${fullDay(heat.slots[0].day)} ${hourLong(heat.slots[0].h)} with ${heat.slots[0].v} check-ins` : "none"}.`}>
+                      <span />
+                      {heat.hours.map(h => <span key={h} className={styles.heatHour}>{h % 2 === 0 ? hourShort(h) : ""}</span>)}
+                      {WEEKDAYS.map((d, di) => (
+                        <React.Fragment key={d}>
+                          <span className={styles.heatLabel}>{d}</span>
+                          {heat.hours.map(h => {
+                            const v = heat.grid[di]?.[h] ?? 0;
+                            const occ = heat.occ[di] || 0;
+                            const text = `${fullDay(d)} ${hourLong(h)} – ${v} check-in${v === 1 ? "" : "s"}${occ > 1 ? ` (about ${(v / occ).toFixed(1)} each ${fullDay(d)})` : ""}`;
+                            return <span key={h} className={styles.heatCell} style={{ ["--cell" as any]: heatColor(v) }} onMouseEnter={() => setHeatHover(text)} />;
+                          })}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </div>
+                  <div className={styles.panelHead} style={{ alignItems: "center" }}>
+                    <div className={styles.heatReadout} aria-live="polite">
+                      {heatHover ?? <>Busiest slot <b>{heat.slots[0] ? `${fullDay(heat.slots[0].day)} ${hourLong(heat.slots[0].h)}` : "—"}</b> · peak hour <b>{s?.peak_hour || "—"}</b></>}
+                    </div>
+                    <div className={styles.heatScale}>
+                      <span>Fewer</span>
+                      <span className={styles.heatRamp}><span style={{ ["--cell" as any]: "var(--heat-0)" }} />{heatRamp.map(c => <span key={c} style={{ ["--cell" as any]: c }} />)}</span>
+                      <span>More (max {heat.max})</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </Panel>
+            <div className={r.cols21}>
+              <Panel title="By hour of day" icon={BarChart3} sub="All check-ins in the period">
+                <div className={r.chartSm}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={hourly} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                      <CartesianGrid vertical={false} stroke={palette.grid} />
+                      <XAxis dataKey="label" tick={axisTick(palette)} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                      <YAxis allowDecimals={false} tick={axisTick(palette)} tickLine={false} axisLine={false} />
+                      <Tooltip content={<ChartTip />} cursor={{ fill: "color-mix(in srgb, currentColor 6%, transparent)" }} />
+                      <Bar dataKey="visits" name="Check-ins" fill={palette.s1} radius={[4, 4, 0, 0]} maxBarSize={30} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </Panel>
+              <Panel title="Busiest slots" icon={TrendingUp} sub="Weekday and hour with the most check-ins">
+                {heat.slots.length === 0 ? <Empty icon={Clock} title="No visits" /> : (
+                  <div className={r.slotList}>
+                    {heat.slots.map((x, i) => (
+                      <div key={`${x.day}${x.h}`} className={r.slot}>
+                        <span className={r.rank}>#{i + 1}</span>
+                        <span>{fullDay(x.day)}, {hourLong(x.h)} – {hourLong((x.h + 1) % 24)}</span>
+                        <span className={r.slotVal}>{x.v}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Panel>
+            </div>
+          </>
+        )}
+
+        {/* ── Visit patterns ── */}
+        {report && tab === "patterns" && (
+          <div className={styles.cols2}>
+            <Panel title="Time spent per visit" icon={Timer} sub={`Average ${fmtDur(cur?.avg_stay_minutes)} · ${fmtInt(cur?.no_checkout ?? 0)} visits never checked out`}>
+              <BarRows fmt={fmtInt} empty="No visits"
+                rows={report.stay.map((x, i) => ({ key: x.label, label: x.label, value: x.count, color: i === report.stay.length - 1 ? "#a8a69f" : i >= 5 ? palette.s2 : palette.s1, meta: `${x.pct}%` }))} />
+            </Panel>
+            <Panel title="How they check in" icon={DoorOpen} sub="Face device, QR, desk or app">
+              <BarRows fmt={fmtInt} empty="No visits" rows={report.methods.map((x, i) => ({ key: x.label, label: x.label, value: x.count, color: [palette.s1, palette.s3, palette.s4, palette.s2, palette.s6, palette.s5][i % 6], meta: `${x.pct}%` }))} />
+            </Panel>
+            <Panel title="Visits by plan" icon={Users} sub="Which memberships bring people in">
+              <BarRows fmt={fmtInt} empty="No visits" rows={report.plans.slice(0, 12).map(x => ({ key: x.label, label: x.label, value: x.count, color: x.label.startsWith("Walk-in") ? palette.s2 : palette.s1, meta: `${x.pct}%` }))} />
+            </Panel>
+            <Panel title="Activities" icon={Dumbbell} sub="What members logged in the app">
+              <BarRows fmt={fmtInt} empty="No activities logged in this period" rows={report.activities.slice(0, 12).map(x => ({ key: x.label, label: x.label, value: x.count, color: palette.s3, meta: `${x.pct}%` }))} />
+            </Panel>
+          </div>
+        )}
+
+        {/* ── Settings ── */}
+        {tab === "settings" && (
+          <Panel title="Report settings" icon={Settings2} sub="Weekly email summary and the capacity the Check-In page measures occupancy against">
+            <div className={r.setting}>
+              <span className={styles.kpiIcon} data-tone="blue"><Mail size={16} /></span>
+              <div className={r.settingText}>
+                <div className={r.settingTitle}>Weekly attendance email</div>
+                <div className={r.settingSub}>Every Monday, a summary of last week's attendance goes to this address.</div>
+              </div>
+              <div className={r.settingControls}>
+                <input className={r.field} type="email" placeholder="manager@yourgym.com" value={recipient} onChange={e => setRecipient(e.target.value)} disabled={savingSettings} aria-label="Report email" style={{ width: "16rem" }} />
+                <Switch checked={autoReports} disabled={savingSettings} onCheckedChange={toggleAuto} aria-label="Weekly attendance email" />
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            <div className={r.setting}>
+              <span className={styles.kpiIcon} data-tone="green"><Users size={16} /></span>
+              <div className={r.settingText}>
+                <div className={r.settingTitle}>Gym capacity</div>
+                <div className={r.settingSub}>How many people the gym holds. The Check-In page shows live occupancy out of this number.</div>
+              </div>
+              <div className={r.settingControls}>
+                <input className={r.field} type="number" min={1} value={capacity} onChange={e => setCapacity(e.target.value)} disabled={savingSettings} aria-label="Gym capacity" style={{ width: "7rem" }} />
+                <Button variant="outline" size="sm" onClick={saveCapacity} disabled={savingSettings}>Save</Button>
+              </div>
+            </div>
+          </Panel>
+        )}
+      </div>
     </div>
   );
 }

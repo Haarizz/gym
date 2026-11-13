@@ -77,6 +77,7 @@ import { downloadReceiptInvoice } from "../utils/receipt-invoice";
 import type { CreditCustomer } from "../payments/modals/CreditModal";
 import t from "../components/plans/plan-tabs.module.css";
 import { MemberAvatar, memberPhoto, memberStatus } from "../components/members/MemberAvatar";
+import { askPaymentTerms } from "../components/payment-terms/PaymentTermsDialog";
 
 interface MemberAddonsProps {
   onNavigate?: (section: string) => void;
@@ -707,6 +708,15 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
       );
       return;
     }
+
+    // GymOS › Settings › Payment Terms: PT packages (and PT add-ons) vs other add-ons.
+    const isTraining = !!selectedPackage || /train|coach|\bpt\b|personal/i.test(`${selectedAddon.category ?? ''} ${selectedAddon.name ?? ''}`);
+    if (!(await askPaymentTerms(isTraining ? 'personal_training' : 'addon', {
+      memberDbId: selectedMember.id,
+      memberName: selectedMember.name,
+      amount: amountToPay,
+      detail: selectedAddon.name,
+    }))) return;
 
     const newExpiry = calculateNewExpiry();
     const startDate = new Date();

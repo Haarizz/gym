@@ -190,7 +190,7 @@ public class Member extends BaseEntity implements BranchAware {
     @Column(name = "billed_to_head")
     private Boolean billedToHead = false;
 
-    // The membership end date an expiry due was last raised for (V134) — one due per expiry.
+    // The membership end date an expiry due was last raised for (V137) — one due per expiry.
     @Column(name = "expiry_due_raised_for")
     private LocalDateTime expiryDueRaisedFor;
 

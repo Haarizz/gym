@@ -28,6 +28,7 @@ import { usePaymentManager } from '../payments/usePaymentManager';
 import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
 import { buildPaymentPayload } from '../payments/paymentPayload';
 import { PAYMENT_TYPES } from '../payments/paymentModel';
+import { askPaymentTerms } from '../components/payment-terms/PaymentTermsDialog';
 import type { CreditCustomer } from '../payments/modals/CreditModal';
 import {
   FaPlus,
@@ -1541,6 +1542,17 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     if (!isEditMode && !paymentManager.settleable) {
       toast.error('Allocate the full amount (or leave the remainder on Credit) before continuing');
       return;
+    }
+    // GymOS › Settings › Payment Terms: the member accepts the switched-on terms first.
+    if (!isEditMode) {
+      const termsPlan = apiPlans.find(p => p.id.toString() === formData.membershipPlan)
+        || apiPlans.find(p => p.name === formData.membershipPlan);
+      const accepted = await askPaymentTerms('registration', {
+        memberName: `${formData.firstName} ${formData.lastName}`.trim(),
+        amount: getInvoiceTotal(),
+        detail: termsPlan?.name || formData.membershipPlan || null,
+      });
+      if (!accepted) return;
     }
 
     // Process payment and create member

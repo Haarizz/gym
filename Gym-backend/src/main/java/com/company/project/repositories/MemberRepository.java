@@ -152,7 +152,7 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
             + " ('pending_approval', 'frozen', 'suspended')) ORDER BY " + BIOS_END_DATE + ", m.name")
     List<Member> findMembershipsEndingBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
-    /** Memberships whose end date has passed and haven't had an expiry due raised for that end date (V134). */
+    /** Memberships whose end date has passed and haven't had an expiry due raised for that end date (V137). */
     @Query("SELECT m.id FROM Member m WHERE " + BIOS_END_DATE + " < :todayStart"
             + " AND (m.expiryDueRaisedFor IS NULL OR m.expiryDueRaisedFor <> " + BIOS_END_DATE + ")")
     List<Long> findExpiryDueCandidateIds(@Param("todayStart") LocalDateTime todayStart);
@@ -195,6 +195,11 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
 
     @Query("SELECT COUNT(m) FROM Member m WHERE " + BIOS_EFFECTIVELY_ACTIVE)
     long countEffectivelyActive(@Param("asOf") LocalDateTime asOf);
+
+    /** Rows of [id, memberId, name, phone, photoUrl, membershipType, endDate] — Attendance Reports › not visiting. */
+    @Query("SELECT m.id, m.memberId, m.name, m.phone, m.photoUrl, m.membershipType, " + BIOS_END_DATE
+            + " FROM Member m WHERE " + BIOS_EFFECTIVELY_ACTIVE)
+    List<Object[]> findEffectivelyActiveBrief(@Param("asOf") LocalDateTime asOf);
 
     /** Rows of [membershipPlan, totalMembers, effectivelyActiveMembers] — the Manage Plans cards. */
     @Query("SELECT m.membershipPlan, COUNT(m), SUM(CASE WHEN " + BIOS_EFFECTIVELY_ACTIVE + " THEN 1 ELSE 0 END) "

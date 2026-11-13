@@ -1,0 +1,140 @@
+/* Attendance (redesign 2026-11-12). Builds on the shared analytics look (overview-kit +
+   community-analytics.module.css); Tailwind is a frozen snapshot, so new layout lives here on the
+   theme tokens. Kind colours: members blue, walk-ins orange, trainers violet, staff teal. */
+
+.dateNav { display: flex; align-items: center; gap: 0.375rem; flex-wrap: nowrap; }
+.datePick { width: 9.5rem; flex-shrink: 0; }
+.dateNav :global(button) { white-space: nowrap; }
+.iconBtn {
+  width: 2.25rem; height: 2.25rem; display: grid; place-items: center; border-radius: 0.5rem; border: 0; cursor: pointer;
+  background: var(--card); color: var(--foreground); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+.iconBtn:hover:not(:disabled) { background: var(--muted); }
+.iconBtn:disabled { opacity: 0.4; cursor: default; }
+.iconBtn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.live {
+  display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600; font-size: var(--text-xs);
+  color: #15803d; background: color-mix(in srgb, #15803d 12%, transparent); border-radius: 999px; padding: 0.15rem 0.6rem;
+}
+:global(.dark) .live { color: #4ade80; background: color-mix(in srgb, #4ade80 14%, transparent); }
+.past {
+  display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600; font-size: var(--text-xs);
+  color: var(--muted-foreground); background: var(--muted); border-radius: 999px; padding: 0.15rem 0.6rem;
+}
+.dot { width: 0.5rem; height: 0.5rem; border-radius: 999px; background: currentColor; position: relative; }
+.live .dot::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor;
+  animation: pulse 1.8s ease-out infinite;
+}
+@keyframes pulse { from { transform: scale(1); opacity: 0.6; } to { transform: scale(2.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .live .dot::after { animation: none; } }
+
+/* ── Alert strip ───────────────────────────────────────────────────────── */
+.alert {
+  display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.875rem; flex-wrap: wrap;
+  background: color-mix(in srgb, #c98a00 12%, var(--card)); color: var(--foreground); font-size: var(--text-sm);
+}
+.alert svg { color: #b45309; flex-shrink: 0; }
+:global(.dark) .alert svg { color: #fbbf24; }
+.alertText { flex: 1 1 16rem; }
+
+/* ── Toolbar ───────────────────────────────────────────────────────────── */
+.toolbar { display: flex; gap: 0.625rem; align-items: center; flex-wrap: wrap; padding: 0.75rem 1rem; }
+.search { position: relative; flex: 1 1 14rem; max-width: 20rem; }
+.search svg { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--muted-foreground); pointer-events: none; }
+.search input {
+  width: 100%; height: 2.25rem; border-radius: 0.5rem; border: 0; padding: 0 0.75rem 0 2.25rem; font-size: var(--text-sm);
+  background: var(--muted); color: var(--foreground);
+}
+.search input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.toolEnd { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.count { font-size: 0.7rem; font-weight: 700; margin-left: 0.3rem; opacity: 0.8; }
+
+/* ── Who's in now ──────────────────────────────────────────────────────── */
+.groups { display: flex; flex-direction: column; gap: 1.25rem; }
+.people { display: grid; grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr)); gap: 0.75rem; }
+.person {
+  border-radius: 0.875rem; padding: 0.875rem; display: flex; flex-direction: column; gap: 0.625rem;
+  background: color-mix(in srgb, var(--tone) 5%, var(--muted)); position: relative; min-width: 0;
+}
+.person[data-alert="true"] { background: color-mix(in srgb, #d03b3b 9%, var(--muted)); }
+.personTop { display: flex; gap: 0.625rem; align-items: center; min-width: 0; }
+.photo {
+  width: 2.75rem; height: 2.75rem; border-radius: 999px; flex-shrink: 0; object-fit: cover; display: grid; place-items: center;
+  font-weight: 700; font-size: var(--text-sm); color: var(--tone); background: color-mix(in srgb, var(--tone) 16%, transparent);
+  box-shadow: 0 0 0 2px var(--card);
+}
+.photoSm { width: 2.125rem; height: 2.125rem; font-size: var(--text-xs); }
+.photoWrap { position: relative; flex-shrink: 0; }
+.onDot {
+  position: absolute; right: 0; bottom: 0; width: 0.7rem; height: 0.7rem; border-radius: 999px; background: #16a34a;
+  box-shadow: 0 0 0 2px var(--card);
+}
+.who { min-width: 0; flex: 1; }
+.name { font-weight: 600; font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub { font-size: var(--text-xs); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kind {
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; border-radius: 999px; padding: 0.15rem 0.5rem;
+  color: var(--tone); background: color-mix(in srgb, var(--tone) 13%, transparent); white-space: nowrap; flex-shrink: 0;
+}
+.timerRow { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.timer { font-size: 1.375rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.timer[data-level="warn"] { color: #b45309; }
+.timer[data-level="alert"] { color: #d03b3b; }
+:global(.dark) .timer[data-level="warn"] { color: #fbbf24; }
+:global(.dark) .timer[data-level="alert"] { color: #f87171; }
+.since { font-size: var(--text-xs); color: var(--muted-foreground); text-align: right; }
+.bar { height: 0.375rem; border-radius: 999px; background: color-mix(in srgb, var(--foreground) 8%, transparent); overflow: hidden; }
+.barFill { height: 100%; border-radius: inherit; background: var(--tone); transition: width 400ms ease; }
+.barFill[data-level="warn"] { background: #d4a017; }
+.barFill[data-level="alert"] { background: #d03b3b; }
+.personFoot { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 1.75rem; }
+.tags { display: flex; gap: 0.3rem; flex-wrap: wrap; min-width: 0; }
+.tag {
+  font-size: 0.68rem; font-weight: 600; border-radius: 0.375rem; padding: 0.1rem 0.4rem; background: var(--card); color: var(--muted-foreground);
+  display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap;
+}
+.tag[data-tone] { color: var(--tone); background: color-mix(in srgb, var(--tone) 12%, var(--card)); }
+.outBtn {
+  border: 0; cursor: pointer; border-radius: 0.5rem; padding: 0.3rem 0.65rem; font-size: var(--text-xs); font-weight: 600;
+  display: inline-flex; align-items: center; gap: 0.3rem; background: var(--card); color: #b42318; white-space: nowrap;
+}
+:global(.dark) .outBtn { color: #f87171; }
+.outBtn:hover:not(:disabled) { background: color-mix(in srgb, #d03b3b 10%, var(--card)); }
+.outBtn:disabled { opacity: 0.55; cursor: default; }
+.outBtn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* ── Tables ────────────────────────────────────────────────────────────── */
+.personCell { display: flex; align-items: center; gap: 0.625rem; min-width: 12rem; }
+.spent { display: flex; flex-direction: column; gap: 0.25rem; min-width: 7rem; }
+.spentBar { height: 0.3rem; border-radius: 999px; background: color-mix(in srgb, var(--foreground) 8%, transparent); overflow: hidden; }
+.spentFill { height: 100%; background: var(--tone); border-radius: inherit; }
+.time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.insideText { color: #15803d; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+:global(.dark) .insideText { color: #4ade80; }
+.neutral {
+  display: inline-flex; font-size: var(--text-xs); font-weight: 600; padding: 0.15rem 0.55rem; border-radius: 999px;
+  background: var(--muted); color: var(--muted-foreground); white-space: nowrap;
+}
+.more { display: flex; justify-content: center; padding-top: 0.5rem; }
+
+/* ── Team strip ────────────────────────────────────────────────────────── */
+.teamFacts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+.teamFact { border-radius: 0.75rem; padding: 0.75rem 0.875rem; background: color-mix(in srgb, var(--tone) 7%, var(--muted)); }
+.teamFactValue { font-size: 1.375rem; font-weight: 700; color: var(--tone); line-height: 1.2; }
+.teamFactLabel { font-size: var(--text-xs); color: var(--muted-foreground); font-weight: 600; }
+
+.chartBox { width: 100%; height: 280px; }
+.chartBoxSm { width: 100%; height: 220px; }
+.trendFacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+
+@media (max-width: 1024px) {
+  .teamFacts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .people { grid-template-columns: minmax(0, 1fr); }
+  .trendFacts { grid-template-columns: minmax(0, 1fr); }
+  .search { max-width: none; }
+  .toolEnd { margin-left: 0; }
+}

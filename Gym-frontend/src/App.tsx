@@ -220,6 +220,7 @@ import {
   AvatarImage,
 } from "./components/ui/avatar";
 import { Toaster } from "./components/ui/sonner";
+import { PaymentTermsHost } from "./components/payment-terms/PaymentTermsDialog";
 import { syncThemeForUser } from "./utils/theme";
 
 /**
@@ -1784,6 +1785,7 @@ export default function App() {
         <GlobalSearch pages={globalSearchPages} branchId={activeBranchId} branchName={activeBranchName} />
       )}
       <ResponsiveEnhancer enabled={!isPosRoute} />
+      {!isGymbiosAdmin && !isMemberRole && <PaymentTermsHost />}
       <Toaster />
     </SidebarProvider>
   );

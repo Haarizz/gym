@@ -138,6 +138,63 @@ public class DeferredRevenueScheduleService {
         scheduleRepo.save(schedule);
     }
 
+    /**
+     * Billing › Refunds: takes a refund's net (ex-VAT) amount out of the bill's still-deferred
+     * revenue. Returns { deferredDebit, recognizeNow }:
+     * <ul>
+     *   <li>deferredDebit — what the refund takes out of Deferred Revenue (at most what is left);
+     *       the rest of the refund comes out of recognised Membership Revenue.</li>
+     *   <li>recognizeNow — when the plan is cancelled, whatever is still deferred after the
+     *       refund is the gym's to keep: recognised immediately and the schedule closed.</li>
+     * </ul>
+     * Without cancelling, the pending months are scaled down so they add up to what is left.
+     */
+    public BigDecimal[] applyRefund(Long receiptId, BigDecimal netRefund, boolean cancelPlan) {
+        BigDecimal deferredDebit = BigDecimal.ZERO;
+        BigDecimal recognizeNow = BigDecimal.ZERO;
+        if (receiptId == null || netRefund == null || netRefund.signum() <= 0) {
+            return new BigDecimal[] { deferredDebit, recognizeNow };
+        }
+        BigDecimal toTake = netRefund;
+        for (DeferredRevenueSchedule schedule : scheduleRepo.findByReceiptIdAndStatus(receiptId, "ACTIVE")) {
+            List<DeferredRevenueRecognitionLine> pending = lineRepo.findByScheduleIdOrderByPeriodNumberAsc(schedule.getId())
+                    .stream().filter(l -> "PENDING".equals(l.getStatus())).toList();
+            BigDecimal remaining = pending.stream().map(DeferredRevenueRecognitionLine::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal take = toTake.min(remaining).max(BigDecimal.ZERO);
+            toTake = toTake.subtract(take);
+            deferredDebit = deferredDebit.add(take);
+            BigDecimal left = remaining.subtract(take);
+
+            if (cancelPlan || left.signum() <= 0) {
+                recognizeNow = recognizeNow.add(left.max(BigDecimal.ZERO));
+                for (DeferredRevenueRecognitionLine l : pending) l.setStatus("CANCELLED");
+                lineRepo.saveAll(pending);
+                schedule.setTotalAmount(schedule.getTotalAmount().subtract(take));
+                schedule.setRecognizedAmount(schedule.getRecognizedAmount().add(left.max(BigDecimal.ZERO)));
+                schedule.setRemainingAmount(BigDecimal.ZERO);
+                schedule.setStatus(cancelPlan ? "CANCELLED" : "COMPLETED");
+            } else {
+                // Scale every pending month down; the last one absorbs the rounding.
+                BigDecimal allocated = BigDecimal.ZERO;
+                for (int i = 0; i < pending.size(); i++) {
+                    DeferredRevenueRecognitionLine l = pending.get(i);
+                    BigDecimal amount = i < pending.size() - 1
+                            ? l.getAmount().multiply(left).divide(remaining, 2, RoundingMode.DOWN)
+                            : left.subtract(allocated);
+                    allocated = allocated.add(amount);
+                    l.setAmount(amount);
+                }
+                lineRepo.saveAll(pending);
+                schedule.setTotalAmount(schedule.getTotalAmount().subtract(take));
+                schedule.setRemainingAmount(left);
+            }
+            scheduleRepo.save(schedule);
+            if (toTake.signum() <= 0 && !cancelPlan) break;
+        }
+        return new BigDecimal[] { deferredDebit, recognizeNow };
+    }
+
     public List<DeferredRevenueSchedule> findActiveSchedules() {
         return scheduleRepo.findByStatusOrderByStartDateDesc("ACTIVE");
     }

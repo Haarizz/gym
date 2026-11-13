@@ -18,6 +18,7 @@ import styles from '../purchase/PurchaseInvoice.module.css';
 import { cx } from '../purchase/purchaseUi';
 import { todayIso } from '../purchase/purchaseInvoiceUtils';
 import { balanceOf } from './salesInvoiceUtils';
+import { askPaymentTerms } from '../payment-terms/PaymentTermsDialog';
 
 const fmt2 = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
 
@@ -88,6 +89,13 @@ export function SalesInvoiceSettleDialog({ request, bankAccounts, stockCheckEnab
       toast.error('Walk-in sales must be paid in full — allocate the whole amount (or pick a member to sell on account)');
       return;
     }
+    // Only when money is actually taken now (a confirm left fully on account isn't a payment).
+    if (payment && payment.amount > 0 && !(await askPaymentTerms('sales_invoice', {
+      memberDbId: inv.memberId ?? null,
+      memberName: inv.customerName,
+      amount: payment.amount,
+      detail: inv.invoiceNumber,
+    }))) return;
 
     setSaving(true);
     try {

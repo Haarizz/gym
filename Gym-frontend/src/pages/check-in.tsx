@@ -1,12 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import { PhoneInput } from "../components/shared/PhoneInput";
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -14,32 +11,17 @@ import {
 } from "../components/ui/alert-dialog";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Separator } from "../components/ui/separator";
 import {
-  LogIn,
-  LogOut,
-  Search,
-  QrCode,
-  UserCheck,
-  Users,
-  Camera,
-  CheckCircle,
-  AlertCircle,
-  UserPlus,
-  Upload,
-  X,
-  CalendarClock,
-  RefreshCw,
-  Briefcase,
-  Clock,
-  Settings,
+  AlertCircle, BarChart3, Briefcase, CalendarClock, Camera, CheckCircle, Clock, Coffee, DoorOpen, Footprints,
+  Gauge, History, LogIn, LogOut, QrCode, RefreshCw, Search, Settings, Timer, Upload, UserCheck, UserPlus, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { styles, Kpi, Panel, Empty, SectionTabs, Seg, Status, fmtInt } from '../components/overview/overview-kit';
+import { useBranch } from '../utils/branch-context';
 import { membersService, type Member } from '../utils/supabase/members-service';
 import { staffService, type Staff } from '../utils/supabase/staff-service';
-import { checkInService, MinVisitNotReachedError, type CheckInSettings, type TodayAttendanceRecord, type WalkInCheckInRequest } from '../utils/supabase/checkin-service';
-import { staffAttendanceService } from '../utils/supabase/staff-attendance-service';
+import { checkInService, MinVisitNotReachedError, type CheckInSettings, type WalkInCheckInRequest } from '../utils/supabase/checkin-service';
+import { staffAttendanceService, type DayReport, type DayVisit } from '../utils/supabase/staff-attendance-service';
 import { attendanceService } from '../utils/supabase/attendance-service';
 import { plansService, type Plan } from '../utils/supabase/plans-service';
 import { accountHeadsService, type AccountHead } from '../utils/supabase/account-heads-service';
@@ -51,32 +33,54 @@ import type { CreditCustomer } from '../payments/modals/CreditModal';
 import { walkInRegistrationService, type MyWalkInLink, type PendingWalkInRegistration } from '../utils/supabase/walk-in-registration-service';
 import { WalkInQr } from '../components/shared/WalkInQr';
 import { useDebouncedValue } from '../utils/use-debounced-value';
+import a from './attendance.module.css';
+import c from './check-in.module.css';
+import { askPaymentTerms } from '../components/payment-terms/PaymentTermsDialog';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type PersonKind = 'member' | 'staff';
+type EffStatus = 'active' | 'expired' | 'frozen' | 'suspended' | 'pending_approval' | 'inactive' | string;
 interface PersonEntry {
   kind: PersonKind;
   id: number;
   name: string;
   bizId: string;       // MBR-... or EMP-...
   role: string;        // membership type for members, role for staff
-  status: string;
+  status: EffStatus;   // members: effective status (an active membership past its end date is expired)
   photoUrl?: string;
+  phone?: string;
+  endDate?: string | null;
+  trainer?: boolean;
   // Membership suspended by staff — check-in is refused until it's resumed.
   suspended?: boolean;
   suspendedReason?: string | null;
 }
+type Tab = 'desk' | 'daily' | 'configuration';
+type Who = 'all' | 'member' | 'staff';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function initials(name: string) {
-  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  return name.split(/\s+/).filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
 }
 
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+const todayIso = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** Same rule as the backend's MemberEffectiveStatus: suspended wins, then frozen/pending, then the end date. */
+function effectiveStatus(m: Member): EffStatus {
+  if (m.membership_suspended) return 'suspended';
+  const stored = (m.membership_status || '').toLowerCase();
+  if (stored === 'pending_approval' || stored === 'frozen') return stored;
+  const end = (m.membership_end_date || m.expiry_date || '').slice(0, 10);
+  if (end && end < todayIso()) return 'expired';
+  return stored || 'inactive';
 }
+
+const isTrainerRole = (role?: string | null) => /trainer|coach|instructor/i.test(role || '');
 
 function memberToPerson(m: Member): PersonEntry {
   return {
@@ -85,8 +89,10 @@ function memberToPerson(m: Member): PersonEntry {
     name: m.name,
     bizId: m.member_id || String(m.id),
     role: m.membership_type || 'Member',
-    status: m.membership_status,
+    status: effectiveStatus(m),
     photoUrl: m.photo_url,
+    phone: m.phone,
+    endDate: (m.membership_end_date || m.expiry_date || null),
     suspended: !!m.membership_suspended,
     suspendedReason: m.suspended_reason ?? null,
   };
@@ -101,37 +107,88 @@ function staffToPerson(s: Staff): PersonEntry {
     role: s.role || 'Staff',
     status: s.status,
     photoUrl: s.photo_url,
+    trainer: isTrainerRole(s.role),
   };
+}
+
+function daysUntil(iso?: string | null): number | null {
+  if (!iso) return null;
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  if (!y) return null;
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  return Math.round((new Date(y, m - 1, d).getTime() - t.getTime()) / 86400000);
+}
+
+function fmtDur(min: number) {
+  const m = Math.max(0, Math.round(min));
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+}
+
+const STATUS_LOOK: Record<string, { label: string; tone: string }> = {
+  active: { label: 'Active', tone: '#15803d' },
+  expired: { label: 'Expired', tone: '#b42318' },
+  frozen: { label: 'Frozen', tone: '#2563eb' },
+  suspended: { label: 'Suspended', tone: '#b42318' },
+  pending_approval: { label: 'Pending approval', tone: '#b45309' },
+  inactive: { label: 'Inactive', tone: '#64748b' },
+};
+const statusLook = (s: string) => STATUS_LOOK[(s || '').toLowerCase()] || { label: s || '—', tone: '#64748b' };
+
+const KIND_TONE: Record<string, string> = { member: 'blue', walk_in: 'orange', trainer: 'violet', staff: 'teal' };
+
+function Photo({ name, url, tone, on, small }: { name: string; url?: string | null; tone: string; on?: boolean; small?: boolean }) {
+  const [broken, setBroken] = useState(false);
+  const cls = `${a.photo} ${small ? a.photoSm : ''}`;
+  return (
+    <span className={a.photoWrap} data-tone={tone}>
+      {url && !broken ? <img src={url} alt="" className={cls} onError={() => setBroken(true)} /> : <span className={cls} aria-hidden="true">{initials(name)}</span>}
+      {on && <span className={a.onDot} title="Inside now" />}
+    </span>
+  );
+}
+
+function useNow(ms: number) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(t); }, [ms]);
+  return now;
 }
 
 /** Members listed at a time on the check-in screen (the rest are a search away). */
 const MEMBER_RESULTS = 50;
+const LONG_STAY = 180;
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function CheckIn() {
   const { currencyCode, currencyPrefix } = useCurrency();
+  const { activeBranchId } = useBranch();
+  const navigate = useNavigate();
+  const now = useNow(15_000);
+
   // ── Data state ──────────────────────────────────────────────────────────────
   const [memberPeople, setMemberPeople]   = useState<PersonEntry[]>([]);
   const [staffPeople, setStaffPeople]     = useState<PersonEntry[]>([]);
   const [memberTotal, setMemberTotal]     = useState(0);   // every member in the branch
   const [memberMatches, setMemberMatches] = useState(0);   // members matching the current search
   const [memberSearching, setMemberSearching] = useState(false);
-  const [todayAttendance, setTodayAttendance] = useState<TodayAttendanceRecord[]>([]);
+  // Today (gym day): everyone inside — members, walk-ins, trainers, staff — and every visit so far.
+  const [day, setDay]                     = useState<DayReport | null>(null);
   const [loading, setLoading]             = useState(true);
   const [checkingInId, setCheckingInId]   = useState<number | null>(null);
-  const [checkingOutId, setCheckingOutId] = useState<number | null>(null); // attendance record id being checked out
-  const [staffActiveMap, setStaffActiveMap] = useState<Record<number, number>>({}); // staffDbId → attendanceRecordId
+  const [checkingOutId, setCheckingOutId] = useState<number | null>(null); // attendance record / staff id being closed
 
   // ── UI state ─────────────────────────────────────────────────────────────────
   const [searchTerm, setSearchTerm]       = useState('');
+  const [who, setWho]                     = useState<Who>('all');
+  const [feedView, setFeedView]           = useState<'inside' | 'today'>('inside');
   // The dashboard's Day-Pass card opens this straight on the Walk-In / Daily tab
   const location = useLocation();
-  const [activeTab, setActiveTab]         = useState(
-    (location.state as { tab?: string } | null)?.tab === 'daily' ? 'daily' : 'registered'
+  const [activeTab, setActiveTab]         = useState<Tab>(
+    (location.state as { tab?: string } | null)?.tab === 'daily' ? 'daily' : 'desk'
   );
   const [selectedPerson, setSelectedPerson] = useState<PersonEntry | null>(null);
-  const [activeOnlyFilter, setActiveOnlyFilter] = useState(false);
+  const searchBoxRef = useRef<HTMLInputElement>(null);
 
   // ── Daily visitor form ───────────────────────────────────────────────────────
   const [visitorName, setVisitorName]     = useState('');
@@ -140,8 +197,6 @@ export function CheckIn() {
   const [walkInPlans, setWalkInPlans]     = useState<Plan[]>([]);
   const [selectedPlan, setSelectedPlan]   = useState('');
   const [grantingAccess, setGrantingAccess] = useState(false);
-  const [dailyCheckIns, setDailyCheckIns] = useState<any[]>([]);
-  const [walkInsLoaded, setWalkInsLoaded] = useState(false);
   const [bankAccounts, setBankAccounts]   = useState<AccountHead[]>([]);
   const [staffOptions, setStaffOptions]   = useState<Staff[]>([]);
   const [processedByStaffId, setProcessedByStaffId] = useState('');
@@ -155,8 +210,7 @@ export function CheckIn() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef     = useRef<HTMLVideoElement>(null);
 
-  // Configurable gym floor capacity (Attendance Reports > report settings),
-  // defaulting to 150 only until the real value loads.
+  // Configurable gym floor capacity (Attendance Reports > Settings), defaulting to 150 until it loads.
   const [gymCapacity, setGymCapacity] = useState(150);
   useEffect(() => {
     attendanceService.getReportSettings()
@@ -164,7 +218,7 @@ export function CheckIn() {
       .catch(() => {});
   }, []);
 
-  // Check-in timing rules for this branch (Configuration tab). Enforced by the backend.
+  // Check-in timing rules for this branch (Rules tab). Enforced by the backend.
   const [savedSettings, setSavedSettings] = useState<CheckInSettings | null>(null);
   const [settingsForm, setSettingsForm] = useState<CheckInSettings | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -188,7 +242,7 @@ export function CheckIn() {
       const saved = await checkInService.updateSettings(settingsForm);
       setSavedSettings(saved);
       setSettingsForm(saved);
-      toast.success('Check-in settings saved');
+      toast.success('Check-in rules saved');
     } catch (err: any) {
       toast.error(err.message || 'Could not save check-in settings');
     } finally {
@@ -196,8 +250,8 @@ export function CheckIn() {
     }
   };
 
-  // Daily/walk-in passes are now real plans configured in Manage Plans under the
-  // "Walk-In / Daily Visitor" membership type, instead of a hardcoded list.
+  // Daily/walk-in passes are real plans configured in Manage Plans under the
+  // "Walk-In / Daily Visitor" membership type.
   useEffect(() => {
     plansService.getPlans('Active')
       .then(all => setWalkInPlans(all.filter(p => p.planType === 'Walk-In')))
@@ -230,7 +284,7 @@ export function CheckIn() {
       ]);
       setStaffPeople(staffRes.items.map(staffToPerson));
       setStaffOptions(staffRes.items);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load people list');
     }
   }, [loadMembers]);
@@ -242,55 +296,13 @@ export function CheckIn() {
       .finally(() => setMemberSearching(false));
   }, [debouncedSearch, loadMembers]);
 
-  const loadTodayAttendance = useCallback(async () => {
+  const loadDay = useCallback(async () => {
     try {
-      const records = await checkInService.getTodayAttendance();
-      setTodayAttendance(records);
+      setDay(await staffAttendanceService.getDayReport());
     } catch {
-      // non-fatal — show empty list
+      // non-fatal — the lists stay as they were
     }
   }, []);
-
-  const loadStaffActiveMap = useCallback(async () => {
-    try {
-      const records = await staffAttendanceService.getTodayStaffAttendance();
-      const map: Record<number, number> = {};
-      records.filter(r => r.status === 'working').forEach(r => {
-        map[r.staff_db_id] = r.id;
-      });
-      setStaffActiveMap(map);
-    } catch {
-      // non-fatal
-    }
-  }, []);
-
-  const loadTodayWalkIns = useCallback(async () => {
-    if (walkInsLoaded) return;
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const res = await staffAttendanceService.getAttendance(today, undefined, 0, 200);
-      const walkIns = res.items
-        .filter(r => r.type === 'walk_in')
-        .map(r => ({
-          id: r.id,
-          memberName: r.walk_in_name || 'Visitor',
-          memberId: `DAILY-${String(r.id).slice(-4)}`,
-          avatar: null,
-          checkInTime: new Date(r.check_in_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-          status: r.status === 'active' ? 'Active' : 'Completed',
-          membership: r.activity_type || 'Daily Pass',
-          type: 'daily',
-          mobile: r.walk_in_phone || '',
-          plan: null,
-          paymentMethod: '',
-          amount: null,
-        }));
-      setDailyCheckIns(walkIns);
-      setWalkInsLoaded(true);
-    } catch {
-      // non-fatal
-    }
-  }, [walkInsLoaded]);
 
   const loadPendingRegistrations = useCallback(async () => {
     try {
@@ -300,9 +312,18 @@ export function CheckIn() {
     }
   }, []);
 
+  const loadAll = useCallback(() => {
+    setLoading(true);
+    return Promise.all([loadPeople(), loadDay(), loadPendingRegistrations()]).finally(() => setLoading(false));
+  }, [loadPeople, loadDay, loadPendingRegistrations]);
+
+  useEffect(() => { loadAll(); }, [loadAll, activeBranchId]);
+
+  // The desk screen stays open all day: pick up face-device / app check-ins every 30 seconds.
   useEffect(() => {
-    Promise.all([loadPeople(), loadTodayAttendance(), loadStaffActiveMap(), loadTodayWalkIns(), loadPendingRegistrations()]).finally(() => setLoading(false));
-  }, [loadPeople, loadTodayAttendance, loadStaffActiveMap, loadTodayWalkIns, loadPendingRegistrations]);
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') loadDay(); }, 30_000);
+    return () => window.clearInterval(t);
+  }, [loadDay]);
 
   // Visitors sign up from their own phones — keep the pending list fresh while the desk is on this tab.
   useEffect(() => {
@@ -341,25 +362,44 @@ export function CheckIn() {
 
   // ── Derived values ───────────────────────────────────────────────────────────
 
+  const visits = day?.visits ?? [];
+  const tz = day?.time_zone;
+  const fmtTime = useCallback((iso?: string | null) => {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: tz }); }
+    catch { return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); }
+  }, [tz]);
+  const minutesIn = useCallback((v: DayVisit) => (v.inside ? Math.max(v.minutes, Math.floor((now - new Date(v.check_in).getTime()) / 60000)) : v.minutes), [now]);
+
+  // member id → open visit, staff id → open shift
+  const insideMember = useMemo(() => {
+    const m: Record<number, DayVisit> = {};
+    for (const v of visits) if (v.inside && v.kind === 'member' && v.person_id != null) m[v.person_id] = v;
+    return m;
+  }, [visits]);
+  const insideStaff = useMemo(() => {
+    const m: Record<number, DayVisit> = {};
+    for (const v of visits) if (v.inside && (v.kind === 'staff' || v.kind === 'trainer') && v.person_id != null) m[v.person_id] = v;
+    return m;
+  }, [visits]);
+
+  const insideGuests = visits.filter(v => v.inside && (v.kind === 'member' || v.kind === 'walk_in'));
+  const insideTeam = visits.filter(v => v.inside && (v.kind === 'staff' || v.kind === 'trainer'));
+  const walkInsToday = visits.filter(v => v.kind === 'walk_in' && !v.from_earlier_day);
+  const checkInsToday = visits.filter(v => (v.kind === 'member' || v.kind === 'walk_in') && !v.from_earlier_day).length;
+  const occupancy = gymCapacity > 0 ? Math.round((insideGuests.length / gymCapacity) * 100) : 0;
+  const occLevel = occupancy >= 90 ? 'alert' : occupancy >= 70 ? 'warn' : 'ok';
+
   // Members come back already matched by the server; staff are matched here.
   const q = searchTerm.trim().toLowerCase();
+  const staffMatches = staffPeople.filter(p => !q || p.name.toLowerCase().includes(q) || p.bizId.toLowerCase().includes(q) || p.role.toLowerCase().includes(q));
   const filtered = [
-    ...memberPeople,
-    ...staffPeople.filter(p => p.name.toLowerCase().includes(q) || p.bizId.toLowerCase().includes(q)),
+    ...(who === 'staff' ? [] : memberPeople),
+    ...(who === 'member' ? [] : staffMatches),
   ];
-
-  // member_id → attendance record id, for members currently checked in (no checkout yet)
-  const activeMemberAttendance = todayAttendance.reduce<Record<number, number>>((map, r) => {
-    if (r.status === 'active') map[r.member_id] = r.id;
-    return map;
-  }, {});
-
-  const todayCount  = todayAttendance.length + dailyCheckIns.length;
-  const activeCount = todayAttendance.length + dailyCheckIns.filter(d => d.status === 'Active').length;
-  const occupancy   = Math.round((activeCount / gymCapacity) * 100);
-  const visibleTodayAttendance = activeOnlyFilter
-    ? todayAttendance.filter(r => r.status === 'active')
-    : todayAttendance;
+  const canAct = (p: PersonEntry) => p.kind === 'member'
+    ? (!!insideMember[p.id] || (p.status === 'active' && !p.suspended))
+    : (p.status || '').toLowerCase() !== 'inactive';
 
   const selectedPlanDetails = walkInPlans.find(p => p.id.toString() === selectedPlan);
   const walkInCharge = Number(selectedPlanDetails?.price ?? 0);
@@ -373,8 +413,8 @@ export function CheckIn() {
     setCheckingOutId(attendanceId);
     try {
       const res = await checkInService.checkout(attendanceId, force);
-      toast.success(`${memberName} checked out — ${res.formatted_duration}`);
-      await loadTodayAttendance();
+      toast.success(`${memberName} checked out${res.formatted_duration ? ` · ${res.formatted_duration}` : ''}`);
+      await loadDay();
     } catch (err: any) {
       if (err instanceof MinVisitNotReachedError) {
         setEarlyCheckOut({ attendanceId, name: memberName, message: err.message });
@@ -389,9 +429,9 @@ export function CheckIn() {
   const handleStaffClockIn = async (person: PersonEntry) => {
     setCheckingInId(person.id);
     try {
-      const rec = await staffAttendanceService.clockIn(person.id, 'WEB');
-      setStaffActiveMap(prev => ({ ...prev, [person.id]: rec.id }));
+      await staffAttendanceService.clockIn(person.id, 'WEB');
       toast.success(`${person.name} clocked in`);
+      await loadDay();
     } catch (err: any) {
       toast.error(err.message || 'Clock-in failed');
     } finally {
@@ -403,8 +443,8 @@ export function CheckIn() {
     setCheckingOutId(person.id);
     try {
       const rec = await staffAttendanceService.clockOut(person.id);
-      setStaffActiveMap(prev => { const n = { ...prev }; delete n[person.id]; return n; });
-      toast.success(`${person.name} clocked out — ${rec.formatted_duration || ''}`);
+      toast.success(`${person.name} clocked out${rec.formatted_duration ? ` · ${rec.formatted_duration}` : ''}`);
+      await loadDay();
     } catch (err: any) {
       toast.error(err.message || 'Clock-out failed');
     } finally {
@@ -412,19 +452,16 @@ export function CheckIn() {
     }
   };
 
-  const handleCheckIn = async (person: PersonEntry) => {
+  /** One button per row: check in / check out a member, clock in / out a staff member. */
+  const primaryAction = (person: PersonEntry) => {
     if (person.kind === 'staff') {
-      toast.info('Staff clock-in is managed through the Attendance module');
+      if (insideStaff[person.id]) handleStaffClockOut(person); else handleStaffClockIn(person);
       return;
     }
-    if (activeMemberAttendance[person.id]) {
-      toast.error(`${person.name} is already checked in`);
-      return;
-    }
-    if (person.status?.toLowerCase() !== 'active') {
-      toast.error(`Cannot check in — membership is ${person.status}`);
-      return;
-    }
+    const open = insideMember[person.id];
+    if (open) { handleCheckOut(open.record_id, person.name); return; }
+    if (person.suspended) { toast.error(`${person.name}'s membership is suspended${person.suspendedReason ? `: ${person.suspendedReason}` : ''}`); return; }
+    if (person.status !== 'active') { toast.error(`Can't check in — membership is ${statusLook(person.status).label.toLowerCase()}`); return; }
     setSelectedPerson(person);
   };
 
@@ -437,13 +474,25 @@ export function CheckIn() {
         member_id: selectedPerson.id,
         device_id: 'WEB',
       });
-      toast.success(res.message);
+      toast.success(res.message || `${selectedPerson.name} checked in`);
       setSelectedPerson(null);
-      await loadTodayAttendance();
+      setSearchTerm('');
+      await loadDay();
+      searchBoxRef.current?.focus();
     } catch (err: any) {
       toast.error(err.message || 'Check-in failed');
     } finally {
       setCheckingInId(null);
+    }
+  };
+
+  // Enter in the search box acts on the first result (scan a card / type an ID, press Enter).
+  const onSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && filtered.length > 0 && !memberSearching && debouncedSearch === searchTerm.trim()) {
+      e.preventDefault();
+      primaryAction(filtered[0]);
+    } else if (e.key === 'Escape') {
+      setSearchTerm('');
     }
   };
 
@@ -493,6 +542,11 @@ export function CheckIn() {
       });
       return;
     }
+    if (!(await askPaymentTerms('day_pass', {
+      memberName: visitorName,
+      amount: walkInCharge,
+      detail: selectedPlanDetails?.name ?? 'Day pass',
+    }))) return;
     try {
       setGrantingAccess(true);
       const lines = walkInPaymentManager.paymentLines;
@@ -515,7 +569,7 @@ export function CheckIn() {
         const line = nonCreditLines[0];
         paymentMethod = lineMethod(line);
         if (line.paymentType === PAYMENT_TYPES.ONLINE && line.bankAccountId) {
-          const account = bankAccounts.find(a => String(a.id) === line.bankAccountId);
+          const account = bankAccounts.find(acc => String(acc.id) === line.bankAccountId);
           bankAccountCode = account?.code;
           bankAccountName = account?.name;
         }
@@ -545,30 +599,15 @@ export function CheckIn() {
         processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
         self_registration_id: selfRegistration?.id,
       };
-      const resp = await checkInService.walkInCheckIn(req);
+      await checkInService.walkInCheckIn(req);
       if (selfRegistration) setPendingRegistrations(prev => prev.filter(p => p.id !== selfRegistration.id));
-
-      const visitor = {
-        id: resp.attendance_id,
-        memberName: visitorName,
-        memberId: `DAILY-${String(resp.attendance_id).slice(-4)}`,
-        avatar: visitorPhoto,
-        checkInTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        status: 'Active',
-        membership: selectedPlanDetails?.name || 'Daily Pass',
-        type: 'daily',
-        mobile: visitorMobile,
-        plan: selectedPlanDetails,
-        paymentMethod: paymentSummary,
-        amount: selectedPlanDetails?.price,
-      };
-      setDailyCheckIns(prev => [visitor, ...prev.filter(p => p.id !== resp.attendance_id)]);
       toast.success(`Access granted to ${visitorName}`, {
         description: walkInCredit > 0
           ? `${selectedPlanDetails?.name} — ${currencyPrefix}${walkInCredit} left on credit`
           : `${selectedPlanDetails?.name} — Valid for ${selectedPlanDetails?.duration}`,
       });
       resetDailyForm();
+      await loadDay();
     } catch (err: any) {
       toast.error(err.message || 'Walk-in check-in failed');
       if (selfRegistration) loadPendingRegistrations();
@@ -587,456 +626,335 @@ export function CheckIn() {
     }
   };
 
+  // ── Render pieces ─────────────────────────────────────────────────────────────
+
+  const clock = (() => {
+    try {
+      return new Date(now).toLocaleString(undefined, { weekday: 'long', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: tz });
+    } catch { return new Date(now).toLocaleString(); }
+  })();
+
+  const feedRow = (v: DayVisit, showOut: boolean) => {
+    const min = minutesIn(v);
+    const isGuest = v.kind === 'member' || v.kind === 'walk_in';
+    const level = isGuest ? (min >= LONG_STAY ? 'alert' : min >= LONG_STAY * 0.7 ? 'warn' : 'ok') : 'ok';
+    const busy = checkingOutId === v.record_id || (!isGuest && v.person_id != null && checkingOutId === v.person_id);
+    return (
+      <div key={v.key} className={c.feedRow} data-tone={KIND_TONE[v.kind]}>
+        <Photo name={v.name} url={v.photo_url} tone={KIND_TONE[v.kind]} on={v.inside} small />
+        <div style={{ minWidth: 0 }}>
+          <div className={a.name}>{v.name}</div>
+          <div className={a.sub}>
+            {v.inside ? `in since ${fmtTime(v.check_in)}${v.from_earlier_day ? ' (yesterday)' : ''}` : `${fmtTime(v.check_in)} – ${fmtTime(v.check_out)}`}
+            {v.code ? ` · ${v.code}` : ''}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div className={c.feedTime}>
+            <div className={c.feedTimer} data-level={level}>{fmtDur(min)}</div>
+            {v.inside ? (level === 'alert' ? <span className={c.warnTag}>check-out missed?</span> : 'inside') : 'stayed'}
+          </div>
+          {showOut && v.inside && (
+            <button type="button" className={c.btnOut} style={{ minWidth: 0 }} disabled={busy}
+              onClick={() => {
+                if (isGuest) handleCheckOut(v.record_id, v.name);
+                else if (v.person_id != null) {
+                  const p = staffPeople.find(s => s.id === v.person_id);
+                  if (p) handleStaffClockOut(p);
+                }
+              }}
+              aria-label={`${isGuest ? 'Check out' : 'Clock out'} ${v.name}`}>
+              {busy ? <RefreshCw size={12} className="animate-spin" /> : <LogOut size={12} />}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-
+    <div className={styles.root}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className={styles.head}>
         <div>
-          <h1 className="text-3xl font-bold text-gymbios-heading">Check In</h1>
-          <p className="text-muted-foreground">Manage access for registered members or daily visitors</p>
+          <h1 className={styles.title}>Check In</h1>
+          <div className={styles.subtitle}>
+            <span className={a.live}><span className={a.dot} />Live</span>
+            <span className={c.clock}>{clock}</span>
+            {tz && <span>· {tz.replace('_', ' ')}</span>}
+          </div>
         </div>
-        <div className="flex space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => { setLoading(true); setWalkInsLoaded(false); Promise.all([loadPeople(), loadTodayAttendance(), loadStaffActiveMap(), loadTodayWalkIns(), loadPendingRegistrations()]).finally(() => setLoading(false)); }}
-            className="border-primary/30"
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+        <div className={styles.actions}>
+          <Button variant="outline" size="sm" onClick={() => loadAll()} aria-label="Refresh">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <Button variant="outline" className="border-primary/30" onClick={openWalkInQr}>
-            <QrCode className="mr-2 h-4 w-4" />
-            Walk-in QR
+          <Button variant="outline" size="sm" onClick={openWalkInQr}>
+            <QrCode className="mr-2 h-4 w-4" /> Walk-in QR
           </Button>
-          <Button variant="outline" className="border-primary/30 opacity-60 cursor-not-allowed" disabled title="Hardware device required">
-            <QrCode className="mr-2 h-4 w-4" />
-            QR Scanner
-            <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">Soon</span>
-          </Button>
-          <Button variant="outline" className="border-primary/30 opacity-60 cursor-not-allowed" disabled title="Face recognition device required">
-            <Camera className="mr-2 h-4 w-4" />
-            Face Recognition
-            <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">Soon</span>
+          <Button variant="outline" size="sm" onClick={() => navigate('/attendance')}>
+            <BarChart3 className="mr-2 h-4 w-4" /> Attendance
           </Button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card
-          className="border-primary/10 shadow-md cursor-pointer"
-          style={activeTab === 'registered' && !activeOnlyFilter ? { boxShadow: '0 0 0 2px var(--gb-primary-deep)' } : undefined}
-          onClick={() => { setActiveTab('registered'); setActiveOnlyFilter(false); }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Today's Check-ins</CardTitle>
-            <div className="bg-gradient-light p-2 rounded-lg"><LogIn className="h-4 w-4 text-primary" /></div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{todayCount}</div>
-            <p className="text-xs text-muted-foreground">Total visits today</p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="border-primary/10 shadow-md cursor-pointer"
-          style={activeOnlyFilter ? { boxShadow: '0 0 0 2px #16a34a' } : undefined}
-          title="Click to show only currently active check-ins"
-          onClick={() => { setActiveTab('registered'); setActiveOnlyFilter(v => !v); }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Currently Active</CardTitle>
-            <div className="bg-green-50 p-2 rounded-lg"><UserCheck className="h-4 w-4 text-green-600" /></div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{activeCount}</div>
-            <p className="text-xs text-muted-foreground">Members in gym</p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="border-primary/10 shadow-md cursor-pointer"
-          onClick={() => { setActiveTab('registered'); setActiveOnlyFilter(false); }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Occupancy Rate</CardTitle>
-            <div className="bg-gradient-light p-2 rounded-lg"><Users className="h-4 w-4 text-primary" /></div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{occupancy}%</div>
-            <p className="text-xs text-muted-foreground">of {gymCapacity} capacity</p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="border-primary/10 shadow-md cursor-pointer"
-          style={activeTab === 'daily' ? { boxShadow: '0 0 0 2px #2563eb' } : undefined}
-          onClick={() => { setActiveTab('daily'); setActiveOnlyFilter(false); }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Daily Visitors</CardTitle>
-            <div className="bg-blue-50 p-2 rounded-lg"><UserPlus className="h-4 w-4 text-blue-600" /></div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{dailyCheckIns.length}</div>
-            <p className="text-xs text-muted-foreground">Walk-in passes today</p>
-          </CardContent>
-        </Card>
+      {/* KPIs */}
+      <div className={styles.kpis}>
+        <Kpi icon={DoorOpen} tone="green" label="Inside now" value={day ? fmtInt(insideGuests.length) : '—'}
+          hint={day ? `${insideGuests.filter(v => v.kind === 'walk_in').length} walk-ins among them` : undefined}
+          onClick={() => { setActiveTab('desk'); setFeedView('inside'); }} title="Who is inside" />
+        <Kpi icon={Gauge} tone={occLevel === 'alert' ? 'red' : occLevel === 'warn' ? 'amber' : 'teal'} label="Occupancy"
+          value={day ? `${occupancy}%` : '—'}
+          hint={<span style={{ display: 'block', width: '100%' }}>of {fmtInt(gymCapacity)} capacity
+            <span className={c.meter} style={{ display: 'block' }}><span className={c.meterFill} data-level={occLevel} style={{ display: 'block', width: `${Math.min(100, occupancy)}%` }} /></span></span>} />
+        <Kpi icon={LogIn} tone="blue" label="Check-ins today" value={day ? fmtInt(checkInsToday) : '—'}
+          hint={day?.summary.peak_hour ? `busiest ${day.summary.peak_hour}` : 'so far today'}
+          onClick={() => { setActiveTab('desk'); setFeedView('today'); }} title="Today's check-ins" />
+        <Kpi icon={Footprints} tone="orange" label="Walk-ins" value={day ? fmtInt(walkInsToday.length) : '—'}
+          hint={pendingRegistrations.length ? `${pendingRegistrations.length} waiting to pay` : 'day passes today'}
+          onClick={() => setActiveTab('daily')} title="Walk-in / day pass" />
+        <Kpi icon={Briefcase} tone="violet" label="Team on duty" value={day ? fmtInt(insideTeam.length) : '—'}
+          hint={day ? `${insideTeam.filter(v => v.kind === 'trainer').length} trainers · ${insideTeam.filter(v => v.kind === 'staff').length} staff` : undefined}
+          onClick={() => { setActiveTab('desk'); setWho('staff'); }} title="Clock staff in and out" />
+        <Kpi icon={Timer} tone="amber" label="Average stay" value={day?.summary.avg_stay_minutes ? fmtDur(day.summary.avg_stay_minutes) : '—'}
+          hint={day?.summary.long_stays ? `${day.summary.long_stays} inside 3h+` : 'today'} />
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="w-full flex">
-          <TabsTrigger value="registered" className="flex-1">
-            <UserCheck className="h-4 w-4 mr-2" />
-            Members &amp; Staff
-          </TabsTrigger>
-          <TabsTrigger value="daily" className="flex-1">
-            <UserPlus className="h-4 w-4 mr-2" />
-            Walk-In / Daily
-          </TabsTrigger>
-          <TabsTrigger value="configuration" className="flex-1">
-            <Settings className="h-4 w-4 mr-2" />
-            Configuration
-          </TabsTrigger>
-        </TabsList>
+      <SectionTabs<Tab>
+        label="Check-in sections"
+        value={activeTab}
+        onChange={setActiveTab}
+        tabs={[
+          { id: 'desk', label: 'Members & staff', icon: UserCheck },
+          { id: 'daily', label: 'Walk-in / day pass', icon: UserPlus, count: pendingRegistrations.length },
+          { id: 'configuration', label: 'Rules', icon: Settings },
+        ]}
+      />
 
-        {/* ── Members & Staff tab ── */}
-        <TabsContent value="registered" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* ── Members & staff ── */}
+      {activeTab === 'desk' && (
+        <div className={c.desk}>
+          <Panel title="Find & check in" icon={Search}
+            sub="Type a name, member ID or phone — press Enter to act on the first result">
+            <label className={c.scan}>
+              <Search size={18} className={c.scanIcon} />
+              <input ref={searchBoxRef} autoFocus value={searchTerm} onChange={e => setSearchTerm(e.target.value)} onKeyDown={onSearchKey}
+                placeholder="Search name, ID or phone…" aria-label="Search members and staff" />
+              {searchTerm ? (
+                <button type="button" className={c.scanHint} onClick={() => setSearchTerm('')} aria-label="Clear search" style={{ border: 0, cursor: 'pointer' }}>Esc</button>
+              ) : <span className={c.scanHint}>Enter</span>}
+            </label>
+            <div className={c.searchMeta}>
+              <div className={styles.chips} role="group" aria-label="Who">
+                {([['all', 'Everyone'], ['member', 'Members'], ['staff', 'Staff & trainers']] as [Who, string][]).map(([k, l]) => (
+                  <button key={k} type="button" className={styles.chip} data-active={who === k} onClick={() => setWho(k)}>{l}</button>
+                ))}
+              </div>
+              <span>
+                {memberMatches > memberPeople.length && who !== 'staff'
+                  ? (q ? `First ${memberPeople.length} of ${fmtInt(memberMatches)} matches` : `${memberPeople.length} most recent of ${fmtInt(memberTotal)} members`)
+                  : `${filtered.length} shown`}
+              </span>
+            </div>
 
-            {/* People list */}
-            <Card className="border-primary/10 shadow-lg overflow-hidden">
-              <CardHeader className="bg-gradient-light border-b border-primary/10">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-primary">Members &amp; Staff</CardTitle>
-                    <CardDescription>Search and check-in</CardDescription>
-                  </div>
-                  <Badge variant="outline" className="border-primary/30 text-primary">
-                    {memberTotal + staffPeople.length} total
-                  </Badge>
+            {loading && !filtered.length ? (
+              <Empty icon={RefreshCw} title="Loading…" />
+            ) : filtered.length === 0 ? (
+              <Empty icon={Search} title={searchTerm ? `No one matches “${searchTerm}”` : 'No members or staff yet'}
+                text={searchTerm ? 'Try the member ID or phone number.' : undefined} />
+            ) : (
+              <div className={c.results} data-busy={memberSearching}>
+                {filtered.map((person, idx) => {
+                  const isMember = person.kind === 'member';
+                  const open = isMember ? insideMember[person.id] : insideStaff[person.id];
+                  const look = statusLook(isMember ? person.status : (person.status || 'active'));
+                  const blocked = isMember && !open && (person.status !== 'active' || !!person.suspended);
+                  const left = isMember ? daysUntil(person.endDate) : null;
+                  const busy = checkingInId === person.id || checkingOutId === person.id || (open && checkingOutId === open.record_id);
+                  const tone = isMember ? 'blue' : person.trainer ? 'violet' : 'teal';
+                  return (
+                    <div key={`${person.kind}-${person.id}`} className={c.row} data-inside={!!open} data-blocked={blocked}
+                      data-first={idx === 0 && !!q}>
+                      <Photo name={person.name} url={person.photoUrl} tone={tone} on={!!open} />
+                      <div style={{ minWidth: 0 }}>
+                        <div className={c.rowName}>
+                          <span className="nm" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{person.name}</span>
+                          {!isMember && <span className={a.kind} data-tone={tone}>{person.trainer ? 'Trainer' : 'Staff'}</span>}
+                        </div>
+                        <div className={c.rowSub}>
+                          <span>{person.bizId}</span>
+                          <span>· {person.role}</span>
+                          {open ? (
+                            <span className={c.inTag}>· {isMember ? 'In gym' : 'On duty'} {fmtDur(minutesIn(open))}</span>
+                          ) : isMember && person.status === 'active' && left != null && left <= 7 ? (
+                            <span className={c.warnTag}>· {left <= 0 ? 'ends today' : `ends in ${left} day${left === 1 ? '' : 's'}`}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className={c.rowEnd}>
+                        {isMember && (
+                          <span className={c.pill} style={{ ['--tone' as any]: look.tone }}
+                            title={person.suspended ? `Suspended${person.suspendedReason ? `: ${person.suspendedReason}` : ''}` : undefined}>
+                            {look.label}
+                          </span>
+                        )}
+                        {open ? (
+                          <button type="button" className={c.btnOut} disabled={!!busy} onClick={() => primaryAction(person)}>
+                            {busy ? <RefreshCw size={13} className="animate-spin" /> : <LogOut size={13} />}{isMember ? 'Check out' : 'Clock out'}
+                          </button>
+                        ) : (
+                          <button type="button" className={c.btnIn} disabled={!!busy || !canAct(person)} onClick={() => primaryAction(person)}
+                            title={blocked ? `Membership is ${look.label.toLowerCase()}` : undefined}>
+                            {busy ? <RefreshCw size={13} className="animate-spin" /> : <LogIn size={13} />}{isMember ? 'Check in' : 'Clock in'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Panel>
+
+          <Panel title={feedView === 'inside' ? 'Inside now' : 'Today so far'} icon={feedView === 'inside' ? DoorOpen : History}
+            scope={String(feedView === 'inside' ? insideGuests.length + insideTeam.length : visits.filter(v => !v.from_earlier_day).length)}
+            sub={feedView === 'inside' ? 'Live — updates every 30 seconds, including face-device and app check-ins' : 'Every check-in and clock-in today, newest first'}
+            action={<Seg label="View" value={feedView} onChange={setFeedView} options={[['inside', 'Inside'], ['today', 'Today']]} />}>
+            {!day ? <Empty icon={RefreshCw} title="Loading…" /> : feedView === 'inside' ? (
+              insideGuests.length + insideTeam.length === 0 ? (
+                <Empty icon={DoorOpen} title="Nobody is inside" text="People appear here the moment they check in at the desk, the face device or the app." />
+              ) : (
+                <div className={c.feed}>
+                  {insideGuests.length > 0 && <div className={c.groupLabel}>Members & walk-ins · {insideGuests.length}</div>}
+                  {[...insideGuests].sort((x, y) => x.check_in.localeCompare(y.check_in)).map(v => feedRow(v, true))}
+                  {insideTeam.length > 0 && <div className={c.groupLabel}>Trainers & staff · {insideTeam.length}</div>}
+                  {insideTeam.map(v => feedRow(v, true))}
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4 pt-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by name or ID..."
-                    className="pl-10 border-primary/20 focus:border-primary"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                  />
-                </div>
+              )
+            ) : (
+              visits.filter(v => !v.from_earlier_day).length === 0 ? <Empty icon={History} title="No check-ins yet today" /> : (
+                <div className={c.feed}>{visits.filter(v => !v.from_earlier_day).map(v => feedRow(v, true))}</div>
+              )
+            )}
+          </Panel>
+        </div>
+      )}
 
-                {loading ? (
-                  <div className="flex items-center justify-center py-12 text-muted-foreground">
-                    <RefreshCw className="h-5 w-5 animate-spin mr-2" /> Loading...
+      {/* ── Walk-in / day pass ── */}
+      {activeTab === 'daily' && (
+        <>
+          {pendingRegistrations.length > 0 && (
+            <Panel title="Signed up with the QR — waiting to pay" icon={Clock} scope={String(pendingRegistrations.length)}
+              sub="They get in only after you take payment. Updates every 30 seconds.">
+              <div className={c.pending}>
+                {pendingRegistrations.map(r => (
+                  <div key={r.id} className={c.pendingRow} data-active={selfRegistration?.id === r.id}>
+                    <Photo name={r.name} tone="orange" small />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className={a.name}>{r.name}</div>
+                      <div className={a.sub}>
+                        {r.phone}{r.plan_name ? ` · ${r.plan_name}` : ''}{r.referred_by_staff_name ? ` · via ${r.referred_by_staff_name}` : ''}
+                        {' · '}{new Date(r.created_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                      </div>
+                    </div>
+                    <Button size="sm" className="btn-primary" onClick={() => takeSelfRegistrationPayment(r)}>Take payment</Button>
+                    <Button size="sm" variant="ghost" onClick={() => dismissSelfRegistration(r)} title="Visitor left or signed up twice">Dismiss</Button>
                   </div>
-                ) : filtered.length === 0 ? (
-                  <div className="text-center py-10 text-muted-foreground text-sm">
-                    {searchTerm ? `No results for "${searchTerm}"` : 'No members or staff found'}
+                ))}
+              </div>
+            </Panel>
+          )}
+
+          <div className={c.walk}>
+            <Panel title="Sell a day pass" icon={UserPlus} sub="Register the visitor, pick a pass, take payment — access starts right away">
+              {selfRegistration && (
+                <div className={c.banner}>
+                  <span>Taking payment for <strong>{selfRegistration.name}</strong>, who signed up with the walk-in QR.</span>
+                  <Button variant="ghost" size="sm" onClick={resetDailyForm} aria-label="Cancel"><X className="h-4 w-4" /></Button>
+                </div>
+              )}
+
+              <div className={c.step}>
+                <div className={c.stepHead}><span className={c.stepNo}>1</span>Visitor</div>
+                <div className={c.grid2}>
+                  <div className="space-y-2">
+                    <Label>Full name <span style={{ color: 'var(--destructive)' }}>*</span></Label>
+                    <Input placeholder="Visitor's full name" value={visitorName} onChange={e => setVisitorName(e.target.value)} />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Mobile number <span style={{ color: 'var(--destructive)' }}>*</span></Label>
+                    <PhoneInput value={visitorMobile} onChange={setVisitorMobile} />
+                  </div>
+                </div>
+                <div className={c.photoBox}>
+                  {visitorPhoto ? (
+                    <>
+                      <img src={visitorPhoto} alt="Visitor" className={c.photoPreview} />
+                      <span className={styles.muted} style={{ fontSize: 'var(--text-xs)' }}>Photo ready</span>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setVisitorPhoto(null)} aria-label="Remove photo"><X className="h-4 w-4" /></Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button type="button" variant="outline" size="sm" onClick={handleCapturePhoto}>
+                        <Camera className="mr-2 h-4 w-4" />{isCameraActive ? 'Take photo' : 'Camera'}
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                        <Upload className="mr-2 h-4 w-4" /> Upload photo
+                      </Button>
+                      <span className={styles.muted} style={{ fontSize: 'var(--text-xs)' }}>Optional</span>
+                      <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileUpload} />
+                    </>
+                  )}
+                </div>
+                {isCameraActive && <div className={c.video}><video ref={videoRef} autoPlay playsInline /></div>}
+              </div>
+
+              <div className={c.step}>
+                <div className={c.stepHead}><span className={c.stepNo}>2</span>Pass</div>
+                {walkInPlans.length === 0 ? (
+                  <Empty icon={CalendarClock} title="No day passes set up"
+                    text='Add a plan under Manage Plans with the membership type "Walk-In / Daily Visitor".' />
                 ) : (
-                  <div className={`space-y-2 overflow-y-auto pr-1 transition-opacity ${memberSearching ? 'opacity-50' : ''}`} style={{ maxHeight: '520px' }}>
-                    {memberMatches > memberPeople.length && (
-                      <p className="text-xs text-muted-foreground px-1">
-                        {q
-                          ? `Showing the first ${memberPeople.length} of ${memberMatches} matching members — type more to narrow it down.`
-                          : `Showing the ${memberPeople.length} most recent members — search by name, ID or phone to find anyone.`}
-                      </p>
-                    )}
-                    {filtered.map(person => (
-                      <PersonRow
-                        key={`${person.kind}-${person.id}`}
-                        person={person}
-                        onCheckIn={handleCheckIn}
-                        onMemberCheckOut={() => handleCheckOut(activeMemberAttendance[person.id], person.name)}
-                        onStaffClockIn={handleStaffClockIn}
-                        onStaffClockOut={handleStaffClockOut}
-                        isChecking={checkingInId === person.id}
-                        isCheckedIn={!!activeMemberAttendance[person.id]}
-                        isClockedIn={!!staffActiveMap[person.id]}
-                        isActing={
-                          checkingInId === person.id ||
-                          checkingOutId === person.id ||
-                          checkingOutId === activeMemberAttendance[person.id]
-                        }
-                      />
+                  <div className={c.plans} role="radiogroup" aria-label="Day pass">
+                    {walkInPlans.map(p => (
+                      <button key={p.id} type="button" role="radio" aria-checked={selectedPlan === String(p.id)} className={c.plan}
+                        data-active={selectedPlan === String(p.id)} onClick={() => setSelectedPlan(String(p.id))}>
+                        <span className={c.planName}>{p.name}</span>
+                        <span className={c.planPrice}>{Number(p.price) > 0 ? <><CurrencyGlyph /> {p.price}</> : 'Free'}</span>
+                        <span className={c.planDur}>{p.duration}</span>
+                      </button>
                     ))}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* Recent check-ins */}
-            <Card className="border-primary/10 shadow-lg overflow-hidden">
-              <CardHeader className="bg-gradient-light border-b border-primary/10">
-                <CardTitle className="text-primary">Recent Check-ins</CardTitle>
-                <CardDescription>Latest member activity today</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-4">
-                {todayAttendance.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <UserCheck className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
-                    <p className="text-sm">No check-ins yet today</p>
-                  </div>
-                ) : visibleTodayAttendance.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <UserCheck className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
-                    <p className="text-sm">No one is currently active.</p>
-                    <Button variant="link" size="sm" onClick={() => setActiveOnlyFilter(false)}>Clear filter</Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3 overflow-y-auto pr-1" style={{ maxHeight: '520px' }}>
-                    {visibleTodayAttendance.map(record => {
-                      const name = record.member_name || record['walk_in_name'] || 'Visitor';
-                      const isActive = record.status === 'active';
-                      const isCheckingOut = checkingOutId === record.id;
-                      return (
-                      <div key={record.id} className="flex items-center justify-between p-3 border border-primary/10 rounded-lg hover:bg-gradient-light transition-colors">
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="border-2 border-primary/20">
-                            <AvatarImage src={record.photo_url} />
-                            <AvatarFallback className="bg-gradient-light text-primary text-sm">
-                              {initials(name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium text-sm">{name}</div>
-                            <div className="text-xs text-muted-foreground">{record.member_biz_id} · {record.membership_type}</div>
-                            <div className="text-xs text-muted-foreground">
-                              In: {formatTime(record.check_in_time)}
-                              {record.check_out_time && ` · Out: ${formatTime(record.check_out_time)}`}
-                              {record.formatted_duration && ` · ${record.formatted_duration}`}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-1.5">
-                          {isActive ? (
-                            <>
-                              <Badge className="bg-green-100 text-green-800 border-0 text-xs">
-                                <CheckCircle className="mr-1 h-3 w-3" /> In Gym
-                              </Badge>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-6 text-xs border-red-200 text-red-600 hover:bg-red-50"
-                                onClick={() => handleCheckOut(record.id, name)}
-                                disabled={isCheckingOut}
-                              >
-                                {isCheckingOut
-                                  ? <div className="animate-spin rounded-full h-3 w-3 border-b border-red-500 mr-1" />
-                                  : <LogOut className="mr-1 h-3 w-3" />
-                                }
-                                Check Out
-                              </Button>
-                            </>
-                          ) : (
-                            <Badge className="bg-gray-100 text-gray-600 border-0 text-xs">Completed</Badge>
-                          )}
-                          <span className="text-xs text-muted-foreground capitalize">{record.check_in_method}</span>
-                        </div>
-                      </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* ── Daily Visitor tab ── */}
-        <TabsContent value="daily" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
-          {pendingRegistrations.length > 0 && (
-            <Card className="border-amber-200 shadow-md">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-primary flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-amber-600" />
-                  Self-registered — awaiting payment
-                  <Badge className="bg-amber-100 text-amber-800 border-0">{pendingRegistrations.length}</Badge>
-                </CardTitle>
-                <CardDescription>Visitors who signed up with the walk-in QR. They get in only after you take payment.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {pendingRegistrations.map(r => (
-                  <div
-                    key={r.id}
-                    className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border ${selfRegistration?.id === r.id ? 'border-primary bg-gradient-light' : 'border-primary/10'}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-primary truncate">{r.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {r.phone}
-                        {r.plan_name ? ` · ${r.plan_name}` : ''}
-                        {r.referred_by_staff_name ? ` · via ${r.referred_by_staff_name}` : ''}
-                        {' · '}{new Date(r.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" className="btn-primary" onClick={() => takeSelfRegistrationPayment(r)}>
-                        Take payment
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => dismissSelfRegistration(r)} title="Visitor left or signed up twice">
-                        Dismiss
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 border-primary/10 shadow-lg overflow-hidden">
-              <CardHeader className="bg-gradient-primary text-white">
-                <div className="flex items-center space-x-2">
-                  <UserPlus className="h-5 w-5" />
-                  <CardTitle>Walk-In / Daily Visitor Access</CardTitle>
+                <div className="space-y-2" style={{ maxWidth: '22rem' }}>
+                  <Label>Sold by</Label>
+                  <Select value={processedByStaffId || undefined} onValueChange={setProcessedByStaffId}>
+                    <SelectTrigger><SelectValue placeholder="Staff member (optional)" /></SelectTrigger>
+                    <SelectContent>
+                      {staffOptions.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <p className={styles.muted} style={{ fontSize: 'var(--text-xs)' }}>Counts toward that staff member's revenue target.</p>
                 </div>
-                <CardDescription className="text-white/80">Register and grant temporary access</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6 pt-6">
-                {selfRegistration && (
-                  <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 text-sm">
-                    <span className="text-amber-900">
-                      Taking payment for <strong>{selfRegistration.name}</strong>, who signed up with the walk-in QR.
-                    </span>
-                    <Button variant="ghost" size="sm" onClick={resetDailyForm}><X className="h-4 w-4" /></Button>
+              </div>
+
+              {selectedPlan && (
+                <div className={c.step}>
+                  <div className={c.stepHead}><span className={c.stepNo}>3</span>Payment</div>
+                  <div className={c.charge}>
+                    <div>
+                      <div className={styles.muted} style={{ fontSize: 'var(--text-xs)' }}>To pay</div>
+                      <div className={c.chargeValue}><CurrencyGlyph /> {walkInCharge}</div>
+                      <div className={styles.muted} style={{ fontSize: 'var(--text-xs)' }}>{selectedPlanDetails?.name} · valid for {selectedPlanDetails?.duration}</div>
+                    </div>
+                    {walkInCharge <= 0 ? <Status kind="good">Free</Status>
+                      : !walkInPaymentManager.settleable ? <Status kind="warning">Awaiting payment</Status>
+                      : walkInCredit <= 0 ? <Status kind="good">Paid</Status>
+                      : walkInCredit >= walkInCharge ? <Status kind="warning">On credit</Status>
+                      : <Status kind="warning">Partly on credit</Status>}
                   </div>
-                )}
-                {/* Visitor info */}
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-primary flex items-center">
-                    <Users className="h-4 w-4 mr-2" /> Visitor Information
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-primary">Full Name <span className="text-red-500">*</span></Label>
-                      <Input placeholder="Enter full name" value={visitorName} onChange={e => setVisitorName(e.target.value)} className="border-primary/20 focus:border-primary" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-primary">Mobile Number <span className="text-red-500">*</span></Label>
-                      <PhoneInput value={visitorMobile} onChange={setVisitorMobile} inputClassName="border-primary/20 focus:border-primary" />
-                    </div>
-                  </div>
-
-                  {/* Photo */}
-                  <div className="space-y-2">
-                    <Label className="text-primary">Photo <span className="text-muted-foreground text-sm">(Optional)</span></Label>
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      {!visitorPhoto ? (
-                        <>
-                          <Button type="button" variant="outline" onClick={handleCapturePhoto} className="flex-1 border-primary/30">
-                            <Camera className="mr-2 h-4 w-4" />
-                            {isCameraActive ? 'Capture Photo' : 'Use Camera'}
-                          </Button>
-                          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="flex-1 border-primary/30">
-                            <Upload className="mr-2 h-4 w-4" /> Upload Photo
-                          </Button>
-                          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
-                        </>
-                      ) : (
-                        <div className="flex items-center space-x-3 p-3 border border-primary/20 rounded-lg bg-gradient-light w-full">
-                          <img src={visitorPhoto} alt="Visitor" className="w-14 h-14 rounded-lg object-cover border-2 border-primary/20" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-primary">Photo ready</p>
-                            <p className="text-xs text-muted-foreground">Ready for check-in</p>
-                          </div>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => setVisitorPhoto(null)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                    {isCameraActive && (
-                      <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
-                        <video ref={videoRef} className="w-full h-full object-cover" autoPlay playsInline />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <Separator className="bg-primary/10" />
-
-                {/* Plan & Payment */}
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-primary flex items-center">
-                    <CalendarClock className="h-4 w-4 mr-2" /> Access Plan &amp; Payment
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-primary">Choose Daily Plan <span className="text-red-500">*</span></Label>
-                      <Select value={selectedPlan} onValueChange={setSelectedPlan}>
-                        <SelectTrigger className="border-primary/20">
-                          <SelectValue placeholder={walkInPlans.length === 0 ? "No walk-in plans configured" : "Select a plan"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {walkInPlans.map(p => (
-                            <SelectItem key={p.id} value={p.id.toString()}>
-                              {p.name} — <CurrencyGlyph /> {p.price} ({p.duration})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {walkInPlans.length === 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          Add a plan under Manage Plans → Membership Type "Walk-In / Daily Visitor".
-                        </p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-primary">Processed By (Staff)</Label>
-                      <Select value={processedByStaffId || undefined} onValueChange={setProcessedByStaffId}>
-                        <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select staff member (optional)" /></SelectTrigger>
-                        <SelectContent>
-                          {staffOptions.map(s => (
-                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">Credits this sale toward that staff member's revenue target.</p>
-                    </div>
-                  </div>
-
-                  {selectedPlan && (
-                    <div className="p-4 bg-gradient-light border border-primary/20 rounded-lg flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Total Charge</p>
-                        <p className="text-2xl font-bold text-primary"><CurrencyGlyph /> {walkInCharge}</p>
-                        <p className="text-xs text-muted-foreground mt-1">Valid for {selectedPlanDetails?.duration}</p>
-                      </div>
-                      {walkInCharge <= 0 ? (
-                        <Badge className="bg-green-100 text-green-800 border-0 px-3 py-1">
-                          <CheckCircle className="h-4 w-4 mr-1" /> Free
-                        </Badge>
-                      ) : !walkInPaymentManager.settleable ? (
-                        <Badge className="bg-yellow-100 text-yellow-800 border-0 px-3 py-1">
-                          <AlertCircle className="h-4 w-4 mr-1" /> Awaiting Payment
-                        </Badge>
-                      ) : walkInCredit <= 0 ? (
-                        <Badge className="bg-green-100 text-green-800 border-0 px-3 py-1">
-                          <CheckCircle className="h-4 w-4 mr-1" /> Paid
-                        </Badge>
-                      ) : walkInCredit >= walkInCharge ? (
-                        <Badge className="bg-yellow-100 text-yellow-800 border-0 px-3 py-1">
-                          <AlertCircle className="h-4 w-4 mr-1" /> On Credit
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-orange-100 text-orange-800 border-0 px-3 py-1">
-                          <AlertCircle className="h-4 w-4 mr-1" /> Partly on Credit
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Payment — same allocation flow as Renewals / Add-ons */}
-                  {selectedPlan && walkInCharge > 0 && (
+                  {walkInCharge > 0 && (
                     <PaymentAllocationPanel
                       manager={walkInPaymentManager}
                       invoiceTotal={walkInCharge}
@@ -1046,173 +964,125 @@ export function CheckIn() {
                     />
                   )}
                 </div>
+              )}
 
-                <Separator className="bg-primary/10" />
+              <div className={c.actionsRow}>
+                <Button variant="outline" onClick={resetDailyForm}><X className="mr-2 h-4 w-4" /> Clear</Button>
+                <Button className="btn-primary" onClick={handleGrantAccess}
+                  disabled={!visitorName || !visitorMobile || !selectedPlan || grantingAccess || (walkInCharge > 0 && !walkInPaymentManager.settleable)}>
+                  {grantingAccess ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Granting…</> : <><CheckCircle className="mr-2 h-4 w-4" /> Grant access</>}
+                </Button>
+              </div>
+            </Panel>
 
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button variant="outline" className="flex-1 border-primary/30" onClick={resetDailyForm}>
-                    <X className="mr-2 h-4 w-4" /> Cancel
-                  </Button>
-                  <Button
-                    className="flex-1 btn-primary"
-                    onClick={handleGrantAccess}
-                    disabled={!visitorName || !visitorMobile || !selectedPlan || grantingAccess
-                      || (walkInCharge > 0 && !walkInPaymentManager.settleable)}
-                  >
-                    {grantingAccess
-                      ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> Granting...</>
-                      : <><CheckCircle className="mr-2 h-4 w-4" /> Grant Access</>
-                    }
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Today's daily visitors */}
-            <Card className="border-primary/10 shadow-lg overflow-hidden">
-              <CardHeader className="bg-gradient-light border-b border-primary/10">
-                <CardTitle className="text-primary">Today's Daily Visitors</CardTitle>
-                <CardDescription>Walk-in passes issued</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-4">
-                {dailyCheckIns.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <UserPlus className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
-                    <p className="text-sm">No daily visitors yet</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3 overflow-y-auto" style={{ maxHeight: '520px' }}>
-                    {dailyCheckIns.map(v => (
-                      <div key={v.id} className="p-3 border border-primary/10 rounded-lg bg-gradient-light">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            {v.avatar
-                              ? <img src={v.avatar} alt={v.memberName} className="w-10 h-10 rounded-full object-cover border-2 border-primary/20" />
-                              : <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center"><UserPlus className="h-5 w-5 text-blue-600" /></div>
-                            }
-                            <div>
-                              <p className="font-medium text-sm">{v.memberName}</p>
-                              <p className="text-xs text-muted-foreground">{v.memberId}</p>
-                            </div>
-                          </div>
-                          <Badge className="bg-blue-100 text-blue-800 border-0 text-xs">Daily</Badge>
-                        </div>
-                        <div className="space-y-1 text-xs text-muted-foreground ml-12">
-                          <div className="flex justify-between"><span>Plan:</span><span className="font-medium text-primary">{v.membership}</span></div>
-                          <div className="flex justify-between"><span>Check-in:</span><span className="font-medium">{v.checkInTime}</span></div>
-                          <div className="flex justify-between"><span>Amount:</span><span className="font-medium text-green-600"><CurrencyGlyph /> {v.amount}</span></div>
-                          <div className="flex justify-between"><span>Mobile:</span><span className="font-medium">{v.mobile}</span></div>
+            <Panel title="Today's walk-ins" icon={Footprints} scope={String(walkInsToday.length)} sub="Day passes used today">
+              {walkInsToday.length === 0 ? <Empty icon={Footprints} title="No walk-ins yet today" /> : (
+                <div className={c.feed}>
+                  {walkInsToday.map(v => (
+                    <div key={v.key} className={c.feedRow} data-tone="orange">
+                      <Photo name={v.name} tone="orange" on={v.inside} small />
+                      <div style={{ minWidth: 0 }}>
+                        <div className={a.name}>{v.name}</div>
+                        <div className={a.sub}>{[v.detail, v.activity].filter(Boolean).join(' · ')}</div>
+                        <div className={a.sub}>
+                          {fmtTime(v.check_in)}{v.check_out ? ` – ${fmtTime(v.check_out)}` : ''}
+                          {v.payment_status && v.payment_status !== 'paid' ? <span className={c.warnTag}> · {v.payment_status}</span> : null}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* ── Configuration tab ── */}
-        <TabsContent value="configuration" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
-          <Card className="border-primary/10 shadow-lg overflow-hidden max-w-3xl">
-            <CardHeader className="bg-gradient-light border-b border-primary/10">
-              <CardTitle className="text-primary">Check-in Configuration</CardTitle>
-              <CardDescription>Timing rules for member check-ins at this branch. Set 0 to turn a rule off.</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              {!settingsForm ? (
-                <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
-              ) : (
-                <div className="space-y-6">
-                  <SettingField
-                    label="Minimum time between check-in and check-out"
-                    hint="Members can't check themselves out sooner. Staff can still check them out here after confirming."
-                    value={settingsForm.min_visit_minutes}
-                    onChange={v => setSettingsForm({ ...settingsForm, min_visit_minutes: v })}
-                  />
-                  <Separator className="bg-primary/10" />
-                  <SettingField
-                    label="Quick break time"
-                    hint="Length of a break during a visit. Members tap Take Break in the app and stay checked in; break time isn't counted as gym time. 0 turns Take Break off."
-                    value={settingsForm.break_grace_minutes}
-                    onChange={v => setSettingsForm({ ...settingsForm, break_grace_minutes: v })}
-                  />
-                  <Separator className="bg-primary/10" />
-                  <SettingField
-                    label="Next check-in time after a check-out"
-                    hint="After any check-out, how long a member must wait before checking in again."
-                    value={settingsForm.cooldown_minutes}
-                    onChange={v => setSettingsForm({ ...settingsForm, cooldown_minutes: v })}
-                  />
-                  <div className="flex justify-end space-x-2 pt-2">
-                    <Button
-                      variant="outline"
-                      className="border-primary/30"
-                      onClick={() => setSettingsForm(savedSettings)}
-                      disabled={!settingsDirty || savingSettings}
-                    >
-                      Reset
-                    </Button>
-                    <Button className="btn-primary" onClick={saveSettings} disabled={!settingsDirty || savingSettings}>
-                      {savingSettings ? 'Saving...' : 'Save'}
-                    </Button>
-                  </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div className={c.feedTime}><div className={c.feedTimer}>{fmtDur(minutesIn(v))}</div>{v.inside ? 'inside' : 'left'}</div>
+                        {v.inside && (
+                          <button type="button" className={c.btnOut} style={{ minWidth: 0 }} disabled={checkingOutId === v.record_id}
+                            onClick={() => handleCheckOut(v.record_id, v.name)} aria-label={`Check out ${v.name}`}>
+                            <LogOut size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </Panel>
+          </div>
+        </>
+      )}
 
-      {/* Confirm check-in dialog */}
+      {/* ── Rules ── */}
+      {activeTab === 'configuration' && (
+        <>
+          {!settingsForm ? (
+            <div className={styles.card}><Empty icon={RefreshCw} title="Loading the rules…" /></div>
+          ) : (
+            <>
+              <div className={c.rules}>
+                <RuleCard icon={Timer} tone="blue" title="Minimum visit"
+                  text="Members can't check themselves out sooner than this. The desk can still check them out after confirming."
+                  value={settingsForm.min_visit_minutes} onChange={v => setSettingsForm({ ...settingsForm, min_visit_minutes: v })} />
+                <RuleCard icon={Coffee} tone="amber" title="Quick break"
+                  text="How long a member can step out with Take Break in the app and stay checked in. Break time isn't counted as gym time. 0 turns Take Break off."
+                  value={settingsForm.break_grace_minutes} onChange={v => setSettingsForm({ ...settingsForm, break_grace_minutes: v })} />
+                <RuleCard icon={Clock} tone="violet" title="Wait before checking in again"
+                  text="After any check-out, how long a member has to wait before the next check-in."
+                  value={settingsForm.cooldown_minutes} onChange={v => setSettingsForm({ ...settingsForm, cooldown_minutes: v })} />
+              </div>
+              <div className={`${styles.card} ${styles.filters}`} style={{ justifyContent: 'space-between' }}>
+                <span className={styles.muted} style={{ fontSize: 'var(--text-xs)' }}>
+                  Rules apply to this branch and are enforced for the desk, the face device and the member app. Set 0 to turn a rule off.
+                  {' '}Gym capacity ({fmtInt(gymCapacity)}) is set in Attendance Reports › Settings.
+                </span>
+                <div className={c.ruleSave}>
+                  <Button variant="outline" size="sm" onClick={() => setSettingsForm(savedSettings)} disabled={!settingsDirty || savingSettings}>Reset</Button>
+                  <Button className="btn-primary" size="sm" onClick={saveSettings} disabled={!settingsDirty || savingSettings}>
+                    {savingSettings ? 'Saving…' : 'Save rules'}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {/* Confirm check-in */}
       {selectedPerson && (
         <Dialog open onOpenChange={() => setSelectedPerson(null)}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Confirm Check-in</DialogTitle>
-              <DialogDescription>Checking in {selectedPerson.name}</DialogDescription>
+              <DialogTitle>Check in {selectedPerson.name}?</DialogTitle>
+              <DialogDescription>Starts their visit now. They can check out at the desk, the face device or the app.</DialogDescription>
             </DialogHeader>
-            <div className="flex items-center space-x-4 py-4">
-              <Avatar className="h-16 w-16 border-2 border-primary/20">
-                <AvatarImage src={selectedPerson.photoUrl} />
-                <AvatarFallback className="bg-gradient-light text-primary text-lg">
-                  {initials(selectedPerson.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h3 className="text-lg font-semibold">{selectedPerson.name}</h3>
-                <p className="text-sm text-muted-foreground">{selectedPerson.bizId}</p>
-                <Badge className="mt-1 bg-gradient-light text-primary border border-primary/20">
-                  {selectedPerson.role}
-                </Badge>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <Label>Check-in Time</Label>
-                <div className="font-medium">{new Date().toLocaleTimeString()}</div>
-              </div>
-              <div>
-                <Label>Date</Label>
-                <div className="font-medium">{new Date().toLocaleDateString()}</div>
-              </div>
-            </div>
-            <div className="flex justify-end space-x-2 mt-2">
-              <Button variant="outline" onClick={() => setSelectedPerson(null)} className="border-primary/30">Cancel</Button>
-              <Button
-                className="btn-primary"
-                onClick={confirmCheckIn}
-                disabled={checkingInId !== null}
-              >
-                {checkingInId !== null
-                  ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> Checking in...</>
-                  : <><CheckCircle className="mr-2 h-4 w-4" /> Confirm Check-in</>
-                }
+            {(() => {
+              const left = daysUntil(selectedPerson.endDate);
+              return (
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', padding: '0.5rem 0' }}>
+                  <Photo name={selectedPerson.name} url={selectedPerson.photoUrl} tone="blue" />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontWeight: 700 }}>{selectedPerson.name}</div>
+                    <div className={styles.muted} style={{ fontSize: 'var(--text-xs)' }}>{selectedPerson.bizId} · {selectedPerson.role}</div>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.35rem', alignItems: 'center' }}>
+                      <span className={c.pill} style={{ ['--tone' as any]: statusLook(selectedPerson.status).tone }}>{statusLook(selectedPerson.status).label}</span>
+                      {selectedPerson.endDate && (
+                        <span className={left != null && left <= 7 ? c.warnTag : styles.muted} style={{ fontSize: 'var(--text-xs)' }}>
+                          {left != null && left <= 0 ? 'Membership ends today' : `Ends ${new Date(selectedPerson.endDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}${left != null ? ` · ${left} day${left === 1 ? '' : 's'} left` : ''}`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+            {daysUntil(selectedPerson.endDate) != null && (daysUntil(selectedPerson.endDate) as number) <= 7 && (
+              <div className={c.banner}><span><AlertCircle className="inline h-4 w-4 mr-1" />Membership ends soon — a good moment to offer a renewal.</span></div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <Button variant="outline" onClick={() => setSelectedPerson(null)}>Cancel</Button>
+              <Button className="btn-primary" onClick={confirmCheckIn} disabled={checkingInId !== null} autoFocus>
+                {checkingInId !== null ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Checking in…</> : <><CheckCircle className="mr-2 h-4 w-4" /> Check in</>}
               </Button>
             </div>
           </DialogContent>
         </Dialog>
       )}
+
       <AlertDialog open={!!earlyCheckOut} onOpenChange={open => { if (!open) setEarlyCheckOut(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1232,6 +1102,7 @@ export function CheckIn() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
       <Dialog open={walkInQrOpen} onOpenChange={setWalkInQrOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1261,142 +1132,31 @@ export function CheckIn() {
   );
 }
 
-// ── SettingField sub-component ────────────────────────────────────────────────
+// ── Rule card ─────────────────────────────────────────────────────────────────
 
-function SettingField({ label, hint, value, onChange }: {
-  label: string;
-  hint: string;
+function RuleCard({ icon: Icon, tone, title, text, value, onChange }: {
+  icon: React.ComponentType<{ size?: number }>;
+  tone: string;
+  title: string;
+  text: string;
   value: number;
   onChange: (minutes: number) => void;
 }) {
   return (
-    <div className="space-y-1.5">
-      <Label className="text-primary">{label}</Label>
-      <div className="flex items-center gap-2">
-        <Input
-          type="number"
-          min={0}
-          max={1440}
-          value={value}
-          onChange={e => onChange(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-          className="w-28 border-primary/20 focus:border-primary"
-        />
-        <span className="text-sm text-muted-foreground">minutes</span>
+    <div className={`${styles.card} ${c.rule}`}>
+      <div className={c.ruleTop}>
+        <span className={styles.kpiIcon} data-tone={tone}><Icon size={16} /></span>
+        {value > 0 ? <Status kind="info">On</Status> : <span className={c.pill}>Off</span>}
       </div>
-      <p className="text-xs text-muted-foreground">{hint}</p>
+      <div className={c.ruleTitle}>{title}</div>
+      <div className={c.ruleText}>{text}</div>
+      <label className={c.ruleInput}>
+        <input type="number" min={0} max={1440} value={value} aria-label={`${title} in minutes`}
+          onChange={e => onChange(Math.max(0, Math.min(1440, Math.floor(Number(e.target.value) || 0))))} />
+        <span className={styles.muted} style={{ fontSize: 'var(--text-sm)' }}>minutes</span>
+      </label>
     </div>
   );
 }
 
-// ── PersonRow sub-component ───────────────────────────────────────────────────
-
-function PersonRow({ person, onCheckIn, onMemberCheckOut, onStaffClockIn, onStaffClockOut, isChecking, isCheckedIn, isClockedIn, isActing }: {
-  person: PersonEntry;
-  onCheckIn: (p: PersonEntry) => void;
-  onMemberCheckOut: () => void;
-  onStaffClockIn: (p: PersonEntry) => void;
-  onStaffClockOut: (p: PersonEntry) => void;
-  isChecking: boolean;
-  isCheckedIn: boolean;
-  isClockedIn: boolean;
-  isActing: boolean;
-}) {
-  const isMember  = person.kind === 'member';
-  const isSuspended = isMember && !!person.suspended;
-  const isActive  = person.status?.toLowerCase() === 'active' && !isSuspended;
-
-  const statusColor = isActive
-    ? 'bg-green-100 text-green-800'
-    : isSuspended || person.status === 'suspended'
-    ? 'bg-red-100 text-red-800'
-    : 'bg-gray-100 text-gray-700';
-
-  return (
-    <div className="flex items-center justify-between p-3 border border-primary/10 rounded-lg hover:bg-gradient-light transition-colors">
-      <div className="flex items-center space-x-3">
-        <Avatar className="border-2 border-primary/20">
-          <AvatarImage src={person.photoUrl} />
-          <AvatarFallback className="bg-gradient-light text-primary text-sm">
-            {initials(person.name)}
-          </AvatarFallback>
-        </Avatar>
-        <div>
-          <div className="font-medium text-sm flex items-center gap-1.5">
-            {person.name}
-            {!isMember && (
-              <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground font-normal">
-                <Briefcase className="h-3 w-3" /> Staff
-              </span>
-            )}
-          </div>
-          <div className="text-xs text-muted-foreground">{person.bizId} · {person.role}</div>
-        </div>
-      </div>
-      <div className="flex items-center space-x-2">
-        <Badge
-          className={`${statusColor} border-0 text-xs capitalize`}
-          title={isSuspended ? `Membership suspended${person.suspendedReason ? `: ${person.suspendedReason}` : ''}` : undefined}
-        >
-          {isSuspended ? 'Suspended' : person.status}
-        </Badge>
-        {isMember ? (
-          isCheckedIn ? (
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-red-200 text-red-600 hover:bg-red-50 text-xs"
-              onClick={onMemberCheckOut}
-              disabled={isActing}
-            >
-              {isActing
-                ? <div className="animate-spin rounded-full h-3 w-3 border-b border-red-500 mr-1" />
-                : <LogOut className="mr-1 h-3 w-3" />
-              }
-              Check Out
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              className="btn-primary"
-              onClick={() => onCheckIn(person)}
-              disabled={isActing || !isActive}
-            >
-              {isChecking
-                ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
-                : <><LogIn className="mr-1 h-3 w-3" /> Check In</>
-              }
-            </Button>
-          )
-        ) : isClockedIn ? (
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-red-200 text-red-600 hover:bg-red-50 text-xs"
-            onClick={() => onStaffClockOut(person)}
-            disabled={isActing}
-          >
-            {isActing
-              ? <div className="animate-spin rounded-full h-3 w-3 border-b border-red-500 mr-1" />
-              : <LogOut className="mr-1 h-3 w-3" />
-            }
-            Clock Out
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-primary/30 text-xs"
-            onClick={() => onStaffClockIn(person)}
-            disabled={isActing || !isActive}
-          >
-            {isActing
-              ? <div className="animate-spin rounded-full h-3 w-3 border-b border-primary mr-1" />
-              : <LogIn className="mr-1 h-3 w-3" />
-            }
-            Clock In
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
+export default CheckIn;
