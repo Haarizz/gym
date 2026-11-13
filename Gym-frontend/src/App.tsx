@@ -65,6 +65,7 @@ import { ManageAssets } from "./pages/manage-assets";
 
 import { GymManagement } from "./pages/gym-management";
 import { GymImport } from "./pages/gym-import";
+import { DbConsole } from "./pages/db-console";
 import { GymRatings } from "./pages/ratings";
 import { Enquiries } from "./pages/enquiries";
 import { ChatReports } from "./pages/chat-reports";
@@ -211,6 +212,7 @@ import {
   Star,
   Inbox,
   ShieldAlert,
+  TerminalSquare,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
@@ -749,6 +751,14 @@ const menuItems = [
     permission: "GYM_MANAGEMENT_CREATE",
   },
   {
+    // Platform admin only: SSH to the server and run SQL on any database (DbConsoleController).
+    title: "Database Console",
+    icon: TerminalSquare,
+    id: "db-console",
+    path: "/db-console",
+    permission: "GYM_MANAGEMENT_CREATE",
+  },
+  {
     // Platform admin: every gym's member ratings.
     title: "Ratings",
     icon: Star,
@@ -945,8 +955,8 @@ export default function App() {
   // gym clients and prospects, not its own branch/profile, so both are hidden for
   // this role specifically rather than gated by the normal per-module permission
   // system.
-  const gymbiosAdminMenuIds = ['gym-management', 'gym-import', 'platform-ratings', 'pending-approval', 'platform-leads', 'platform-follow-up'];
-  const gymbiosAdminPaths = ['/gym-management', '/gym-import', '/platform-ratings', '/pending-approval', '/platform-leads', '/platform-follow-up', '/'];
+  const gymbiosAdminMenuIds = ['gym-management', 'gym-import', 'db-console', 'platform-ratings', 'pending-approval', 'platform-leads', 'platform-follow-up'];
+  const gymbiosAdminPaths = ['/gym-management', '/gym-import', '/db-console', '/platform-ratings', '/pending-approval', '/platform-leads', '/platform-follow-up', '/'];
   // Also covers the platform Ratings drill-down pages (/platform-ratings/:tenantSlug/...).
   const isGymbiosAdminPath = (path: string) => gymbiosAdminPaths.includes(path) || path.startsWith('/platform-ratings/');
   const rolesRaw = sessionStorage.getItem('roles');
@@ -969,7 +979,8 @@ export default function App() {
   );
   const visibleMenuItems = useMemo(
     () => filterMenuByPermission(menuItems, canUse).filter(
-      (item) => isGymbiosAdmin ? gymbiosAdminMenuIds.includes(item.id) : true
+      // The Database Console is for the platform owner only, whatever permissions a gym role holds.
+      (item) => isGymbiosAdmin ? gymbiosAdminMenuIds.includes(item.id) : item.id !== 'db-console'
     ).map((item: any) => (
       // The gym owner gets everyone's targets there (Staff Targets board); other roles their own.
       isGymOwner && item.id === "my-profile" && item.subItems
@@ -1435,6 +1446,7 @@ export default function App() {
       <Route path="/branch-management" element={<BranchManagementRedirect />} />
       <Route path="/gym-management" element={<GymManagement />} />
       <Route path="/gym-import" element={<GymImport />} />
+      <Route path="/db-console" element={<DbConsole />} />
       <Route path="/platform-ratings" element={<PlatformRatings />} />
       <Route path="/platform-ratings/:tenantSlug" element={<PlatformRatings />} />
       <Route path="/platform-ratings/:tenantSlug/:branchId" element={<PlatformRatings />} />

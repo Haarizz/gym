@@ -45,6 +45,13 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<!-- SSH for the super admin Database Console (tunnel to the server's Postgres) -->
+		<dependency>
+			<groupId>com.github.mwiede</groupId>
+			<artifactId>jsch</artifactId>
+			<version>0.2.20</version>
+		</dependency>
+
 		<!-- Flyway: versioned schema migrations (replaces relying solely on
 		     spring.jpa.hibernate.ddl-auto for schema changes going forward) -->
 		<dependency>
