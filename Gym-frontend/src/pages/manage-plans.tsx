@@ -55,7 +55,7 @@ import {
 import { Checkbox } from "../components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/ui/collapsible";
 import planStyles from "./manage-plans.module.css";
-import { PlanKanban, PlanViewToggle, type PlanViewMode } from "../components/plans/PlanKanban";
+import { PlanKanban, PlanViewToggle, planDurationLabel, type PlanViewMode } from "../components/plans/PlanKanban";
 import exampleImage from 'figma:asset/362a2ed9c216cf9c38308e71b24d35a09379ac76.png';
 import { toast } from "sonner";
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
@@ -1129,7 +1129,7 @@ export function ManagePlans() {
                   <TableCell>
                     <div className="flex items-center">
                       <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-                      {plan.duration}
+                      {planDurationLabel(plan)}
                     </div>
                   </TableCell>
                   <TableCell>
