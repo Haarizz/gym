@@ -26,8 +26,9 @@ import java.util.Set;
  * Expiry dues: when a membership's end date passes, the member owes the plan's current
  * price for the next period. Agreed rules:
  * <ul>
- *   <li>One due per expiry (members.expiry_due_raised_for), only for memberships that
- *       expire after V137 shipped — those already expired then were stamped and skipped.</li>
+ *   <li>One due per expiry, for every expired member including those already expired
+ *       before this shipped: "already raised" means an Expiry Due receipt for the member
+ *       dated on or after their end date (members.expiry_due_raised_for is informational).</li>
  *   <li>Amount = the plan's current price (with any running plan offer, as a renewal today
  *       would charge); a Family plan billed to the head is priced for the whole household.
  *       A deleted plan falls back to the member's last fee.</li>
@@ -81,7 +82,11 @@ public class ExpiryDueService {
         if (m == null) return false;
         LocalDateTime end = endDate(m);
         if (end == null || !end.toLocalDate().isBefore(LocalDate.now())) return false;
-        if (end.equals(m.getExpiryDueRaisedFor())) return false;
+        // Already raised for this expiry: a due for this member dated on/after the end date
+        // (whatever became of it — paid, cancelled or written off). Decided from the end date
+        // and the receipts, not the expiry_due_raised_for stamp, which V137 back-filled for
+        // members already expired at the time.
+        if (receiptRepository.existsByRenewsMemberIdAndTransactionDateGreaterThanEqual(m.getId(), end)) return false;
 
         String stored = lower(m.getMembershipStatus());
         String approval = lower(m.getApprovalStatus());
@@ -89,7 +94,6 @@ public class ExpiryDueService {
                 || "pending".equals(approval) || "rejected".equals(approval)) {
             return false;
         }
-        m.setExpiryDueRaisedFor(end);
         if (ENDED_STATUSES.contains(stored)) return false;
 
         Member head = familyHead(m);
@@ -151,6 +155,7 @@ public class ExpiryDueService {
                 + (payer != m ? " for family member " + m.getName() : "")
                 + " — paying this renews " + (r.getPlanName() != null ? r.getPlanName() : "the membership")
                 + " from the payment date");
+        m.setExpiryDueRaisedFor(end); // informational only
         Receipt saved = receiptRepository.save(r);
         saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
         saved.setInvoiceNo(voucherNumberService.next("INV"));

@@ -84,8 +84,18 @@ class ExpiryDueServiceTest {
         assertEquals("pending", john.getPaymentStatus());
         assertEquals(expiredOn, john.getExpiryDueRaisedFor());
 
-        // Only once per expiry
+        // Only once per expiry: the due just raised is dated after the end date
+        when(receiptRepository.existsByRenewsMemberIdAndTransactionDateGreaterThanEqual(7L, expiredOn)).thenReturn(true);
         assertFalse(service.raiseDueFor(7L));
+    }
+
+    @Test
+    void memberExpiredLongBeforeThisShippedStillGetsADue() {
+        LocalDateTime longAgo = LocalDate.now().minusYears(2).atStartOfDay();
+        john.setMembershipEndDate(longAgo);
+        john.setExpiryDueRaisedFor(longAgo); // stamped by the V137 back-fill
+        assertTrue(service.raiseDueFor(7L));
+        assertEquals(0, new BigDecimal("500").compareTo(john.getOutstandingBalance()));
     }
 
     @Test

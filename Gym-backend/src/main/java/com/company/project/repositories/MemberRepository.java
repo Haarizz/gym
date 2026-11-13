@@ -152,9 +152,14 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
             + " ('pending_approval', 'frozen', 'suspended')) ORDER BY " + BIOS_END_DATE + ", m.name")
     List<Member> findMembershipsEndingBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
-    /** Memberships whose end date has passed and haven't had an expiry due raised for that end date (V137). */
+    /**
+     * Memberships whose end date has passed with no expiry due raised since that date — worked
+     * out from the end date and the receipts, so members who were already expired when V137
+     * shipped are included too.
+     */
     @Query("SELECT m.id FROM Member m WHERE " + BIOS_END_DATE + " < :todayStart"
-            + " AND (m.expiryDueRaisedFor IS NULL OR m.expiryDueRaisedFor <> " + BIOS_END_DATE + ")")
+            + " AND NOT EXISTS (SELECT r.id FROM Receipt r WHERE r.renewsMemberId = m.id"
+            + " AND r.transactionDate >= " + BIOS_END_DATE + ")")
     List<Long> findExpiryDueCandidateIds(@Param("todayStart") LocalDateTime todayStart);
 
     long countByJoinDateBetween(LocalDateTime startDate, LocalDateTime endDate);
