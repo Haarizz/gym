@@ -40,7 +40,10 @@ import { SalesAnalytics } from "./pages/sales-analytics";
 import { SalesSettings } from "./pages/sales-settings";
 import { Financials } from "./pages/financials";
 import { PayrollEmployees } from "./pages/payroll-employees";
-import { Assets } from "./pages/assets";
+// Assets, Budgeting and Recruitment are coming-soon previews on sample data (pages/coming-soon).
+import { AssetsOverview, ManageAssets, AssetTransactions } from "./pages/coming-soon/assets-preview";
+import { AssetReports, AssetAnalytics } from "./pages/coming-soon/asset-insights-preview";
+import { Budgeting } from "./pages/coming-soon/budgeting-preview";
 import { GymOS } from "./pages/gymos";
 import { POSMode } from "./pages/pos-mode";
 import { BiOS } from "./pages/bios";
@@ -61,7 +64,6 @@ import { PostWorkoutCheckin } from "./pages/post-workout-checkin";
 import { ServicePortfolios } from "./pages/service-portfolios";
 import { CatalogResolver } from "./pages/catalog/resolver";
 import { StaffsTrainers } from "./pages/staffs-trainers";
-import { ManageAssets } from "./pages/manage-assets";
 
 import { GymManagement } from "./pages/gym-management";
 import { GymImport } from "./pages/gym-import";
@@ -70,10 +72,7 @@ import { GymRatings } from "./pages/ratings";
 import { Enquiries } from "./pages/enquiries";
 import { ChatReports } from "./pages/chat-reports";
 import { PlatformRatings } from "./pages/platform-ratings";
-import { AssetTransactions } from "./pages/asset-transactions";
 import { AssetHistoryPage } from "./pages/asset-history";
-import { AssetReports } from "./pages/asset-reports";
-import { AssetAnalytics } from "./pages/asset-analytics";
 import { Ledgers } from "./pages/ledgers";
 import { ReceiptVoucher } from "./pages/receipt-voucher";
 import { MemberConnectAnalytics } from "./pages/member-connect-analytics";
@@ -126,7 +125,7 @@ import { CreateReceipt } from "./pages/create-receipt";
 import { Facilities } from "./pages/facilities";
 import { Login, REQUEST_DEMO_PATH } from "./pages/login";
 import { EmergencyProfile } from "./pages/emergency-profile";
-import { Recruitment } from "./pages/recruitment";
+import { Recruitment } from "./pages/coming-soon/recruitment-preview";
 import { PayrollReports } from "./pages/payroll-reports";
 import { PayrollAnalytics } from "./pages/payroll-analytics";
 import { RolesPermissions } from "./pages/roles-permissions";
@@ -213,6 +212,8 @@ import {
   Inbox,
   ShieldAlert,
   TerminalSquare,
+  PiggyBank,
+  Boxes,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
@@ -644,6 +645,14 @@ const menuItems = [
         path: "/fiscal-periods",
         permission: "FISCAL_PERIODS_VIEW",
       },
+      {
+        // Coming soon: preview on sample data.
+        title: "Budgeting",
+        icon: PiggyBank,
+        id: "budgeting",
+        path: "/budgeting",
+        permission: "FINANCIALS_VIEW",
+      },
       // Financial Settings is hidden from the menu (2026-10-23); the /financial-settings route still works.
     ],
   },
@@ -716,6 +725,52 @@ const menuItems = [
         id: "payroll-analytics",
         path: "/payroll-analytics",
         permission: "PAYROLL_ANALYTICS_VIEW",
+      },
+      {
+        // Coming soon: preview on sample data.
+        title: "Recruitment",
+        icon: Briefcase,
+        id: "recruitment",
+        path: "/recruitment",
+        permission: "PAYROLL_VIEW",
+      },
+    ],
+  },
+  {
+    // Coming soon: preview on sample data (the banner on each page says so).
+    title: "Assets",
+    icon: Boxes,
+    id: "assets",
+    path: "/assets",
+    permission: "ASSETS_VIEW",
+    subItems: [
+      {
+        title: "Asset Register",
+        icon: ClipboardList,
+        id: "manage-assets",
+        path: "/manage-assets",
+        permission: "ASSETS_VIEW",
+      },
+      {
+        title: "Transactions",
+        icon: ArrowLeftRight,
+        id: "asset-transactions",
+        path: "/asset-transactions",
+        permission: "ASSETS_VIEW",
+      },
+      {
+        title: "Reports",
+        icon: FileText,
+        id: "asset-reports",
+        path: "/asset-reports",
+        permission: "ASSETS_VIEW",
+      },
+      {
+        title: "Analytics",
+        icon: PieChart,
+        id: "asset-analytics",
+        path: "/asset-analytics",
+        permission: "ASSETS_VIEW",
       },
     ],
   },
@@ -1256,6 +1311,7 @@ export default function App() {
         "financial-analytics",
         "fiscal-periods",
         "financial-settings",
+        "budgeting",
       ];
 
       // Auto-expand Payroll & Employees for its sub-items
@@ -1441,7 +1497,8 @@ export default function App() {
       <Route path="/administration/staff" element={<Navigate to="/staffs-trainers" replace />} />
       <Route path="/administration/roles-permissions" element={<RolesPermissions />} />
 
-      <Route path="/assets" element={<Assets />} />
+      <Route path="/assets" element={<AssetsOverview />} />
+      <Route path="/budgeting" element={<Budgeting />} />
       <Route path="/manage-assets" element={<ManageAssets />} />
       <Route path="/branch-management" element={<BranchManagementRedirect />} />
       <Route path="/gym-management" element={<GymManagement />} />
