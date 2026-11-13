@@ -336,6 +336,27 @@ public class BookingPaymentService {
         booking.setRefundedAt(LocalDateTime.now());
     }
 
+    /**
+     * A booking cancelled because the whole membership is being cancelled. No wallet refund
+     * here: whatever was paid for it is refunded (or kept) through the cancellation itself,
+     * as its bill shows up in the refund with everything else.
+     */
+    public void settleMembershipCancellation(Booking booking) {
+        booking.setCancelledBy(CANCELLED_BY_STAFF);
+        if (STATUS_PENDING_APPROVAL.equalsIgnoreCase(booking.getStatus())) {
+            voidPendingPayment(booking, "Staff", "Membership cancelled before the payment was approved");
+            return;
+        }
+        if (booking.getRewardId() != null) {
+            rewardRedemptionService.restorePass(booking.getRewardId());
+            booking.setRewardId(null);
+        }
+        Receipt receipt = receiptOf(booking);
+        if (receipt == null) return;
+        BigDecimal paid = money(receipt.getTotalPaidToDate() != null ? receipt.getTotalPaidToDate() : receipt.getPaidAmount());
+        if (paid.signum() > 0) booking.setRefundStatus(REFUND_NOT_REFUNDABLE);
+    }
+
     /** The receipt behind a paid booking, or null (free / staff-booked) — for the approvals list. */
     @Transactional(readOnly = true)
     public Receipt receiptFor(Booking booking) {

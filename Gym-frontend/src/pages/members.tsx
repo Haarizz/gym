@@ -35,6 +35,7 @@ import {
   Play,
   BarChart3,
   Phone,
+  UserX,
   Mail,
   MapPin,
   Calendar,
@@ -68,6 +69,7 @@ import { RenewalTransactionHistory, RenewalSummaryCards } from "../components/me
 import { DueForRenewalList } from "../components/members/DueForRenewalList";
 import { MemberAnalyticsDialog } from "../components/members/MemberAnalyticsDialog";
 import { FreezeTransactionHistory } from "../components/members/FreezeTransactionHistory";
+import { CancelMembershipDialog } from "../components/members/CancelMembershipDialog";
 import { MembershipLifecycleReport, LIFECYCLE_REPORT_TYPES, countLifecycleReport, countRenewalReport, type LifecycleReportType } from "../components/members/MembershipLifecycleReport";
 import { MemberStatCards, type StatCardDef } from "../components/members/MemberStatCards";
 import { PhotoZoomViewer } from "../components/members/PhotoZoomViewer";
@@ -213,6 +215,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   // Membership access (suspend/resume) in the profile dialog. Suspending closes this
   // gym's member features and check-in; the member's app account is never blocked.
   const [suspendReasonDraft, setSuspendReasonDraft] = useState('');
+  // Members › Cancel membership (action menu)
+  const [cancelMemberId, setCancelMemberId] = useState<string | number | null>(null);
   const [isSuspendFormOpen, setIsSuspendFormOpen] = useState(false);
   const [isUpdatingMembershipAccess, setIsUpdatingMembershipAccess] = useState(false);
   useEffect(() => {
@@ -572,6 +576,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       case "inactive": return "bg-gray-100 text-gray-800";
       case "suspended": return "bg-orange-100 text-orange-800";
       case "expired": return "bg-red-100 text-red-800";
+      case "cancelled": return "bg-rose-100 text-rose-800 line-through decoration-rose-400/60";
       default: return "bg-gray-100 text-gray-800";
     }
   };
@@ -858,6 +863,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     // they must win over an expiry-date check, otherwise a frozen member whose
     // plan end date has already passed gets miscategorized as "Expired".
     const rawStatus = (member.membership_status || '').toLowerCase();
+    if (rawStatus === 'cancelled') return 'Cancelled';
     if (rawStatus === 'frozen' || rawStatus === 'suspended') {
       return member.membership_status!.charAt(0).toUpperCase() + member.membership_status!.slice(1);
     }
@@ -1565,6 +1571,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     <SelectItem value="expired">Expired</SelectItem>
                     <SelectItem value="frozen">Frozen</SelectItem>
                     <SelectItem value="pending_approval">Pending Approval</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>
                 <Popover open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
@@ -1904,6 +1911,19 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                   <Phone className="h-4 w-4 mr-2" />
                                   Call
                                 </DropdownMenuItem>
+                                {(member.membership_status || '').toLowerCase() !== 'cancelled'
+                                  && member.membership_status !== 'pending_approval' && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50"
+                                      onClick={() => setCancelMemberId(member.id)}
+                                    >
+                                      <UserX className="h-4 w-4 mr-2" />
+                                      {member.cancellation_hold_at ? 'Finish cancellation' : 'Cancel membership'}
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -1987,6 +2007,13 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   )}
                 </DialogContent>
               </Dialog>
+
+              <CancelMembershipDialog
+                memberId={cancelMemberId}
+                open={cancelMemberId != null}
+                onClose={() => setCancelMemberId(null)}
+                onChanged={() => { loadMembers(); }}
+              />
 
               {/* Member Profile Dialog */}
               <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>

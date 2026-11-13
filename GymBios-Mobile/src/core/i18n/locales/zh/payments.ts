@@ -26,6 +26,18 @@ const payments = {
     rejectedInfo: '请联系健身房前台处理付款问题，或重新购买套餐。',
     browseGyms: '浏览健身房',
 
+    cancelledTitle: "会籍已取消",
+
+    cancelledAtGym: "{{gym}} 已取消你的会籍。",
+
+    cancelledGeneric: "健身房已取消你的会籍。",
+
+    cancelledInfo: "你的 GymBios 账户属于你本人，仍可正常使用：你可以浏览社区、查找健身房。你在这家健身房的付款记录保留在下方。如需重新加入，请联系健身房——他们会在同一账户上恢复你的会籍。",
+
+    cancelledHistory: "你在这里的付款",
+
+    cancelledNoHistory: "暂无付款记录。",
+
     suspendedTitle: "会员资格已暂停",
     suspendedAtGym: "您在{{gym}}的会员资格已被健身房暂停。",
     suspendedGeneric: "您的会员资格已被健身房暂停。",

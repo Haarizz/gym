@@ -118,7 +118,9 @@ public final class MembershipApplicationDTOs {
             String emergencyContactName,
             String emergencyContactPhone,
             String notes,
-            Long planId) {}
+            Long planId,
+            /** Partner / family members, for Family and Couple plans only. */
+            List<ApplicationFamilyMember> familyMembers) {}
 
     public record ApplicationReceipt(String reference, String planName, BigDecimal amount, String currencyCode,
                                      String paymentMethod, String paymentStatus, String approvalStatus,

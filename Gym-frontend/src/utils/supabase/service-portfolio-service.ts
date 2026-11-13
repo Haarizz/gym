@@ -222,6 +222,8 @@ export interface DeskApplicationRequest {
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
   plan_id: number;
+  /** The rest of the household on a Family / Couple plan. */
+  family_members?: ApplicationFamilyMember[];
 }
 
 // The public page is opened by strangers — never attach a stored session token,

@@ -54,6 +54,9 @@ public final class FlywayHistoryInspector {
      * @return true if repair() ran
      */
     public static boolean repairIfSafe(org.flywaydb.core.Flyway flyway, DataSource ds) throws IOException, SQLException {
+        if (hasHistoryTable(ds)) {
+            realignRenamedRows(ds, loadLocalMigrations());
+        }
         if (hasHistoryTable(ds) && !findRenumberedRows(readHistory(ds), loadLocalMigrations()).isEmpty()) {
             return false;
         }
@@ -120,6 +123,83 @@ public final class FlywayHistoryInspector {
             }
         }
         return Collections.unmodifiableList(rows);
+    }
+
+    /**
+     * Moves history rows whose migration file was later renamed to a new version number
+     * (typically a merge from main, where a branch's not-yet-shipped migrations get
+     * renumbered above main's) onto that new version, so the database is not left
+     * claiming the OTHER file now at the old number already ran.
+     *
+     * A row is moved only when all of this holds, otherwise it is left for
+     * findRenumberedRows / TenantFlywayHistoryRepairRunner exactly as before:
+     *  - it is a successful SQL row whose script no longer exists under that name;
+     *  - exactly one local file has the same description AND the identical checksum
+     *    (same content, so nothing needs to re-run);
+     *  - that file's version is held by no other history row, and no other row is
+     *    moving there.
+     * All moves for one database happen in a single transaction. Never executes
+     * migration SQL.
+     *
+     * @return number of rows moved
+     */
+    public static int realignRenamedRows(DataSource ds, Map<MigrationVersion, LocalMigration> local) throws SQLException {
+        List<HistoryRow> history = readHistory(ds);
+        java.util.Set<String> localScripts = new java.util.HashSet<>();
+        for (LocalMigration m : local.values()) localScripts.add(m.script());
+        java.util.Set<MigrationVersion> heldVersions = new java.util.HashSet<>();
+        for (HistoryRow row : history) {
+            if (row.version() != null) heldVersions.add(MigrationVersion.fromVersion(row.version()));
+        }
+
+        Map<Integer, LocalMigration> moves = new TreeMap<>();
+        java.util.Set<MigrationVersion> targets = new java.util.HashSet<>();
+        java.util.Set<MigrationVersion> conflicted = new java.util.HashSet<>();
+        for (HistoryRow row : history) {
+            if (row.version() == null || !"SQL".equals(row.type()) || !row.success()
+                    || row.checksum() == null || row.script() == null || localScripts.contains(row.script())) {
+                continue;
+            }
+            List<LocalMigration> same = new ArrayList<>();
+            for (LocalMigration m : local.values()) {
+                if (m.checksum() == row.checksum() && m.description().equals(row.description())) same.add(m);
+            }
+            if (same.size() != 1) continue;
+            LocalMigration target = same.get(0);
+            if (target.version().equals(MigrationVersion.fromVersion(row.version()))) continue;
+            if (heldVersions.contains(target.version()) || !targets.add(target.version())) {
+                conflicted.add(target.version());
+                continue;
+            }
+            moves.put(row.installedRank(), target);
+        }
+        moves.values().removeIf(m -> conflicted.contains(m.version()));
+        if (moves.isEmpty()) return 0;
+
+        try (Connection c = ds.getConnection()) {
+            boolean autoCommit = c.getAutoCommit();
+            c.setAutoCommit(false);
+            try (java.sql.PreparedStatement ps = c.prepareStatement(
+                    "UPDATE flyway_schema_history SET version = ?, script = ? WHERE installed_rank = ?")) {
+                for (Map.Entry<Integer, LocalMigration> e : moves.entrySet()) {
+                    ps.setString(1, e.getValue().versionText());
+                    ps.setString(2, e.getValue().script());
+                    ps.setInt(3, e.getKey());
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            } finally {
+                c.setAutoCommit(autoCommit);
+            }
+        }
+        org.slf4j.LoggerFactory.getLogger(FlywayHistoryInspector.class).info(
+                "Flyway history: moved {} row(s) of renamed migration files to their new versions: {}",
+                moves.size(), moves.values().stream().map(LocalMigration::script).toList());
+        return moves.size();
     }
 
     /**

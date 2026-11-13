@@ -28,6 +28,18 @@ const payments = {
     rejectedInfo: 'Contacta con la recepción del gimnasio para resolver el pago, o vuelve a comprar un plan.',
     browseGyms: 'Explorar gimnasios',
 
+    cancelledTitle: "Membresía cancelada",
+
+    cancelledAtGym: "El gimnasio ha cancelado tu membresía en {{gym}}.",
+
+    cancelledGeneric: "El gimnasio ha cancelado tu membresía.",
+
+    cancelledInfo: "Tu cuenta de GymBios es tuya y sigue funcionando: puedes explorar la Comunidad y buscar gimnasios. Tu historial de pagos en este gimnasio aparece abajo. Para volver, contacta con el gimnasio: reactivarán tu membresía en esta misma cuenta.",
+
+    cancelledHistory: "Tus pagos aquí",
+
+    cancelledNoHistory: "No hay pagos registrados.",
+
     suspendedTitle: "Membresía suspendida",
     suspendedAtGym: "El gimnasio ha suspendido tu membresía en {{gym}}.",
     suspendedGeneric: "El gimnasio ha suspendido tu membresía.",

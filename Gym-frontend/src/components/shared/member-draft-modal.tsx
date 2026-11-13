@@ -15,8 +15,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Badge } from "../ui/badge";
 import { Separator } from "../ui/separator";
 import { toast } from "sonner";
-import { Calendar, CheckCircle, User, Mail, MapPin, AlertCircle, UserPlus, Loader2, Award } from 'lucide-react';
-import { servicePortfolioService, apiErrorMessage } from '../../utils/supabase/service-portfolio-service';
+import { Checkbox } from "../ui/checkbox";
+import { Calendar, CheckCircle, User, Users, Mail, MapPin, AlertCircle, UserPlus, Loader2, Award, Plus, Trash2 } from 'lucide-react';
+import { servicePortfolioService, apiErrorMessage, type PortfolioHousehold } from '../../utils/supabase/service-portfolio-service';
+import {
+  type FamilyRow, type FamilyField, RELATIONSHIPS, COUPLE_RELATIONSHIPS, MAX_FAMILY_ROWS,
+  newFamilyRow, ageOn, isChild, rowGender, householdTotal, householdCapError, householdLine, toFamilyMember,
+} from '../../utils/household';
 
 export interface DraftPlanOption {
   id: string;
@@ -27,6 +32,8 @@ export interface DraftPlanOption {
   /** What the member pays — the offer price when the plan has one running. */
   effectivePrice?: number;
   offerLabel?: string | null;
+  /** Set for Family / Couple plans: who joins with the member and how the household is priced. */
+  household?: PortfolioHousehold | null;
 }
 
 interface MemberDraftModalProps {
@@ -53,7 +60,8 @@ const EMPTY = {
   emergencyContactNumber: '',
 };
 
-type FieldKey = keyof typeof EMPTY | 'plan';
+type FieldKey = keyof typeof EMPTY | 'plan' | 'household';
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const digits = (v: string) => v.replace(/\D/g, '');
 
@@ -72,6 +80,9 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, planOptions
   const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [pickedPlanId, setPickedPlanId] = useState('');
+  const [family, setFamily] = useState<FamilyRow[]>([]);
+  /** Family-row errors show once Submit has been pressed. */
+  const [familyAttempted, setFamilyAttempted] = useState(false);
 
   // Each opening starts from the plan it was opened with (or none, for the picker).
   useEffect(() => {
@@ -83,6 +94,44 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, planOptions
 
   const showPicker = !selectedPlan;
   const plan = selectedPlan ?? planOptions.find(p => p.id === pickedPlanId) ?? null;
+  const household = plan?.household ?? null;
+  const familyRows = household ? family : [];
+  const planPrice = plan ? (plan.effectivePrice ?? plan.price) : 0;
+  const amountDue = householdTotal(planPrice, household, 1 + familyRows.length);
+
+  // A Family / Couple plan starts with one row to fill in; switching plans starts over.
+  const householdKey = plan && household ? plan.id : '';
+  useEffect(() => {
+    setFamily(householdKey ? [newFamilyRow()] : []);
+    setFamilyAttempted(false);
+  }, [householdKey, open]);
+
+  const familyErrors = (() => {
+    const out: Record<number, Partial<Record<FamilyField, string>>> = {};
+    const emails = new Set<string>(formData.email.trim() ? [formData.email.trim().toLowerCase()] : []);
+    for (const r of familyRows) {
+      const e: Partial<Record<FamilyField, string>> = {};
+      if (!r.name.trim()) e.name = 'Full name is required';
+      if (!r.relationship) e.relationship = 'Relationship is required';
+      else if (!rowGender(r)) e.gender = 'Gender is required';
+      if (r.dob) {
+        const age = ageOn(r.dob);
+        if (age == null || age < 0 || age > 110) e.dob = 'Invalid date of birth';
+      }
+      const email = r.email.trim().toLowerCase();
+      if (email && !isChild(r)) {
+        if (!EMAIL_PATTERN.test(email)) e.email = 'Invalid email — fix it or leave it blank';
+        else if (emails.has(email)) e.email = 'Each person needs their own email';
+        else emails.add(email);
+      }
+      if (Object.keys(e).length) out[r.key] = e;
+    }
+    return out;
+  })();
+  const householdError = householdCapError(household, familyRows, 'the member');
+  const familyError = (r: FamilyRow, f: FamilyField) => (familyAttempted ? familyErrors[r.key]?.[f] : undefined);
+  const updateFamily = (key: number, patch: Partial<FamilyRow>) =>
+    setFamily(rows => rows.map(r => (r.key === key ? { ...r, ...patch } : r)));
 
   const handleChange = (field: keyof typeof EMPTY, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -100,8 +149,10 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, planOptions
     if (!formData.gender) e.gender = 'Gender is required';
     const ec = digits(formData.emergencyContactNumber).length;
     if (ec > 0 && ec < 7) e.emergencyContactNumber = 'Invalid contact number';
+    if (householdError) e.household = householdError;
     setErrors(e);
-    return Object.keys(e).length === 0;
+    setFamilyAttempted(true);
+    return Object.keys(e).length === 0 && Object.keys(familyErrors).length === 0;
   };
 
   const close = (next: boolean) => {
@@ -111,7 +162,7 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, planOptions
 
   const handleSubmit = async () => {
     if (!validateForm() || !plan) {
-      toast.error('Please fill in all required fields');
+      toast.error(householdError && Object.keys(familyErrors).length === 0 ? householdError : 'Please fill in all required fields');
       return;
     }
     setSubmitting(true);
@@ -130,6 +181,7 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, planOptions
         emergency_contact_name: formData.emergencyContactName.trim() || undefined,
         emergency_contact_phone: ecPhone,
         plan_id: Number(plan.id),
+        family_members: familyRows.length ? familyRows.map(toFamilyMember) : undefined,
       });
       toast.success('Registration request sent for approval', {
         description: `Reference ${receipt.reference}. Take payment at reception, then approve it in Approvals → Applications to add the member.`,
@@ -189,7 +241,6 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, planOptions
                 </SelectContent>
               </Select>
               <FieldError message={errors.plan} />
-              <p className="text-xs text-gray-500 mt-1">Family and couple plans are set up at reception with the whole household.</p>
             </div>
           )}
 
@@ -209,8 +260,10 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, planOptions
                   <p className="text-sm opacity-90">{plan.duration}</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold"><CurrencyGlyph /> {(plan.effectivePrice ?? plan.price).toLocaleString()}</div>
-                  <p className="text-xs opacity-90">Total Amount</p>
+                  <div className="text-2xl font-bold"><CurrencyGlyph /> {amountDue.toLocaleString()}</div>
+                  <p className="text-xs opacity-90">
+                    {household ? `Total for ${1 + familyRows.length} ${familyRows.length ? 'people' : 'person'}` : 'Total Amount'}
+                  </p>
                 </div>
               </div>
               <Separator className="my-3 bg-white/30" />
@@ -343,6 +396,157 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, planOptions
           </div>
 
           <Separator />
+
+          {/* Household (Family / Couple plans) */}
+          {household && (
+            <>
+              <div>
+                <div className="flex items-center space-x-2 mb-1">
+                  <Users className="h-5 w-5 text-[#2B7A78]" />
+                  <h3 className="font-semibold text-lg text-[#1E293B]">{household.kind === 'couple' ? 'Partner' : 'Family Members'}</h3>
+                </div>
+                <p className="text-sm text-gray-500 mb-4">
+                  {household.kind === 'couple'
+                    ? 'The person above is the main member. Add the partner joining them — one bill covers both.'
+                    : 'The person above is the family head. Add everyone joining with them — one bill covers the whole family.'}
+                  {household.kind === 'family' && (household.max_members || household.max_adults || household.max_children)
+                    ? ` ${householdLine(household, 'the member')}.` : ''}
+                </p>
+
+                <div className="space-y-3">
+                  {familyRows.map((r, i) => {
+                    const err = (f: FamilyField) => familyError(r, f);
+                    const child = isChild(r);
+                    const implied = RELATIONSHIPS.find(x => x.value === r.relationship)?.gender ?? null;
+                    const options = RELATIONSHIPS.filter(x => household.kind !== 'couple' || COUPLE_RELATIONSHIPS.includes(x.value));
+                    return (
+                      <div key={r.key} className="rounded-lg border bg-gray-50/60 p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-sm font-semibold text-[#2B7A78]">
+                            {household.kind === 'couple' ? 'Partner' : `Family member ${i + 1}`}
+                            {child && <Badge variant="secondary" className="ml-2">Under 18</Badge>}
+                          </p>
+                          {household.kind === 'family' && familyRows.length > 1 && (
+                            <Button
+                              type="button" variant="ghost" size="sm"
+                              className="h-8 w-8 p-0 text-gray-500 hover:text-red-600"
+                              onClick={() => setFamily(rows => rows.filter(x => x.key !== r.key))}
+                              aria-label={`Remove ${r.name.trim() || `family member ${i + 1}`}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="md:col-span-2">
+                            <Label>Full Name *</Label>
+                            <Input
+                              placeholder="Enter full name"
+                              value={r.name}
+                              onChange={(e) => updateFamily(r.key, { name: e.target.value })}
+                              className={`bg-white ${err('name') ? 'border-red-500' : ''}`}
+                            />
+                            <FieldError message={err('name')} />
+                          </div>
+                          <div>
+                            <Label>Relationship *</Label>
+                            <Select value={r.relationship} onValueChange={(v) => updateFamily(r.key, { relationship: v, gender: '' })}>
+                              <SelectTrigger className={`bg-white ${err('relationship') ? 'border-red-500' : ''}`}>
+                                <SelectValue placeholder="Select relationship" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {options.map(o => <SelectItem key={o.value} value={o.value}>{o.value}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            <FieldError message={err('relationship')} />
+                          </div>
+                          {r.relationship && !implied && (
+                            <div>
+                              <Label>Gender *</Label>
+                              <Select value={r.gender} onValueChange={(v) => updateFamily(r.key, { gender: v })}>
+                                <SelectTrigger className={`bg-white ${err('gender') ? 'border-red-500' : ''}`}>
+                                  <SelectValue placeholder="Select gender" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Male">Male</SelectItem>
+                                  <SelectItem value="Female">Female</SelectItem>
+                                  <SelectItem value="Other">Other</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FieldError message={err('gender')} />
+                            </div>
+                          )}
+                          <div>
+                            <Label>Date of Birth</Label>
+                            <Input
+                              type="date"
+                              max={new Date().toISOString().slice(0, 10)}
+                              value={r.dob}
+                              onChange={(e) => updateFamily(r.key, { dob: e.target.value })}
+                              className={`bg-white ${err('dob') ? 'border-red-500' : ''}`}
+                            />
+                            <FieldError message={err('dob')} />
+                          </div>
+                          {household.kind === 'family' && !r.dob && (
+                            <label className="md:col-span-2 flex items-center gap-2 text-sm cursor-pointer">
+                              <Checkbox checked={r.child} onCheckedChange={(v) => updateFamily(r.key, { child: v === true })} />
+                              Under 18
+                            </label>
+                          )}
+                          {!child && (
+                            <>
+                              <div>
+                                <Label>Phone</Label>
+                                <PhoneInput
+                                  value={r.phone}
+                                  onChange={(v) => updateFamily(r.key, { phone: v })}
+                                  inputClassName="bg-white"
+                                />
+                              </div>
+                              <div>
+                                <Label>Email</Label>
+                                <Input
+                                  type="email"
+                                  placeholder="Optional"
+                                  value={r.email}
+                                  onChange={(e) => updateFamily(r.key, { email: e.target.value })}
+                                  className={`bg-white ${err('email') ? 'border-red-500' : ''}`}
+                                />
+                                <FieldError message={err('email')} />
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {household.kind === 'family' && familyRows.length < MAX_FAMILY_ROWS && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-3 w-full border-dashed border-[#2B7A78] text-[#2B7A78] hover:bg-[#2B7A78]/5"
+                    onClick={() => setFamily(rows => [...rows, newFamilyRow()])}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add family member
+                  </Button>
+                )}
+
+                <div className="mt-3 flex items-center justify-between rounded-lg bg-[#2B7A78]/10 px-4 py-3 text-sm">
+                  <span className="text-gray-700">
+                    {1 + familyRows.length} {familyRows.length ? 'people' : 'person'} including the member
+                    {household.price_per_member ? <> · <CurrencyGlyph />{household.price_per_member.toLocaleString()} per person</> : null}
+                  </span>
+                  <strong className="text-[#2B7A78]"><CurrencyGlyph /> {amountDue.toLocaleString()}</strong>
+                </div>
+                {familyAttempted && householdError && <FieldError message={householdError} />}
+              </div>
+
+              <Separator />
+            </>
+          )}
 
           {/* Health Information */}
           <div>

@@ -242,7 +242,7 @@ public class ServicePortfolioService {
 
     /**
      * Staff raise an application for a walk-in from the Service Portfolios page
-     * (Choose Plan → Register as New Member). It waits in Approvals → Applications as a
+     * (Choose Plan or Member On-board), with the household on a Family / Couple plan. It waits in Approvals → Applications as a
      * cash application, exactly like one from the share link; approving it creates the member.
      * Runs in the staff user's active branch.
      */
@@ -257,7 +257,7 @@ public class ServicePortfolioService {
 
         MembershipApplication app = newApplication(branch, new Applicant(req.fullName(), req.phone(), req.email(),
                 req.gender(), req.dateOfBirth(), req.address(), req.emergencyContactName(), req.emergencyContactPhone(),
-                req.notes(), req.planId(), null), true);
+                req.notes(), req.planId(), req.familyMembers()), true);
         app.setSource(MembershipApplication.SOURCE_DESK);
         app.setRegDocNumber(limit(trim(req.regDocNumber()), 100));
         app.setMedicalConditions(limit(trim(req.medicalConditions()), 2000));
@@ -305,10 +305,10 @@ public class ServicePortfolioService {
                 .orElseThrow(() -> new IllegalArgumentException(desk
                         ? "That plan can't be requested here — it may be inactive or a walk-in day pass"
                         : "That plan is no longer available — please pick another"));
-        // The desk form has no household section, so staff still set those up through Member On-board.
-        if (desk ? isHousehold(plan) : !isJoinable(plan)) {
+        // Family / Couple plans come with their household (both the share link and the desk form).
+        if (!isJoinable(plan)) {
             throw new IllegalArgumentException(desk
-                    ? "Family and couple plans are set up with the whole household — use Member On-board instead"
+                    ? "This plan's type isn't Family or Couple, so its household can't be added here — set it up through Add Member instead"
                     : "This plan is set up at reception — please contact the gym");
         }
         List<ApplicationFamilyMember> family = isHousehold(plan)

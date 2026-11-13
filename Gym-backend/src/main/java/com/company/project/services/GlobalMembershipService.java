@@ -273,7 +273,7 @@ public class GlobalMembershipService {
      */
     static String statusOf(String membershipStatus, String approvalStatus, boolean suspended,
                            LocalDateTime endsAt, LocalDateTime now) {
-        MemberAccessState access = MemberAccessState.of(suspended, approvalStatus);
+        MemberAccessState access = MemberAccessState.of(suspended, approvalStatus, membershipStatus);
         if (!access.allowsMemberFeatures()) {
             return access.name();
         }

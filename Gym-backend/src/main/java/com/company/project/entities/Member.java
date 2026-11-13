@@ -469,6 +469,53 @@ public class Member extends BaseEntity implements BranchAware {
     public Long getGlobalUserId() { return globalUserId; }
     public void setGlobalUserId(Long globalUserId) { this.globalUserId = globalUserId; }
 
+    // ── Membership cancellation (V139) ──────────────────────────────────────
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Column(name = "cancelled_by")
+    private String cancelledBy;
+
+    @Column(name = "cancellation_reason")
+    private String cancellationReason;
+
+    @Column(name = "cancellation_notes", columnDefinition = "TEXT")
+    private String cancellationNotes;
+
+    @Column(name = "cancellation_hold_at")
+    private LocalDateTime cancellationHoldAt;
+
+    @Column(name = "cancellation_hold_by")
+    private String cancellationHoldBy;
+
+    @Column(name = "cancellation_hold_refund", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
+    private boolean cancellationHoldRefund;
+
+    /**
+     * Set only while MembershipCancellationService is cancelling this member, so the dues it
+     * settles out of a refund aren't refused because the member is frozen or on hold.
+     */
+    @Transient
+    private boolean cancelling;
+
+    public LocalDateTime getCancelledAt() { return cancelledAt; }
+    public void setCancelledAt(LocalDateTime cancelledAt) { this.cancelledAt = cancelledAt; }
+    public String getCancelledBy() { return cancelledBy; }
+    public void setCancelledBy(String cancelledBy) { this.cancelledBy = cancelledBy; }
+    public String getCancellationReason() { return cancellationReason; }
+    public void setCancellationReason(String cancellationReason) { this.cancellationReason = cancellationReason; }
+    public String getCancellationNotes() { return cancellationNotes; }
+    public void setCancellationNotes(String cancellationNotes) { this.cancellationNotes = cancellationNotes; }
+    public LocalDateTime getCancellationHoldAt() { return cancellationHoldAt; }
+    public void setCancellationHoldAt(LocalDateTime cancellationHoldAt) { this.cancellationHoldAt = cancellationHoldAt; }
+    public String getCancellationHoldBy() { return cancellationHoldBy; }
+    public void setCancellationHoldBy(String cancellationHoldBy) { this.cancellationHoldBy = cancellationHoldBy; }
+    public boolean isCancellationHoldRefund() { return cancellationHoldRefund; }
+    public void setCancellationHoldRefund(boolean cancellationHoldRefund) { this.cancellationHoldRefund = cancellationHoldRefund; }
+    public boolean isCancelling() { return cancelling; }
+    public void setCancelling(boolean cancelling) { this.cancelling = cancelling; }
+    public boolean isOnCancellationHold() { return cancellationHoldAt != null; }
+
     @Column(name = "branch_id")
     private Long branchId;
 

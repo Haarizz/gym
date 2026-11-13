@@ -47,6 +47,16 @@ public final class MemberSuspension {
                 + " — unfreeze it before " + action + ".");
     }
 
+    /**
+     * Collecting a member's dues. A member whose cancellation is on hold is suspended only
+     * until they pay, so their dues must still be collectable; a member being cancelled right
+     * now (dues taken out of the refund) may be frozen. Everyone else: {@link #requireUsable}.
+     */
+    public static void requireCanPayDues(Member member, String action) {
+        if (member == null || member.isCancelling() || member.isOnCancellationHold()) return;
+        requireUsable(member, action);
+    }
+
     private static String who(Member member) {
         String who = member.getName() != null ? member.getName() : "This member";
         if (member.getMemberId() != null) who += " (" + member.getMemberId() + ")";

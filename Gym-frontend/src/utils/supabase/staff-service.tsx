@@ -128,7 +128,37 @@ export interface StaffListPerformance {
   revenue_achieved: number;
   achievement_percentage: number;
   commission_earned: number;
+  /** EXCELLENT (target met) | ON_TRACK (pacing to target) | AT_RISK (behind pace) | NO_TARGET */
   performance_status?: string;
+  period?: string;
+  /** All-time share (0–100) of their assigned leads that converted. */
+  conversion_rate?: number;
+  /** Month attendance (0–100) against scheduled working days. */
+  attendance_rate?: number;
+  present_today?: boolean;
+  /** Average member workout-feedback rating (all time). */
+  rating?: number;
+  rating_count?: number;
+  // Performance engine figures for the month.
+  admissions?: number;
+  admissions_amount?: number;
+  lead_conversions?: number;
+  pos_sales?: number;
+  pos_sales_amount?: number;
+  pt_sales?: number;
+  pt_sales_amount?: number;
+  pt_sessions_delivered?: number;
+  classes_taught?: number;
+  class_attendees?: number;
+  goals?: Array<{
+    metric: string;
+    label: string;
+    measure: 'count' | 'amount';
+    goal: number;
+    achieved: number;
+    percent: number | null;
+    source: 'staff' | 'role' | 'branch';
+  }>;
 }
 
 /** GET /staff/me/transactions — only the caller's own records. */
@@ -359,10 +389,11 @@ class StaffService {
   }
 
   /** This month's target progress and commission for the given staff (max 100 ids). */
-  async getStaffListPerformance(ids: string[]): Promise<StaffListPerformance[]> {
+  /** period: yyyy-MM; omitted = the current month. */
+  async getStaffListPerformance(ids: string[], period?: string): Promise<StaffListPerformance[]> {
     if (ids.length === 0) return [];
     const response = await authService.makeAuthenticatedRequest(
-      `${backendBaseUrl}/staff/performance?ids=${encodeURIComponent(ids.join(','))}`
+      `${backendBaseUrl}/staff/performance?ids=${encodeURIComponent(ids.join(','))}${period ? `&period=${period}` : ''}`
     );
     if (!response.ok) throw new Error(`Failed to fetch staff performance: ${response.status}`);
     return response.json();

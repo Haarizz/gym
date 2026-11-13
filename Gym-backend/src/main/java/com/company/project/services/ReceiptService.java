@@ -59,6 +59,10 @@ public class ReceiptService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ExpiryDueService expiryDueService;
 
+    // A held membership cancellation finishes once its dues are paid (MembershipCancellationService).
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     /** Statement line type of a refund (credit note): money given back for a cancelled bill. */
     public static final String STATEMENT_REFUND = "Refund";
 
@@ -1058,7 +1062,7 @@ public class ReceiptService {
     public ReceiptResponseDTO settlePayment(SettlePaymentRequestDTO req) {
         Member member = memberRepository.findById(req.getMemberDbId())
                 .orElseThrow(() -> new EntityNotFoundException("Member not found: " + req.getMemberDbId()));
-        MemberSuspension.requireUsable(member, "taking a payment");
+        MemberSuspension.requireCanPayDues(member, "taking a payment");
 
         BigDecimal totalPaid = BigDecimal.ZERO;
         Long soleBillId = null;
@@ -1140,6 +1144,9 @@ public class ReceiptService {
 
         // Generate journal entry: DR Cash/Bank, CR Membership Revenue
         financialEventService.onMemberPaymentReceived(saved);
+        if (eventPublisher != null && totalPaid.signum() > 0) {
+            eventPublisher.publishEvent(new MembershipCancellationService.DuesClearedEvent(member.getId()));
+        }
 
         // Create receipt voucher document for UI display
         if (totalPaid.compareTo(BigDecimal.ZERO) > 0) {

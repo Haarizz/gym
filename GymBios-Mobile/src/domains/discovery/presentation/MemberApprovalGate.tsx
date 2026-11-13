@@ -4,6 +4,7 @@ import { BrandColors } from '@/core/theme';
 import { Loader } from '@/shared/components';
 import { useTranslation } from 'react-i18next';
 import { useMembershipApprovalStatus } from '../hooks/useMembershipApprovalStatus';
+import { MembershipCancelledScreen } from './MembershipCancelledScreen';
 import { MembershipSuspendedScreen } from './MembershipSuspendedScreen';
 import { PaymentRejectedScreen } from './PaymentRejectedScreen';
 import { PendingApprovalScreen } from './PendingApprovalScreen';
@@ -32,7 +33,20 @@ export function MemberApprovalGate({ children }: { children: ReactNode }) {
     );
   }
 
-  // Checked first: a suspension stands even when a payment is also pending.
+  // The gym cancelled the membership: the person keeps their account and can read
+  // their history here; everything else at this gym is closed.
+  if (approval.data?.accessState === 'CANCELLED') {
+    return (
+      <MembershipCancelledScreen
+        gymName={approval.data.gymName}
+        reason={approval.data.cancellationReason}
+        onRefresh={() => approval.refetch()}
+        isRefreshing={approval.isRefetching}
+      />
+    );
+  }
+
+  // A suspension stands even when a payment is also pending.
   if (approval.data?.accessState === 'SUSPENDED') {
     return (
       <MembershipSuspendedScreen

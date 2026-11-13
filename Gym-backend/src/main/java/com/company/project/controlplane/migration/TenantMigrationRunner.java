@@ -97,7 +97,11 @@ public class TenantMigrationRunner implements CommandLineRunner {
                 // repair() realigns a row's description/checksum to whatever file now has
                 // its version — correct for an edited file, but for a RENUMBERED one it
                 // relabels the row as a migration that never ran. Refuse those tenants;
-                // TenantFlywayHistoryRepairRunner fixes their history first.
+                // TenantFlywayHistoryRepairRunner fixes their history first. Rows whose file
+                // was only renamed (identical content) are moved to their new version first.
+                if (FlywayHistoryInspector.hasHistoryTable(tenantDs)) {
+                    FlywayHistoryInspector.realignRenamedRows(tenantDs, localMigrations);
+                }
                 List<FlywayHistoryInspector.HistoryRow> renumbered = FlywayHistoryInspector.hasHistoryTable(tenantDs)
                         ? FlywayHistoryInspector.findRenumberedRows(FlywayHistoryInspector.readHistory(tenantDs), localMigrations)
                         : List.of();

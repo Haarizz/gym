@@ -10,6 +10,7 @@ export type GymMembershipStatus =
   | 'ACTIVE'
   | 'EXPIRED'
   | 'INACTIVE'
+  | 'CANCELLED'
   | 'SUSPENDED'
   | 'PENDING_APPROVAL'
   | 'PAYMENT_REJECTED'

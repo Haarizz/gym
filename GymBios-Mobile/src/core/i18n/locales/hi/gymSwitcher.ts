@@ -21,6 +21,7 @@ const gymSwitcher = {
       EXPIRED: "समाप्त",
       INACTIVE: "निष्क्रिय",
       SUSPENDED: "निलंबित",
+      CANCELLED: "रद्द",
       PENDING_APPROVAL: "स्वीकृति लंबित",
       PAYMENT_REJECTED: "भुगतान अस्वीकृत",
       UNAVAILABLE: "उपलब्ध नहीं",

@@ -20,9 +20,20 @@ import java.time.LocalDate;
 public class MemberRefundController {
 
     private final MemberRefundService service;
+    private final com.company.project.services.MembershipCancellationService cancellations;
 
-    public MemberRefundController(MemberRefundService service) {
+    public MemberRefundController(MemberRefundService service,
+                                  com.company.project.services.MembershipCancellationService cancellations) {
         this.service = service;
+        this.cancellations = cancellations;
+    }
+
+    /** Cancel a membership with a refund (Members › Cancel membership → "Cancel with refund"). */
+    @PostMapping("/cancellation/{memberDbId}")
+    public com.company.project.services.MembershipCancellationService.Result cancelWithRefund(
+            @PathVariable Long memberDbId,
+            @RequestBody com.company.project.services.MembershipCancellationService.RefundCancelRequest request) {
+        return cancellations.cancelWithRefund(memberDbId, request);
     }
 
     @GetMapping("/options")

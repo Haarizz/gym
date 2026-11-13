@@ -184,6 +184,8 @@ const centers = {
       manage: "Manage",
       manageA11y: "Manage your subscription at {{name}}",
       manageMine: "Manage my subscription",
+      cancelledTitle: "Your membership here was cancelled",
+      cancelledBody: "Your membership at {{gym}} was cancelled. To rejoin, contact the gym's reception — they'll restart it on your existing account, with your history.",
       alreadyTitle: "You're already subscribed here",
       alreadyBody: "You already have a subscription at {{gym}}. To renew it or change your plan, open it in Subscriptions.",
       otherBranchTitle: "You're subscribed at another branch",

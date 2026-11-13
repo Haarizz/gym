@@ -186,6 +186,8 @@ const centers = {
       manage: "Gestionar",
       manageA11y: "Gestionar tu suscripción en {{name}}",
       manageMine: "Gestionar mi suscripción",
+      cancelledTitle: "Tu membresía aquí fue cancelada",
+      cancelledBody: "Tu membresía en {{gym}} fue cancelada. Para volver, contacta con la recepción: la reactivarán en tu cuenta actual, con tu historial.",
       alreadyTitle: "Ya tienes una suscripción aquí",
       alreadyBody: "Ya tienes una suscripción en {{gym}}. Para renovarla o cambiar de plan, ábrela en Suscripciones.",
       otherBranchTitle: "Tienes una suscripción en otra sede",

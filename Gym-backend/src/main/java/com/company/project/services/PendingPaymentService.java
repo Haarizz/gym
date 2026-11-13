@@ -48,6 +48,10 @@ import java.util.stream.Collectors;
 @Transactional
 public class PendingPaymentService {
 
+    // A held membership cancellation finishes once its dues are written off (MembershipCancellationService).
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     public static final String STATUS_WRITTEN_OFF = "Written Off";
     private static final Set<String> OPEN_STATUSES = Set.of("Pending", "Overdue", "Partial");
     private static final Map<String, String> REASON_LABELS = Map.of(
@@ -205,6 +209,9 @@ public class PendingPaymentService {
             w = writeOffRepository.saveAndFlush(w);
         } catch (DataIntegrityViolationException e) {
             throw new BusinessRuleViolationException("This due has already been written off.");
+        }
+        if (eventPublisher != null && bill.getMemberDbId() != null) {
+            eventPublisher.publishEvent(new MembershipCancellationService.DuesClearedEvent(bill.getMemberDbId()));
         }
         return WriteOff.of(w);
     }

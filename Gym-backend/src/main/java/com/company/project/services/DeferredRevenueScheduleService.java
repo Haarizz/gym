@@ -195,6 +195,29 @@ public class DeferredRevenueScheduleService {
         return new BigDecimal[] { deferredDebit, recognizeNow };
     }
 
+    /**
+     * A membership cancelled without a refund: the gym keeps the fee, so whatever is still
+     * deferred on the bill becomes revenue now and the schedule stops. Returns that amount.
+     */
+    public BigDecimal forfeitOnCancel(Long receiptId) {
+        BigDecimal kept = BigDecimal.ZERO;
+        if (receiptId == null) return kept;
+        for (DeferredRevenueSchedule schedule : scheduleRepo.findByReceiptIdAndStatus(receiptId, "ACTIVE")) {
+            List<DeferredRevenueRecognitionLine> pending = lineRepo.findByScheduleIdOrderByPeriodNumberAsc(schedule.getId())
+                    .stream().filter(l -> "PENDING".equals(l.getStatus())).toList();
+            BigDecimal left = pending.stream().map(DeferredRevenueRecognitionLine::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add).max(BigDecimal.ZERO);
+            for (DeferredRevenueRecognitionLine l : pending) l.setStatus("CANCELLED");
+            lineRepo.saveAll(pending);
+            schedule.setRecognizedAmount(schedule.getRecognizedAmount().add(left));
+            schedule.setRemainingAmount(BigDecimal.ZERO);
+            schedule.setStatus("CANCELLED");
+            scheduleRepo.save(schedule);
+            kept = kept.add(left);
+        }
+        return kept;
+    }
+
     public List<DeferredRevenueSchedule> findActiveSchedules() {
         return scheduleRepo.findByStatusOrderByStartDateDesc("ACTIVE");
     }

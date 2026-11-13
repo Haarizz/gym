@@ -67,7 +67,7 @@ export function PlanPurchaseModal({
   const totalAmount = Math.max(0, offerPrice - couponDiscount);
   const couponCode = couponSel?.kind === 'coupon' ? couponSel.coupon.code : undefined;
 
-  const showAlreadyMember = async (branchId: unknown) => {
+  const showAlreadyMember = async (branchId: unknown, status?: unknown) => {
     // The list was stale (that's how the member got this far), so refresh it for the
     // gym and branch names.
     await refreshMyGymMemberships();
@@ -78,6 +78,7 @@ export function PlanPurchaseModal({
         branchId: typeof branchId === 'number' ? branchId : null,
         gymName: center.centerName,
         branchName: null,
+        status: typeof status === 'string' && status.toLowerCase() === 'cancelled' ? 'CANCELLED' : undefined,
       },
     );
     setStep('already-member');
@@ -122,7 +123,7 @@ export function PlanPurchaseModal({
         },
         onError: (err: any) => {
           if (err?.status === 409) {
-            void showAlreadyMember(err?.body?.branchId);
+            void showAlreadyMember(err?.body?.branchId, err?.body?.status);
             return;
           }
           toast.error(err?.message || t('centers.purchase.failed'), { title: t('centers.purchase.failedTitle') });

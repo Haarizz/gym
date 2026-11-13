@@ -7,7 +7,7 @@ import { useAuthStore } from '@/domains/auth/store/authStore';
  * but ACTIVE closes this gym's member features — never the account itself, Community
  * or gym discovery.
  */
-export type MemberAccessState = 'ACTIVE' | 'SUSPENDED' | 'PENDING_APPROVAL' | 'PAYMENT_REJECTED';
+export type MemberAccessState = 'ACTIVE' | 'CANCELLED' | 'SUSPENDED' | 'PENDING_APPROVAL' | 'PAYMENT_REJECTED';
 
 export interface MembershipApprovalStatus {
   // 'PENDING' — Cash/Credit/Mixed purchase awaiting reception approval, app access
@@ -23,6 +23,9 @@ export interface MembershipApprovalStatus {
   accessState: MemberAccessState;
   // Staff's reason, set when accessState is 'SUSPENDED'.
   suspendedReason: string | null;
+  // Set when accessState is 'CANCELLED' (the gym cancelled the membership).
+  cancellationReason: string | null;
+  cancelledAt: string | null;
 }
 
 /** True while TenantContextFilter blocks this gym's member endpoints (suspended, pending or rejected purchase). */
@@ -80,6 +83,8 @@ export function useMembershipApprovalStatus(
         isRejectedLocked: data?.approval_status === 'REJECTED' && data?.app_access_enabled === false,
         accessState: deriveAccessState(data),
         suspendedReason: data?.suspended_reason ?? null,
+        cancellationReason: data?.cancellation_reason ?? null,
+        cancelledAt: data?.cancelled_at ?? null,
       };
     },
     enabled: !!activeTenant && (options.enabled ?? true),

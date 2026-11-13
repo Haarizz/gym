@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import {
   servicePortfolioService, apiErrorMessage,
-  type ApplicationFamilyMember, type ApplicationPaymentMethod, type ApplicationReceipt, type PortfolioPlan, type PortfolioSession, type PortfolioTrainer,
+  type ApplicationPaymentMethod, type ApplicationReceipt, type PortfolioPlan, type PortfolioSession, type PortfolioTrainer,
   type PublicPortfolio,
 } from '../utils/supabase/service-portfolio-service';
 import {
@@ -18,6 +18,10 @@ import {
   parsePhoneInput, toInternational, validatePhone, type DialCountry,
 } from '../utils/phone-number';
 import { resolveBackendImageUrl } from '../utils/resolve-image-url';
+import {
+  type FamilyRow, type FamilyField, RELATIONSHIPS, COUPLE_RELATIONSHIPS, MAX_FAMILY_ROWS,
+  newFamilyRow, ageOn, isChild, rowGender, householdTotal, householdCapError, householdLine, toFamilyMember,
+} from '../utils/household';
 import s from './PublicLeadForm.module.css';
 import j from './PublicJoin.module.css';
 import w from './PublicWalkIn.module.css';
@@ -39,33 +43,6 @@ function planCategory(p: PortfolioPlan): PlanCategory {
   return t === 'family' || t === 'couple' ? t : 'individual';
 }
 
-// ── Family / Couple households ──
-// The applicant is the family head; these rows are everyone joining with them.
-interface FamilyRow {
-  key: number;
-  name: string;
-  relationship: string;
-  gender: string;
-  dob: string;
-  child: boolean;
-  phone: string;
-  email: string;
-}
-type FamilyField = 'name' | 'relationship' | 'gender' | 'dob' | 'email';
-
-// Same choices as the desk's Add Member family section; the gender each implies.
-const RELATIONSHIPS: { value: string; gender: 'Male' | 'Female' | null }[] = [
-  { value: 'Wife', gender: 'Female' },
-  { value: 'Husband', gender: 'Male' },
-  { value: 'Son', gender: 'Male' },
-  { value: 'Daughter', gender: 'Female' },
-  { value: 'Father', gender: 'Male' },
-  { value: 'Mother', gender: 'Female' },
-  { value: 'Brother', gender: 'Male' },
-  { value: 'Sister', gender: 'Female' },
-  { value: 'Other', gender: null },
-];
-const COUPLE_RELATIONSHIPS = ['Wife', 'Husband', 'Other'];
 const GENDERS = ['Male', 'Female', 'Other'];
 
 type BranchAccess = NonNullable<PublicPortfolio['access']>;
@@ -74,66 +51,6 @@ const genderAllowed = (access: BranchAccess, gender: string) =>
   access === 'MIXED' || (access === 'LADIES_ONLY' ? gender === 'Female' : gender === 'Male');
 /** The one gender a Ladies Only / Men Only branch takes; '' for a mixed branch. */
 const onlyGender = (access: BranchAccess) => (access === 'LADIES_ONLY' ? 'Female' : access === 'MEN_ONLY' ? 'Male' : '');
-const MAX_FAMILY_ROWS = 20;
-
-let familyKey = 0;
-const newFamilyRow = (): FamilyRow =>
-  ({ key: ++familyKey, name: '', relationship: '', gender: '', dob: '', child: false, phone: '', email: '' });
-
-const ageOn = (iso: string) => {
-  const d = new Date(`${iso}T00:00:00`);
-  return Number.isNaN(d.getTime()) ? null : (Date.now() - d.getTime()) / (365.25 * 864e5);
-};
-/** Under 18 — from the date of birth when given (the server works it out the same way). */
-const isChild = (r: FamilyRow) => {
-  const age = r.dob ? ageOn(r.dob) : null;
-  return age != null ? age < 18 : r.child;
-};
-const rowGender = (r: FamilyRow) => r.gender || RELATIONSHIPS.find(x => x.value === r.relationship)?.gender || '';
-
-/** What the household pays: per person (applicant included) when the plan is priced that way, else the plan price. */
-function householdTotal(plan: PortfolioPlan, headcount: number) {
-  const h = plan.household;
-  if (!h?.price_per_member) return plan.effective_price;
-  let total = 0;
-  for (let i = 0; i < headcount; i++) {
-    total += h.max_members && i >= h.max_members ? (h.additional_member_price ?? h.price_per_member) : h.price_per_member;
-  }
-  return total;
-}
-
-/** The plan's member caps as one message, or null when the household fits. Mirrors MemberService.enforceFamilyMemberCaps. */
-function householdCapError(plan: PortfolioPlan, rows: FamilyRow[]): string | null {
-  const h = plan.household;
-  if (!h) return null;
-  if (h.kind === 'couple') {
-    if (rows.length !== 1) return 'A couple plan is for you and one partner.';
-    if (isChild(rows[0])) return 'A couple plan is for you and one adult partner.';
-    return null;
-  }
-  if (rows.length === 0) return 'Add at least one family member.';
-  const adults = 1 + rows.filter(r => !isChild(r)).length;
-  const children = rows.filter(isChild).length;
-  if (h.max_adults && adults > h.max_adults) return `This plan allows up to ${h.max_adults} adults, including you.`;
-  if (h.max_children && children > h.max_children) return `This plan allows up to ${h.max_children} children.`;
-  if (h.max_members && adults + children > h.max_members && !h.allow_additional_members) {
-    return `This plan allows up to ${h.max_members} people, including you.`;
-  }
-  return null;
-}
-
-/** One line on the plan card saying who the plan covers. */
-function householdLine(plan: PortfolioPlan) {
-  const h = plan.household;
-  if (!h) return null;
-  if (h.kind === 'couple') return 'For you and one partner';
-  const parts: string[] = [];
-  if (h.max_members) parts.push(`Up to ${h.max_members} people${h.allow_additional_members ? ' (more can be added)' : ''}`);
-  if (h.max_adults) parts.push(`${h.max_adults} adults`);
-  if (h.max_children) parts.push(`${h.max_children} children`);
-  return parts.length ? parts.join(' · ') : 'For you and your family';
-}
-
 /** Number of accent colours cards cycle through (data-tone 0–4 in PublicJoin.module.css). */
 const TONES = 5;
 
@@ -365,7 +282,7 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
   const genderOptions = GENDERS.filter(g => genderAllowed(access, g));
   const household = plan?.household ?? null;
   const familyRows = household ? family : [];
-  const amountDue = plan ? householdTotal(plan, 1 + familyRows.length) : 0;
+  const amountDue = plan ? householdTotal(plan.effective_price, plan.household, 1 + familyRows.length) : 0;
 
   const touch = (field: DetailKey | PayKey) => () => {
     if (submitPressRef.current) return;
@@ -425,7 +342,7 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
     }
     return out;
   }, [familyRows, details.email]);
-  const householdError = plan ? householdCapError(plan, familyRows) : null;
+  const householdError = plan ? householdCapError(plan.household, familyRows) : null;
 
   const familyError = (r: FamilyRow, f: FamilyField) =>
     (detailsAttempted || familyTouched[`${r.key}-${f}`]) ? familyErrors[r.key]?.[f] : undefined;
@@ -500,18 +417,7 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
           name_on_card: card.name.trim() || undefined,
         } : undefined,
         accept_terms: acceptTerms,
-        family_members: familyRows.length ? familyRows.map((r): ApplicationFamilyMember => {
-          const child = isChild(r);
-          return {
-            name: r.name.trim(),
-            relationship: r.relationship,
-            gender: rowGender(r),
-            date_of_birth: r.dob || null,
-            minor: child,
-            phone: child ? null : r.phone.trim() || null,
-            email: child ? null : r.email.trim() || null,
-          };
-        }) : undefined,
+        family_members: familyRows.length ? familyRows.map(toFamilyMember) : undefined,
       });
       setReceipt(result);
       goTo('done');
@@ -699,7 +605,7 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
                   ? 'You are the main member. Add the partner joining you — you pay for both of you together.'
                   : 'You are the main member. Add everyone joining with you — you pay for the whole family together.'}
                 {household.kind === 'family' && (household.max_members || household.max_adults || household.max_children)
-                  ? ` ${householdLine(plan)}.` : ''}
+                  ? ` ${householdLine(plan.household)}.` : ''}
                 {branchGender && (
                   <> <strong>{page.branch_name || 'This branch'} is for {branchGender === 'Female' ? 'women' : 'men'} only</strong>, so
                     everyone joining needs to be {branchGender.toLowerCase()}.</>
@@ -1076,7 +982,7 @@ export function PublicJoinPage({ tenantSlug, branchId, token }: { tenantSlug: st
                       {p.household && <span className={j.priceUnit}> {p.household.kind === 'couple' ? 'for both' : 'for the family'}</span>}
                     </div>
                   )}
-                  {p.household && <div className={j.householdBadge}><Users aria-hidden="true" />{householdLine(p)}</div>}
+                  {p.household && <div className={j.householdBadge}><Users aria-hidden="true" />{householdLine(p.household)}</div>}
                   {p.description && <p className={j.prose} style={{ margin: 0 }}>{p.description}</p>}
                   <ul className={j.features}>
                     {p.features.map((f, i) => <li key={i}><CheckCircle aria-hidden="true" />{f}</li>)}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   AlertTriangle, ArrowLeft, Banknote, Ban, CalendarX2, CheckCircle2, CreditCard, FileText, History, Landmark,
@@ -28,8 +29,12 @@ import {
   REFUND_METHODS, REFUND_REASONS, billTypeLabel, refundService,
   type MemberRefund, type MemberRefundBills, type RefundMethod, type RefundPage, type RefundableBill,
 } from '../utils/supabase/refund-service';
+import {
+  cancellationService, type CancelHandoff, type CancelRefundMethod, type CancellationPreview, type CancellationResult, type DuesAction,
+} from '../utils/supabase/cancellation-service';
 import bs from './billing.module.css';
 import s from './refunds.module.css';
+import cs from '../components/members/CancelMembership.module.css';
 
 // ── Period presets (same set as Pending Payments) ─────────────────────────────
 type Preset = 'today' | 'week' | 'month' | 'prev-month' | 'year' | 'all' | 'custom';
@@ -148,6 +153,12 @@ export function Refunds() {
   const [tab, setTab] = useState<'new' | 'history'>('new');
   const [kpi, setKpi] = useState<RefundPage['summary'] | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // Members › Cancel membership → "Cancel with refund" lands here with ?cancel=<member id>.
+  const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  const cancelId = params.get('cancel');
+  const handoff = (location.state as { cancelHandoff?: CancelHandoff } | null)?.cancelHandoff ?? null;
+  const closeCancel = () => setParams(p => { const n = new URLSearchParams(p); n.delete('cancel'); return n; }, { replace: true });
 
   useEffect(() => {
     const r = presetRange('month', { from: '', to: '' });
@@ -189,6 +200,15 @@ export function Refunds() {
         {stat('Average Refund', <Amount value={kpi?.average} />, 'Per refund this month',
           <ReceiptText className="h-4 w-4" />, 'slate')}
       </div>
+
+      {cancelId && (
+        <CancellationRefundDialog
+          memberId={cancelId}
+          handoff={handoff}
+          onClose={closeCancel}
+          onDone={() => { setReloadKey(k => k + 1); }}
+        />
+      )}
 
       <Tabs value={tab} onValueChange={v => setTab(v as 'new' | 'history')} className="space-y-6">
         <TabsList className="w-full flex">
@@ -927,5 +947,323 @@ function RefundHistory({ reloadKey }: { reloadKey: number }) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ── Cancel membership with a refund (from Members › Cancel membership) ─────────
+const CANCEL_PCTS = [1, 0.75, 0.5, 0.25];
+const POLICY_TEXT: Record<string, string> = {
+  prorated: 'Pro-rated — the share of each paid period that is still unused',
+  flat: 'Flat — what is left on current and future bills, less a fixed fee',
+  none: 'No refunds',
+};
+
+function CancellationRefundDialog({ memberId, handoff, onClose, onDone }: {
+  memberId: string; handoff: CancelHandoff | null; onClose: () => void; onDone: () => void;
+}) {
+  const { formatCurrencyText } = useCurrency();
+  const { activeBranchId } = useBranch();
+  const [data, setData] = useState<CancellationPreview | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<'form' | 'review' | 'done'>('form');
+  const [amountText, setAmountText] = useState('');
+  const [method, setMethod] = useState<CancelRefundMethod>('Cash');
+  const [bankAccounts, setBankAccounts] = useState<AccountHead[]>([]);
+  const [bankCode, setBankCode] = useState('');
+  const [reference, setReference] = useState('');
+  const [refundReason, setRefundReason] = useState('MEMBER_REQUEST');
+  const [reason, setReason] = useState(handoff?.reason ?? '');
+  const [notes, setNotes] = useState(handoff?.notes ?? '');
+  const [dues, setDues] = useState<DuesAction | null>(handoff?.dues_action ?? null);
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<CancellationResult | null>(null);
+
+  useEffect(() => {
+    cancellationService.preview(memberId)
+      .then(p => {
+        setData(p);
+        setAmountText(p.policy_total.toFixed(2));
+        if (!handoff?.reason && p.hold?.reason) setReason(p.hold.reason);
+        if (!handoff?.notes && p.hold?.notes) setNotes(p.hold.notes);
+      })
+      .catch(e => setError(apiErrorMessage(e, 'Could not load the cancellation')));
+  }, [memberId, handoff]);
+
+  useEffect(() => {
+    if ((method === 'Bank Transfer' || method === 'Online') && bankAccounts.length === 0) {
+      accountHeadsService.getBankAccounts().then(setBankAccounts).catch(() => undefined);
+    }
+  }, [method, bankAccounts.length]);
+
+  const amount = round2(Number(amountText) || 0);
+  const max = data?.policy_total ?? 0;
+  const duesTotal = data?.dues_total ?? 0;
+  const hasDues = duesTotal > 0.004;
+  const deducted = dues === 'DEDUCT' ? duesTotal : 0;
+  const tooMuch = amount > max + 0.001;
+  const tooLittle = dues === 'DEDUCT' && amount + 0.001 < duesTotal;
+  const needsBank = method === 'Bank Transfer' || method === 'Online';
+  const bank = bankAccounts.find(a => a.code === bankCode);
+  const family = (data?.household.length ?? 0) > 1;
+  const formOk = !!data && data.can_cancel && data.can_refund && !data.pending_request && amount > 0 && !tooMuch && !tooLittle
+    && reason.trim().length > 0 && (!hasDues || !!dues);
+
+  const submit = async () => {
+    if (!data) return;
+    setSaving(true);
+    try {
+      const r = await cancellationService.cancelWithRefund(data.member_db_id, {
+        reason: reason.trim(), notes: notes.trim() || null, dues_action: hasDues ? dues : null, amount, method,
+        bank_account_code: needsBank ? bank?.code ?? null : null, bank_account_name: needsBank ? bank?.name ?? null : null,
+        reference: reference.trim() || null, refund_reason_code: refundReason,
+      });
+      if (r.outcome === 'PENDING_APPROVAL') {
+        toast.success('Sent for approval', { description: `An Admin or Manager will review cancelling ${r.members.join(', ')} with a ${formatCurrencyText(r.refund_amount)} refund.` });
+        onDone();
+        onClose();
+        return;
+      }
+      setResult(r);
+      setStep('done');
+      toast.success(`Membership cancelled and ${formatCurrencyText(r.refund_amount)} refunded`, { description: r.members.join(', ') });
+      onDone();
+    } catch (e) {
+      toast.error(apiErrorMessage(e, 'The cancellation could not be completed'));
+      setStep('form');
+    } finally { setSaving(false); }
+  };
+
+  const close = () => { if (!saving) onClose(); };
+
+  return (
+    <Dialog open onOpenChange={o => { if (!o) close(); }}>
+      <DialogContent className={`${s.dialog} ${cs.wide}`} onInteractOutside={e => e.preventDefault()}>
+        <div className={s.dHead}>
+          <span className={s.dIcon} data-done={step === 'done'}>{step === 'done' ? <CheckCircle2 /> : <Undo2 />}</span>
+          <div className={s.dHeadText}>
+            <DialogTitle className={s.dTitle}>
+              {step === 'done' ? 'Cancelled and refunded' : step === 'review' ? 'Check the cancellation' : 'Cancel membership with a refund'}
+            </DialogTitle>
+            <DialogDescription className={s.dSub}>
+              {data ? <>{data.name}{data.member_id ? ` · ${data.member_id}` : ''}{family ? ` · with ${data.household.filter(p => !p.head).map(p => p.name).join(', ')}` : ''}</> : 'Loading…'}
+            </DialogDescription>
+          </div>
+        </div>
+
+        {data && step !== 'done' && (
+          <div className={s.billStrip}>
+            <div><span>Paid, still refundable</span><strong><Amount value={data.refundable_total} /></strong></div>
+            <div><span>Policy allows</span><strong className={s.green}><Amount value={data.policy_total} /></strong></div>
+            {hasDues && <div><span>Owed</span><strong className={s.red}><Amount value={duesTotal} /></strong></div>}
+            {data.wallet_total > 0 && <div><span>Wallet</span><strong><Amount value={data.wallet_total} /></strong></div>}
+          </div>
+        )}
+
+        {error ? (
+          <div className={s.dBody}><div className={cs.banner} data-tone="red"><AlertTriangle /><span>{error}</span></div></div>
+        ) : !data ? (
+          <div className={s.dBody}><div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div></div>
+        ) : step === 'form' ? (
+          <div className={s.dBody}>
+            {!data.can_cancel && <div className={cs.banner} data-tone="red"><Ban /><span>{data.blocked_reason}</span></div>}
+            {data.can_cancel && !data.can_refund && <div className={cs.banner} data-tone="red"><Ban /><span>{data.refund_blocked_reason} Cancel without a refund from the member’s page instead.</span></div>}
+            {data.pending_request && (
+              <div className={cs.banner} data-tone="blue"><History /><span><strong>Already waiting for approval</strong> — asked by {data.pending_request.requested_by || 'staff'}. Decide it in Approvals › Cancellations.</span></div>
+            )}
+            {!data.pending_request && data.needs_approval && (
+              <div className={cs.banner} data-tone="blue"><CheckCircle2 /><span>An Admin or Manager must approve cancellations. This refund is sent to them and only paid once they approve.</span></div>
+            )}
+
+            <div className={s.field}>
+              <div className={cs.sectionHead}><ReceiptText /> What the policy gives back <em>{POLICY_TEXT[data.policy.method]}</em></div>
+              <div className={cs.billTable}>
+                <div className={cs.billLine} data-head="true"><span>Bill</span><span>Refundable</span><span>Policy</span></div>
+                {data.refund_bills.map(b => (
+                  <div key={b.receipt_id} className={cs.billLine} data-zero={b.policy_amount <= 0}>
+                    <span>
+                      {billTypeLabel(b.type)}{b.plan_name ? ` · ${b.plan_name}` : ''}
+                      <small>{b.receipt_no}{family && b.member_name ? ` · ${b.member_name}` : ''}{b.valid_from || b.valid_till ? ` · ${fmtDate(b.valid_from)} → ${fmtDate(b.valid_till)}` : ''} · {b.basis}</small>
+                    </span>
+                    <span><Amount value={b.refundable} /></span>
+                    <span><Amount value={b.policy_amount} className={b.policy_amount > 0 ? s.green : undefined} /></span>
+                  </div>
+                ))}
+                {data.cancellation_fee > 0 && (
+                  <div className={cs.billLine}><span>Cancellation fee<small>Taken off in proportion across the bills above</small></span><span /><span className={s.red}>−<Amount value={data.cancellation_fee} /></span></div>
+                )}
+                <div className={cs.billLine} data-total="true"><span>Most that can be refunded</span><span><Amount value={data.refundable_total} /></span><span><Amount value={data.policy_total} className={s.green} /></span></div>
+              </div>
+            </div>
+
+            <div className={s.field}>
+              <Label htmlFor="cr-amount">Refund</Label>
+              <div className={cs.pctRow}>
+                {CANCEL_PCTS.map(f => {
+                  const v = round2(max * f);
+                  return (
+                    <button key={f} type="button" className={cs.pct} data-on={Math.abs(amount - v) < 0.005}
+                      disabled={!data.can_refund || (dues === 'DEDUCT' && v + 0.001 < duesTotal)}
+                      onClick={() => setAmountText(v.toFixed(2))}>
+                      <b>{f * 100}%</b><span>{formatCurrencyText(v)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className={s.amountInput}>
+                <span className={s.amountGlyph}><CurrencyGlyph /></span>
+                <Input id="cr-amount" type="number" min={0} step="0.01" max={max} value={amountText}
+                  onChange={e => setAmountText(e.target.value)} className={s.amountField} disabled={!data.can_refund} />
+              </div>
+              {tooMuch && <span className={s.err}>The gym’s policy allows at most {formatCurrencyText(max)}.</span>}
+              {tooLittle && <span className={s.err}>The refund must cover the {formatCurrencyText(duesTotal)} owed when the dues are taken from it.</span>}
+            </div>
+
+            {hasDues && (
+              <div className={s.field}>
+                <Label>Dues of {formatCurrencyText(duesTotal)}</Label>
+                <div className={cs.options}>
+                  <button type="button" className={cs.option} data-on={dues === 'DEDUCT'} onClick={() => setDues('DEDUCT')} disabled={max + 0.004 < duesTotal}>
+                    <Undo2 /><span><b>Take from the refund</b><small>Only the difference is paid out.</small></span>
+                  </button>
+                  <button type="button" className={cs.option} data-on={dues === 'WRITE_OFF'} onClick={() => setDues('WRITE_OFF')}>
+                    <FileText /><span><b>Write it off</b><small>The gym gives up the money owed.</small></span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className={s.field}>
+              <Label>Give it back by</Label>
+              <div className={s.methods} style={{ gridTemplateColumns: `repeat(${data.refund_methods.length}, minmax(0, 1fr))` }}>
+                {data.refund_methods.map(m => {
+                  const Icon = METHOD_ICON[m as RefundMethod];
+                  return (
+                    <button key={m} type="button" className={s.method} data-on={method === m} onClick={() => setMethod(m)}>
+                      <Icon /><span>{m}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <span className={s.hint}>{METHOD_HINT[method as RefundMethod]}. Wallet credit isn’t offered — the member is leaving.</span>
+            </div>
+
+            {(needsBank || method === 'Card') && (
+              <div className={s.grid2}>
+                {needsBank && (
+                  <div className={s.field}>
+                    <Label>Paid from account</Label>
+                    <Select value={bankCode} onValueChange={setBankCode}>
+                      <SelectTrigger><SelectValue placeholder={bankAccounts.length ? 'Choose the bank account' : 'Cash at Bank'} /></SelectTrigger>
+                      <SelectContent>{bankAccounts.map(a => <SelectItem key={a.code} value={a.code}>{a.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className={s.field}>
+                  <Label htmlFor="cr-ref">Reference <span className={s.optional}>optional</span></Label>
+                  <Input id="cr-ref" maxLength={120} value={reference} onChange={e => setReference(e.target.value)}
+                    placeholder={method === 'Card' ? 'Card reversal / approval no.' : 'Transfer reference'} />
+                </div>
+              </div>
+            )}
+
+            <div className={s.grid2}>
+              <div className={s.field}>
+                <Label>Why they’re leaving</Label>
+                <Select value={reason} onValueChange={setReason}>
+                  <SelectTrigger><SelectValue placeholder="Choose a reason" /></SelectTrigger>
+                  <SelectContent>
+                    {(data.reasons.length ? data.reasons : ['Member Relocation', 'Medical Reasons', 'Financial Issues', 'Dissatisfaction', 'Other'])
+                      .concat(reason && !data.reasons.includes(reason) ? [reason] : [])
+                      .map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className={s.field}>
+                <Label>Refund reason</Label>
+                <Select value={refundReason} onValueChange={setRefundReason}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{REFUND_REASONS.map(r => <SelectItem key={r.code} value={r.code}>{r.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className={s.field}>
+              <Label htmlFor="cr-notes">Notes <span className={s.optional}>optional</span></Label>
+              <Textarea id="cr-notes" rows={2} maxLength={1000} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Anything to remember about this cancellation" />
+            </div>
+          </div>
+        ) : step === 'review' ? (
+          <div className={s.dBody}>
+            <div className={s.reviewAmount}>
+              <span>{deducted > 0 ? 'Paid out to' : 'Refund to'} {data.name}</span>
+              <strong><Amount value={amount - deducted} /></strong>
+              <em>{method}{needsBank && bank ? ` · ${bank.name}` : ''}{reference.trim() ? ` · ref ${reference.trim()}` : ''}</em>
+            </div>
+            {deducted > 0 && (
+              <div className={s.reviewList}>
+                <div className={cs.netRow}><span>Refund</span><Amount value={amount} /></div>
+                <div className={cs.netRow}><span>Less dues taken from it</span><span className={s.red}>−<Amount value={deducted} /></span></div>
+                <div className={cs.netRow} data-strong="true"><span>Paid out</span><Amount value={amount - deducted} /></div>
+              </div>
+            )}
+            <div className={s.reviewList}>
+              <div className={s.reviewHead}>What happens</div>
+              <ul>
+                <li><CheckCircle2 />{family ? `${data.household.map(p => p.name).join(', ')} are cancelled together.` : `${data.name}’s membership ends today and is marked Cancelled.`}</li>
+                <li><CheckCircle2 />{formatCurrencyText(amount)} is refunded across {data.refund_bills.filter(b => b.policy_amount > 0).length} bill(s) — a refund voucher each, posted to the ledger.</li>
+                {dues === 'WRITE_OFF' && <li><CheckCircle2 />{formatCurrencyText(duesTotal)} in dues is written off.</li>}
+                {dues === 'DEDUCT' && <li><CheckCircle2 />{formatCurrencyText(duesTotal)} in dues is paid out of the refund.</li>}
+                {data.expiry_dues_total > 0 && <li><CheckCircle2 />The unpaid renewal bill is cancelled.</li>}
+                <li><CheckCircle2 />Upcoming bookings, add-ons and PT packages are cancelled; check-in stops and the gym leaves their app.</li>
+              </ul>
+              <div className={s.reviewReason}>Reason: <strong>{reason}</strong>{notes.trim() ? ` — ${notes.trim()}` : ''}</div>
+            </div>
+            {data.wallet_total > 0 && <div className={cs.banner}><Wallet /><span>{formatCurrencyText(data.wallet_total)} wallet balance isn’t paid out by this.</span></div>}
+            <div className={s.warn}><AlertTriangle /> This can’t be undone from here. Check the amount before you confirm.</div>
+          </div>
+        ) : result ? (
+          <div className={s.dBody}>
+            <div className={s.doneBox}>
+              <div className={s.doneAmount}><Amount value={result.net_paid_out} /></div>
+              <div className={s.doneSub}>{result.dues_deducted > 0 ? 'paid out' : 'refunded'} to {data.name} by {method} · membership cancelled</div>
+              <div className={s.doneMeta}>
+                {result.refunds.map(r => <span key={r.id}>{r.voucher_no}</span>)}
+                {result.dues_deducted > 0 && <span>Dues {formatCurrencyText(result.dues_deducted)} taken from the refund</span>}
+                {result.dues_written_off > 0 && <span>Dues {formatCurrencyText(result.dues_written_off)} written off</span>}
+                {result.bookings_cancelled > 0 && <span>{result.bookings_cancelled} booking(s) cancelled</span>}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className={s.dFoot}>
+          {!data || error ? <Button variant="outline" onClick={close}>Close</Button>
+          : step === 'form' ? (
+            <>
+              <Button variant="outline" onClick={close}>Not now</Button>
+              <Button onClick={() => setStep('review')} disabled={!formOk}>
+                Review <ArrowLeft className="h-4 w-4 ml-1" style={{ transform: 'rotate(180deg)' }} />
+              </Button>
+            </>
+          ) : step === 'review' ? (
+            <>
+              <Button variant="outline" onClick={() => setStep('form')} disabled={saving}><ArrowLeft className="h-4 w-4 mr-1" /> Back</Button>
+              <Button onClick={submit} disabled={saving} className={s.confirmBtn}>
+                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Undo2 className="h-4 w-4 mr-2" />}
+                {data?.needs_approval ? `Send for approval · ${formatCurrencyText(amount)}` : `Cancel & refund ${formatCurrencyText(amount)}`}
+              </Button>
+            </>
+          ) : result ? (
+            <>
+              {result.refunds.length > 0 && (
+                <Button variant="outline" onClick={() => result.refunds.forEach(r => printRefundVoucher(r, formatCurrencyText, activeBranchId))}>
+                  <Printer className="h-4 w-4 mr-2" /> Print {result.refunds.length > 1 ? 'vouchers' : 'voucher'}
+                </Button>
+              )}
+              <Button onClick={close}>Done</Button>
+            </>
+          ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

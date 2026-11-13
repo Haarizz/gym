@@ -21,6 +21,7 @@ const gymSwitcher = {
       EXPIRED: "Expirée",
       INACTIVE: "Inactive",
       SUSPENDED: "Suspendue",
+      CANCELLED: "Résilié",
       PENDING_APPROVAL: "En attente de validation",
       PAYMENT_REJECTED: "Paiement refusé",
       UNAVAILABLE: "Indisponible",

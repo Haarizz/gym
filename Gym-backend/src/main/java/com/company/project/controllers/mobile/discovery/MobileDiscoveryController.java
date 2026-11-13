@@ -533,7 +533,11 @@ public class MobileDiscoveryController {
         private final MemberRepository.ExistingMembershipView existing;
 
         AlreadyMemberException(MemberRepository.ExistingMembershipView existing) {
-            super("Already a member of this gym");
+            // A cancelled member rejoins on their old record (history, app link), which staff
+            // renew at the desk — the app can't create a second membership here.
+            super("cancelled".equalsIgnoreCase(existing.getMembershipStatus())
+                    ? "Your membership at this gym was cancelled. Please contact the gym to rejoin."
+                    : "Already a member of this gym");
             this.existing = existing;
         }
 
