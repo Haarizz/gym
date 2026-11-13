@@ -190,6 +190,13 @@ public class Member extends BaseEntity implements BranchAware {
     @Column(name = "billed_to_head")
     private Boolean billedToHead = false;
 
+    // The membership end date an expiry due was last raised for (V134) — one due per expiry.
+    @Column(name = "expiry_due_raised_for")
+    private LocalDateTime expiryDueRaisedFor;
+
+    public LocalDateTime getExpiryDueRaisedFor() { return expiryDueRaisedFor; }
+    public void setExpiryDueRaisedFor(LocalDateTime expiryDueRaisedFor) { this.expiryDueRaisedFor = expiryDueRaisedFor; }
+
     // Face recognition device enrollment
     @Column(name = "face_id")
     private String faceId;  // null until face recognition device is enrolled

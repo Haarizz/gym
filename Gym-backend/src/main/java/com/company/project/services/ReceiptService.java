@@ -55,6 +55,10 @@ public class ReceiptService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.company.project.repositories.MemberDueWriteOffRepository writeOffRepository;
 
+    // Optional for the same reason; paying an expiry due in full renews the membership.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ExpiryDueService expiryDueService;
+
     public ReceiptService(ReceiptRepository receiptRepository,
                           MemberRepository memberRepository,
                           FinancialEventService financialEventService,
@@ -1049,6 +1053,7 @@ public class ReceiptService {
                 existing.setStatus(newBillPaid.compareTo(fullAmount) >= 0 ? "Paid" : "Partial");
 
                 receiptRepository.save(existing);
+                if (expiryDueService != null) expiryDueService.onBillPaid(existing);
                 totalPaid = totalPaid.add(bp.getPayAmount());
                 if (singleBill) soleBillId = existing.getId();
             }

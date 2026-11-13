@@ -158,6 +158,13 @@ public class Receipt extends BaseEntity implements BranchAware {
     @Column(name = "linked_bill_id")
     private Long linkedBillId;
 
+    // On an "Expiry Due" bill (V134): the member whose membership paying it renews.
+    @Column(name = "renews_member_id")
+    private Long renewsMemberId;
+
+    public Long getRenewsMemberId() { return renewsMemberId; }
+    public void setRenewsMemberId(Long renewsMemberId) { this.renewsMemberId = renewsMemberId; }
+
     @Column(name = "invoice_id")
     private Long invoiceId;
 

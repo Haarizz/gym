@@ -602,6 +602,9 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                                   {bill.transaction_type === 'Freeze Charge' && (
                                     <div className="mt-1 text-xs text-sky-700">{bill.remarks || 'Extra freeze days'}</div>
                                   )}
+                                  {bill.transaction_type === 'Expiry Due' && (
+                                    <div className="mt-1 text-xs text-sky-700">{bill.remarks || 'Membership expired — paying this renews it'}</div>
+                                  )}
                                   {bill.minor_charges && bill.minor_charges.length > 0 && (
                                     <div className="mt-1 space-y-0.5">
                                       {bill.minor_charges.map((mc, i) => (

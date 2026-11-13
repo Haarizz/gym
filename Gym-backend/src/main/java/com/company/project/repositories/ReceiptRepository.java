@@ -92,6 +92,9 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Long>, JpaSpec
 
     // Full transaction history for a member's Statement of Account (primary: by DB id)
     List<Receipt> findByMemberDbIdOrderByTransactionDateAsc(Long memberDbId);
+
+    /** Expiry dues (V134) that renew this member's membership, in the given statuses. */
+    List<Receipt> findByRenewsMemberIdAndStatusIn(Long renewsMemberId, java.util.Collection<String> statuses);
     
     List<Receipt> findByMemberDbIdOrderByTransactionDateDesc(Long memberDbId);
 

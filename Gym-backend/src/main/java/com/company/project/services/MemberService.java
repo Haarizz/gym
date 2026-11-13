@@ -994,6 +994,10 @@ public class MemberService {
     private RegistrationAddonService registrationAddonService;
     private com.company.project.repositories.MemberAddonRepository memberAddonRepository;
 
+    // Optional so hand-built unit tests needn't provide it: a renewal replaces an unpaid expiry due.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ExpiryDueService expiryDueService;
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     void setMemberAddonRepository(com.company.project.repositories.MemberAddonRepository memberAddonRepository) {
         this.memberAddonRepository = memberAddonRepository;
@@ -1361,6 +1365,7 @@ public class MemberService {
             throw new BusinessRuleViolationException("This member's charges are billed to their family head — "
                     + "use the family member renewal endpoint instead.");
         }
+        if (expiryDueService != null) expiryDueService.replaceOpenDueOnRenewal(member);
         String previousPlan = member.getMembershipPlan();
         BigDecimal previousFee = member.getMembershipFee();
         if (request.getPlanName()        != null) member.setMembershipPlan(request.getPlanName());
@@ -1579,6 +1584,7 @@ public class MemberService {
         Member guardian = memberRepository.findByMemberId(minor.getFamilyHeadId())
                 .orElseThrow(() -> new EntityNotFoundException("Guardian not found for this minor."));
 
+        if (expiryDueService != null) expiryDueService.replaceOpenDueOnRenewal(minor);
         String previousPlan = minor.getMembershipPlan();
         BigDecimal previousFee = minor.getMembershipFee();
         if (request.getPlanName() != null) minor.setMembershipPlan(request.getPlanName());
@@ -1665,6 +1671,7 @@ public class MemberService {
             throw new BusinessRuleViolationException("This family's plan is not billed as a single family invoice — "
                     + "renew each member individually instead.");
         }
+        if (expiryDueService != null) expiryDueService.replaceOpenDueOnRenewal(head);
         String previousPlan = head.getMembershipPlan();
         BigDecimal previousFee = head.getMembershipFee();
         if (request.getPlanName() != null) head.setMembershipPlan(request.getPlanName());
