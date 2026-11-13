@@ -280,11 +280,14 @@ public class MembershipPlanService {
         if (durationValue == null || durationType == null) return null;
         try {
             int val = Integer.parseInt(durationValue);
-            String unit = switch (durationType.toLowerCase()) {
-                case "days"   -> val == 1 ? "day"   : "days";
-                case "weeks"  -> val == 1 ? "week"  : "weeks";
-                case "months" -> val == 1 ? "month" : "months";
-                case "years"  -> val == 1 ? "year"  : "years";
+            // The plan form sends Daily/Weekly/Monthly/Annual/Sessions — "1 monthly" read badly.
+            String unit = switch (durationType.trim().toLowerCase()) {
+                case "days", "day", "daily"             -> val == 1 ? "day"     : "days";
+                case "weeks", "week", "weekly"          -> val == 1 ? "week"    : "weeks";
+                case "months", "month", "monthly"       -> val == 1 ? "month"   : "months";
+                case "quarterly"                        -> val == 1 ? "quarter" : "quarters";
+                case "years", "year", "yearly", "annual", "annually" -> val == 1 ? "year" : "years";
+                case "sessions", "session"              -> val == 1 ? "session" : "sessions";
                 default       -> durationType.toLowerCase();
             };
             return val + " " + unit;

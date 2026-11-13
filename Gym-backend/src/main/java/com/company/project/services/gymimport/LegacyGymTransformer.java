@@ -93,7 +93,38 @@ public final class LegacyGymTransformer {
     // ── Working model ────────────────────────────────────────────────────────
 
     private static final class PlanDef {
-        int id; String name; String planType; int size; int days; BigDecimal price; String description; boolean active;
+        int id; String name; String planType; int size; Span span; BigDecimal price; String description; boolean active;
+    }
+
+    /**
+     * A plan's length as the old app stored it: duration_type (daily/weekly/monthly/annual)
+     * + duration_value. Kept as-is — writing everything as "Daily" turned a "1 Month" plan
+     * into a 1-day plan for renewals and expiry. Months/years are calendar units, like
+     * MemberService.computeExpiry.
+     */
+    record Span(String type, int value) {
+        static Span of(String oldType, BigDecimal oldValue) {
+            int v = oldValue == null || oldValue.intValue() <= 0 ? 1 : oldValue.intValue();
+            String t = oldType == null ? "" : oldType.trim().toLowerCase(Locale.ROOT);
+            return new Span(switch (t) {
+                case "weekly", "week", "weeks" -> "Weekly";
+                case "monthly", "month", "months" -> "Monthly";
+                case "annual", "annually", "yearly", "year", "years" -> "Annual";
+                default -> "Daily"; // 'daily', or a dump without the column (value was days)
+            }, v);
+        }
+        LocalDate addTo(LocalDate from) {
+            return switch (type) {
+                case "Weekly" -> from.plusWeeks(value);
+                case "Monthly" -> from.plusMonths(value);
+                case "Annual" -> from.plusYears(value);
+                default -> from.plusDays(value);
+            };
+        }
+        String label() {
+            String unit = switch (type) { case "Weekly" -> "week"; case "Monthly" -> "month"; case "Annual" -> "year"; default -> "day"; };
+            return value + " " + unit + (value == 1 ? "" : "s");
+        }
     }
 
     private static final class StaffDef {
@@ -340,7 +371,7 @@ public final class LegacyGymTransformer {
         // matches the old system. Names are what members and payment descriptions use, and
         // the app looks plans up by name, so an inactive plan sharing a name with another
         // plan (Helenz: inactive "1 Day" #22 next to active "1 Day" #23) gets "(inactive #id)".
-        Map<String, Integer> planDays = new HashMap<>();
+        Map<String, Span> planDays = new HashMap<>();
         Map<String, BigDecimal> planPrice = new HashMap<>();
         List<String> planNamesLongestFirst = new ArrayList<>();
         List<PlanDef> plans = new ArrayList<>();
@@ -351,9 +382,8 @@ public final class LegacyGymTransformer {
         }
         for (Row p : d.rows("membership_plans")) {
             String name = Objects.requireNonNullElse(p.str("name"), "");
-            BigDecimal dv = p.num("duration_value");
-            int days = dv == null || dv.intValue() <= 0 ? 1 : dv.intValue();
-            planDays.put(name.toLowerCase(Locale.ROOT), days);
+            Span span = Span.of(p.str("duration_type"), p.num("duration_value"));
+            planDays.put(name.toLowerCase(Locale.ROOT), span);
             planPrice.put(name.toLowerCase(Locale.ROOT), money(p.num("price")));
             if (!planNamesLongestFirst.contains(name)) planNamesLongestFirst.add(name);
             PlanDef def = new PlanDef();
@@ -370,7 +400,7 @@ public final class LegacyGymTransformer {
             else if (fam.find()) { def.planType = "Family"; def.size = Integer.parseInt(fam.group(1)); }
             else if (n.matches("1 day|daily")) { def.planType = "Walk-In"; def.size = 1; }
             else { def.planType = "Individual"; def.size = 1; }
-            def.days = days;
+            def.span = span;
             def.price = money(p.num("price"));
             def.description = p.text("description");
             plans.add(def);
@@ -591,10 +621,10 @@ public final class LegacyGymTransformer {
                 if (!planDays.containsKey(planName.toLowerCase(Locale.ROOT))) {
                     warn("Payments whose plan could not be read", m.memberNo + ": \"" + desc + "\" → " + planName);
                 }
-                int days = planDays.getOrDefault(planName.toLowerCase(Locale.ROOT), 30);
+                Span span = planDays.getOrDefault(planName.toLowerCase(Locale.ROOT), new Span("Daily", 30));
                 boolean upgrade = desc.startsWith("Upgrade-");
                 LocalDate from = upgrade || cursorEnd[0] == null || cursorEnd[0].isBefore(day) ? day : cursorEnd[0];
-                LocalDate till = from.plusDays(days);
+                LocalDate till = span.addTo(from);
                 BigDecimal amount = money(p.num("final_amount"));
                 Matcher credit = CREDIT.matcher(desc);
                 boolean isCredit = credit.find();
@@ -915,8 +945,8 @@ public final class LegacyGymTransformer {
         List<Object[]> planRows = new ArrayList<>();
         for (PlanDef p : plans) {
             planRows.add(new Object[] { p.name, "Membership", p.planType,
-                    com.company.project.entities.MembershipPlan.isGroupPlanType(p.planType) ? "family_head" : "individual", p.size > 1 ? p.size : null, "Daily",
-                    String.valueOf(p.days), p.days + " daily", p.price, ZERO, p.active ? "Active" : "Inactive", p.description, "[]", "Unlimited", 0,
+                    com.company.project.entities.MembershipPlan.isGroupPlanType(p.planType) ? "family_head" : "individual", p.size > 1 ? p.size : null, p.span.type(),
+                    String.valueOf(p.span.value()), p.span.label(), p.price, ZERO, p.active ? "Active" : "Inactive", p.description, "[]", "Unlimited", 0,
                     "Unlimited", 3, "Payment", 30, 2, ZERO, 10, true, true, true, "[]", "[]", "[]", "[]", branch, now, MARK });
         }
         out.add(new TableRows("membership_plans", List.of("name", "type", "plan_type", "family_billing_mode",
