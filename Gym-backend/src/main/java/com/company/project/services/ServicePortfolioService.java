@@ -595,7 +595,7 @@ public class ServicePortfolioService {
     }
 
     /** The display currency set for the branch (Settings → currency), else AED like the app default. */
-    private String currencyCode(Long branchId) {
+    public String currencyCode(Long branchId) {
         return financialSettingRepository.findByCategoryAndBranchIdOrderBySettingKeyAsc("APP_PREFERENCES", branchId).stream()
                 .filter(f -> "currency_code".equals(f.getSettingKey()) && StringUtils.hasText(f.getSettingValue()))
                 .map(f -> f.getSettingValue().trim())

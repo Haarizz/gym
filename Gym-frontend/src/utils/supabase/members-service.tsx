@@ -25,6 +25,12 @@ export interface Member {
   membership_end_date?: string;
   membership_fee?: number;
   total_visits?: number;
+  /** Members list activity badges (list endpoint only). */
+  renewal_count?: number;
+  upgrade_count?: number;
+  pt_sessions_attended?: number;
+  classes_attended?: number;
+  addons_purchased?: number;
   photo_url?: string;
   date_of_birth?: string;
   blood_type?: string;

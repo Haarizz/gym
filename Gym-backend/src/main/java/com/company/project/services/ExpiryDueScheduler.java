@@ -64,6 +64,12 @@ public class ExpiryDueScheduler {
     }
 
     private void runFor(String label) {
+        try {
+            int cleared = expiryDueService.cancelDayPassDues();
+            if (cleared > 0) log.info("Cancelled {} day-pass expiry due(s) in {}", cleared, label);
+        } catch (Exception e) {
+            log.error("Expiry dues: could not clear day-pass dues in {}", label, e);
+        }
         List<Long> ids;
         try {
             ids = expiryDueService.findCandidateIds();

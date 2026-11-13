@@ -76,6 +76,9 @@ class AuthService {
     }
 
     this.accessToken = storedToken;
+    // Sessions started before the login response carried the gym name for staff have
+    // none stored — fetch it once (the browser tab title shows it).
+    if (!sessionStorage.getItem("gymbios_gym_name")) void this.refreshPermissions();
     return true;
   }
 
@@ -134,7 +137,7 @@ class AuthService {
         sessionStorage.setItem("gymbios_auth",       "true");
         sessionStorage.setItem("gymbios_auth_source","backend");
         if (roleName) sessionStorage.setItem("gymbios_role_name", roleName);
-        // Sidebar subtitle ("Power Gym · Main Branch"); only sent for gym owners.
+        // The gym's name ("Power Gym") — browser tab title ("GymBios - Power Gym") and sidebar label.
         if (gymName) sessionStorage.setItem("gymbios_gym_name", gymName);
         else sessionStorage.removeItem("gymbios_gym_name");
         if (staffName) sessionStorage.setItem("gymbios_staff_name", staffName);
@@ -292,6 +295,12 @@ class AuthService {
           const roleName = result.roleName ?? result.role_name ?? result.roles[0];
           if (roleName) sessionStorage.setItem("gymbios_role_name", roleName);
         }
+        const gymName: unknown = result.gymName ?? result.gym_name;
+        if (typeof gymName === "string" && gymName.trim()
+            && gymName !== sessionStorage.getItem("gymbios_gym_name")) {
+          sessionStorage.setItem("gymbios_gym_name", gymName);
+          window.dispatchEvent(new Event(GYM_NAME_CHANGED_EVENT));
+        }
         if (Array.isArray(result.permissions)) {
           const next = [...result.permissions].sort().join(",");
           const current = [...getPermissions()].sort().join(",");
@@ -376,5 +385,8 @@ class AuthService {
     return response;
   }
 }
+
+/** Fired on window when the stored gym name (gymbios_gym_name) changes. */
+export const GYM_NAME_CHANGED_EVENT = "gymbios:gym-name-changed";
 
 export const authService = new AuthService();

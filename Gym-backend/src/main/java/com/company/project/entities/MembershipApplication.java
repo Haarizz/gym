@@ -39,6 +39,11 @@ public class MembershipApplication extends BaseEntity implements BranchAware {
     /** Staff raised it at the gym for a walk-in (Service Portfolios → Register as New Member). */
     public static final String SOURCE_DESK = "DESK";
 
+    /** decision_email_status: the approve / reject email to the applicant. */
+    public static final String EMAIL_SENT = "SENT";
+    public static final String EMAIL_FAILED = "FAILED";
+    public static final String EMAIL_NOT_CONFIGURED = "NOT_CONFIGURED";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -145,6 +150,15 @@ public class MembershipApplication extends BaseEntity implements BranchAware {
     @Convert(converter = ApplicationFamilyMembersConverter.class)
     @Column(name = "family_members", columnDefinition = "TEXT")
     private List<ApplicationFamilyMember> familyMembers = new ArrayList<>();
+
+    @Column(name = "decision_email_status", length = 20)
+    private String decisionEmailStatus;
+
+    @Column(name = "decision_email_error", columnDefinition = "TEXT")
+    private String decisionEmailError;
+
+    @Column(name = "decision_email_at")
+    private LocalDateTime decisionEmailAt;
 
     public List<ApplicationFamilyMember> getFamilyMembers() { return familyMembers; }
     public void setFamilyMembers(List<ApplicationFamilyMember> familyMembers) {
@@ -255,4 +269,13 @@ public class MembershipApplication extends BaseEntity implements BranchAware {
 
     public String getMedicalConditions() { return medicalConditions; }
     public void setMedicalConditions(String medicalConditions) { this.medicalConditions = medicalConditions; }
+
+    public String getDecisionEmailStatus() { return decisionEmailStatus; }
+    public void setDecisionEmailStatus(String decisionEmailStatus) { this.decisionEmailStatus = decisionEmailStatus; }
+
+    public String getDecisionEmailError() { return decisionEmailError; }
+    public void setDecisionEmailError(String decisionEmailError) { this.decisionEmailError = decisionEmailError; }
+
+    public LocalDateTime getDecisionEmailAt() { return decisionEmailAt; }
+    public void setDecisionEmailAt(LocalDateTime decisionEmailAt) { this.decisionEmailAt = decisionEmailAt; }
 }

@@ -18,6 +18,10 @@ public class WalkInCheckInRequest {
     // How much of amount was actually received now (the rest is left on credit).
     // Takes precedence over paymentStatus; null = all of it if "paid", else none.
     private BigDecimal paidAmount;
+    // Discount staff took off the pass price at the desk — amount is already net of it;
+    // this is only recorded on the bill (with discountLabel, e.g. the reason).
+    private BigDecimal discountAmount;
+    private String discountLabel;
     private String paymentMethod;
     // Bank account a single Online payment landed in — same as a renewal's
     private String bankAccountCode;
@@ -54,6 +58,12 @@ public class WalkInCheckInRequest {
 
     public BigDecimal getPaidAmount() { return paidAmount; }
     public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
+
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
+
+    public String getDiscountLabel() { return discountLabel; }
+    public void setDiscountLabel(String discountLabel) { this.discountLabel = discountLabel; }
 
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }

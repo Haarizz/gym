@@ -5,6 +5,7 @@ import com.company.project.dto.MemberRequestDTO;
 import com.company.project.dto.MemberResponseDTO;
 import com.company.project.dto.MembershipApplicationDTOs.ApplicationView;
 import com.company.project.dto.PaymentSplitDTO;
+import com.company.project.community.global.identity.TenantDataSources;
 import com.company.project.entities.Branch;
 import com.company.project.entities.MembershipApplication;
 import com.company.project.entities.MembershipPlan;
@@ -14,7 +15,11 @@ import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.MembershipApplicationRepository;
 import com.company.project.repositories.MembershipPlanRepository;
 import com.company.project.security.BranchContextHolder;
+import com.company.project.security.TenantContextHolder;
+import com.company.project.services.email.MailErrors;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,9 +48,17 @@ import java.util.stream.Collectors;
  * <p>Applications follow the active branch like other branch records. Deciding one from
  * All Branches mode runs inside the application's own branch after checking the
  * admin may act there.
+ *
+ * <p>Once a decision is saved the applicant is emailed (approved: their member ID; rejected:
+ * the reason as staff wrote it). Best effort, like every GymBios email: the decision stands
+ * whatever happens to the email, and the outcome is kept on the application so staff can see
+ * it and resend. Sent on the request thread after the decision's transaction has committed —
+ * the gym's own mailbox (GymOS › Settings › Email) is found through the request's tenant.
  */
 @Service
 public class MembershipApplicationService {
+
+    private static final Logger log = LoggerFactory.getLogger(MembershipApplicationService.class);
 
     private final MembershipApplicationRepository applicationRepository;
     private final MembershipPlanRepository planRepository;
@@ -53,6 +66,9 @@ public class MembershipApplicationService {
     private final BranchService branchService;
     private final MemberService memberService;
     private final MemberRepository memberRepository;
+    private final EmailService emailService;
+    private final TenantDataSources tenantDataSources;
+    private final ServicePortfolioService portfolioService;
     private final TransactionTemplate tx;
 
     public MembershipApplicationService(MembershipApplicationRepository applicationRepository,
@@ -61,6 +77,9 @@ public class MembershipApplicationService {
                                         BranchService branchService,
                                         MemberService memberService,
                                         MemberRepository memberRepository,
+                                        EmailService emailService,
+                                        TenantDataSources tenantDataSources,
+                                        ServicePortfolioService portfolioService,
                                         PlatformTransactionManager transactionManager) {
         this.memberRepository = memberRepository;
         this.applicationRepository = applicationRepository;
@@ -68,6 +87,9 @@ public class MembershipApplicationService {
         this.branchRepository = branchRepository;
         this.branchService = branchService;
         this.memberService = memberService;
+        this.emailService = emailService;
+        this.tenantDataSources = tenantDataSources;
+        this.portfolioService = portfolioService;
         this.tx = new TransactionTemplate(transactionManager);
     }
 
@@ -83,7 +105,8 @@ public class MembershipApplicationService {
                 : applicationRepository.findByApprovalStatusOrderByCreatedAtDesc(MembershipApplication.APPROVAL_PENDING);
         Map<Long, String> branchNames = branchRepository.findAll().stream()
                 .collect(Collectors.toMap(Branch::getId, b -> b.getBranchName() != null ? b.getBranchName() : "", (a, b) -> a));
-        return rows.stream().map(a -> toView(a, branchNames.get(a.getBranchId()))).toList();
+        boolean emailConfigured = emailService.isConfigured();
+        return rows.stream().map(a -> toView(a, branchNames.get(a.getBranchId()), emailConfigured)).toList();
     }
 
     @Transactional(readOnly = true)
@@ -92,7 +115,7 @@ public class MembershipApplicationService {
     }
 
     public ApplicationView approve(Long id, boolean cashReceived, String approvedBy) {
-        return inApplicationBranch(id, () -> tx.execute(s -> {
+        return inApplicationBranch(id, () -> emailDecision(tx.execute(s -> {
             MembershipApplication app = lockPending(id);
 
             if (MembershipApplication.METHOD_CASH.equals(app.getPaymentMethod()) && !app.isPaid()) {
@@ -122,14 +145,14 @@ public class MembershipApplicationService {
             app.setApprovalStatus(MembershipApplication.APPROVAL_APPROVED);
             app.setDecidedBy(approvedBy);
             app.setDecidedAt(LocalDateTime.now());
-            return toView(applicationRepository.save(app), branchName(app.getBranchId()));
-        }));
+            return applicationRepository.save(app);
+        })));
     }
 
     public ApplicationView reject(Long id, String reason, String rejectedBy) {
         String why = reason == null ? "" : reason.trim();
         if (why.isEmpty()) throw new IllegalArgumentException("A rejection reason is required");
-        return inApplicationBranch(id, () -> tx.execute(s -> {
+        return inApplicationBranch(id, () -> emailDecision(tx.execute(s -> {
             MembershipApplication app = lockPending(id);
             // The card charge is simulated, so the refund is too — recorded so the
             // payment and approval trails both read correctly.
@@ -138,8 +161,90 @@ public class MembershipApplicationService {
             app.setRejectionReason(why.length() > 2000 ? why.substring(0, 2000) : why);
             app.setDecidedBy(rejectedBy);
             app.setDecidedAt(LocalDateTime.now());
-            return toView(applicationRepository.save(app), branchName(app.getBranchId()));
-        }));
+            return applicationRepository.save(app);
+        })));
+    }
+
+    /** Emails the applicant their decision again, e.g. after the gym has set up its mailbox. */
+    public ApplicationView resendDecisionEmail(Long id) {
+        return inApplicationBranch(id, () -> {
+            MembershipApplication app = applicationRepository.findById(id)
+                    .orElseThrow(() -> new EntityNotFoundException("Application not found"));
+            if (app.isAwaitingDecision()) {
+                throw new BusinessRuleViolationException("This application hasn't been approved or rejected yet.");
+            }
+            return emailDecision(app);
+        });
+    }
+
+    // ── Decision email ──────────────────────────────────────────────────────────
+
+    /**
+     * Called after the decision's transaction has committed. Never throws: the outcome is
+     * recorded on the application and returned in the view.
+     */
+    private ApplicationView emailDecision(MembershipApplication app) {
+        Branch branch = branchRepository.findById(app.getBranchId()).orElse(null);
+        String branchName = branch != null ? branch.getBranchName() : null;
+        boolean configured = emailService.isConfigured();
+        String status;
+        String error = null;
+        if (!configured) {
+            status = MembershipApplication.EMAIL_NOT_CONFIGURED;
+        } else if (!StringUtils.hasText(app.getEmail())) {
+            status = MembershipApplication.EMAIL_FAILED;
+            error = "The application has no email address.";
+        } else {
+            try {
+                MembershipApplicationEmails.Email email = decisionEmail(app, branch);
+                emailService.sendEmail(app.getEmail().trim(), email.subject(), email.html());
+                status = MembershipApplication.EMAIL_SENT;
+            } catch (Exception e) {
+                status = MembershipApplication.EMAIL_FAILED;
+                error = MailErrors.explain(e, null, null);
+                log.warn("Couldn't email the decision on membership application {} to the applicant: {}",
+                        app.getId(), e.getMessage());
+            }
+        }
+        app.setDecisionEmailStatus(status);
+        app.setDecisionEmailError(error);
+        app.setDecisionEmailAt(LocalDateTime.now());
+        try {
+            MembershipApplication saved = tx.execute(s -> applicationRepository.findById(app.getId()).map(fresh -> {
+                fresh.setDecisionEmailStatus(app.getDecisionEmailStatus());
+                fresh.setDecisionEmailError(app.getDecisionEmailError());
+                fresh.setDecisionEmailAt(app.getDecisionEmailAt());
+                return applicationRepository.save(fresh);
+            }).orElse(app));
+            return toView(saved != null ? saved : app, branchName, configured);
+        } catch (Exception e) {
+            // The decision is already saved; only the email's record is missing.
+            log.warn("Couldn't record the decision email for membership application {}: {}", app.getId(), e.getMessage());
+            return toView(app, branchName, configured);
+        }
+    }
+
+    private MembershipApplicationEmails.Email decisionEmail(MembershipApplication app, Branch branch) {
+        MembershipApplicationEmails.Context c = new MembershipApplicationEmails.Context(
+                gymName(),
+                branch != null ? branch.getBranchName() : null,
+                branch != null ? branch.getPhone() : null,
+                branch != null ? branch.getEmail() : null,
+                portfolioService.currencyCode(app.getBranchId()));
+        return MembershipApplication.APPROVAL_APPROVED.equals(app.getApprovalStatus())
+                ? MembershipApplicationEmails.approved(app, c)
+                : MembershipApplicationEmails.rejected(app, c);
+    }
+
+    /** The gym's display name (the same one the public join page shows). */
+    private String gymName() {
+        String tenant = TenantContextHolder.getCurrentTenant();
+        if (tenant == null) return null;
+        try {
+            return tenantDataSources.gymName(tenant).orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -268,11 +373,7 @@ public class MembershipApplicationService {
         return r;
     }
 
-    private String branchName(Long branchId) {
-        return branchRepository.findById(branchId).map(Branch::getBranchName).orElse(null);
-    }
-
-    private static ApplicationView toView(MembershipApplication a, String branchName) {
+    private static ApplicationView toView(MembershipApplication a, String branchName, boolean emailConfigured) {
         return new ApplicationView(
                 a.getId(), a.getReference(), a.getBranchId(), branchName,
                 a.getFullName(), a.getPhone(), a.getEmail(), a.getGender(), a.getDateOfBirth(), a.getAddress(),
@@ -283,6 +384,7 @@ public class MembershipApplicationService {
                 a.getApprovalStatus(), a.getDecidedBy(), a.getDecidedAt(), a.getRejectionReason(),
                 a.getMemberId(), a.getMemberCode(), a.getCreatedAt(),
                 a.getSource(), MembershipApplication.SOURCE_DESK.equals(a.getSource()) ? a.getCreatedBy() : null,
-                a.getRegDocNumber(), a.getMedicalConditions(), a.getFamilyMembers());
+                a.getRegDocNumber(), a.getMedicalConditions(), a.getFamilyMembers(),
+                a.getDecisionEmailStatus(), a.getDecisionEmailError(), a.getDecisionEmailAt(), emailConfigured);
     }
 }

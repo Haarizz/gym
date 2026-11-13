@@ -3,13 +3,19 @@
 // source DESK — always cash at reception). Payment and approval are separate: a paid online application still waits here,
 // and a cash one is approved only once reception confirms the cash. Approving creates
 // the member with the chosen plan (starting today) and posts the receipt.
-import React, { useState } from 'react';
+// Either decision emails the applicant (approved: their member ID; rejected: the reason as
+// written) from the gym's mailbox in GymOS › Settings › Email. "Recently decided" shows
+// whether that email went out, with a Resend.
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Checkbox } from '../ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
-import { Banknote, CheckCircle, Clock, CreditCard, FileText, Globe, RefreshCw, Store, XCircle } from 'lucide-react';
+import {
+  AlertTriangle, Banknote, CheckCircle, Clock, CreditCard, FileText, Globe, History, Mail, MailCheck, MailX,
+  RefreshCw, Send, Store, XCircle,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { styles, Panel, Status, fmtDate } from '../overview/overview-kit';
 import q from './approvals.module.css';
@@ -50,6 +56,24 @@ const householdLabel = (a: MembershipApplication) => {
 const sourceLabel = (a: MembershipApplication) =>
   a.source === 'DESK' ? `Registered at the desk${a.submitted_by ? ` by ${a.submitted_by}` : ''}` : 'Share link (applied online)';
 
+/** The end of the success toast: did the applicant hear about it? */
+const emailOutcome = (a: MembershipApplication) =>
+  a.decision_email_status === 'SENT' ? `${a.full_name} has been emailed.`
+    : a.decision_email_status === 'FAILED' ? "The email to the applicant couldn't be sent. You can resend it under Recently decided."
+    : "Email isn't set up, so the applicant wasn't notified.";
+
+function EmailStatus({ a }: { a: MembershipApplication }) {
+  if (a.decision_email_status === 'SENT') {
+    return <Status kind="good"><MailCheck size={11} />Emailed</Status>;
+  }
+  if (a.decision_email_status === 'FAILED') {
+    return <span title={a.decision_email_error || undefined}><Status kind="critical"><MailX size={11} />Email failed</Status></span>;
+  }
+  return <Status kind="warning"><Mail size={11} />Not emailed</Status>;
+}
+
+const DECIDED_PAGE = 10;
+
 export function ApplicationsPanel({ applications, loading, onChanged, money }: {
   applications: MembershipApplication[];
   loading: boolean;
@@ -61,6 +85,39 @@ export function ApplicationsPanel({ applications, loading, onChanged, money }: {
   const [cashReceived, setCashReceived] = useState(false);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const [decided, setDecided] = useState<MembershipApplication[]>([]);
+  const [decidedLoading, setDecidedLoading] = useState(false);
+  const [decidedShown, setDecidedShown] = useState(DECIDED_PAGE);
+  const [resending, setResending] = useState<number | null>(null);
+
+  const loadDecided = useCallback(async () => {
+    setDecidedLoading(true);
+    try {
+      setDecided(await servicePortfolioService.listApplications('decided'));
+    } catch {
+      // The pending queue is what matters here; its own load reports errors.
+    } finally {
+      setDecidedLoading(false);
+    }
+  }, []);
+
+  // Reloads whenever the pending list does, so a decision moves across straight away.
+  useEffect(() => { loadDecided(); }, [applications, loadDecided]);
+
+  const resend = async (a: MembershipApplication) => {
+    setResending(a.id);
+    try {
+      const done = await servicePortfolioService.resendDecisionEmail(a.id);
+      setDecided(rows => rows.map(x => (x.id === done.id ? done : x)));
+      if (done.decision_email_status === 'SENT') toast.success(`Email sent to ${done.email}`);
+      else if (done.decision_email_status === 'FAILED') toast.error(done.decision_email_error || "The email couldn't be sent");
+      else toast.error("Email isn't set up yet. Add your mailbox in GymOS › Settings › Email.");
+    } catch (err) {
+      toast.error(apiErrorMessage(err, "Couldn't resend the email"));
+    } finally {
+      setResending(null);
+    }
+  };
 
   const paid = applications.filter(a => a.payment_status === 'PAID');
   const cash = applications.filter(a => a.payment_status !== 'PAID');
@@ -82,7 +139,7 @@ export function ApplicationsPanel({ applications, loading, onChanged, money }: {
     setBusy(true);
     try {
       const done = await servicePortfolioService.approve(review.id, needsCash);
-      toast.success(`${done.full_name} is now a member${done.member_code ? ` (${done.member_code})` : ''} — ${done.plan_name} is active`);
+      toast.success(`${done.full_name} is now a member${done.member_code ? ` (${done.member_code})` : ''} — ${done.plan_name} is active. ${emailOutcome(done)}`);
       setReview(null);
       onChanged();
     } catch (err) {
@@ -100,10 +157,10 @@ export function ApplicationsPanel({ applications, loading, onChanged, money }: {
     }
     setBusy(true);
     try {
-      await servicePortfolioService.reject(review.id, reason.trim());
-      toast.success(review.payment_status === 'PAID'
-        ? `${review.full_name}'s application rejected — the online payment is marked refunded`
-        : `${review.full_name}'s application rejected`);
+      const done = await servicePortfolioService.reject(review.id, reason.trim());
+      toast.success((review.payment_status === 'PAID'
+        ? `${review.full_name}'s application rejected — the online payment is marked refunded. `
+        : `${review.full_name}'s application rejected. `) + emailOutcome(done));
       setReview(null);
       onChanged();
     } catch (err) {
@@ -198,6 +255,62 @@ export function ApplicationsPanel({ applications, loading, onChanged, money }: {
         sub="The applicant will pay at reception. Confirm the cash when you approve">
         {renderList(cash, 'No cash applications waiting', 'Applicants who chose to pay cash at the gym, and walk-ins registered from Service Portfolios, appear here.')}
       </Panel>
+      <div style={{ height: 16 }} />
+      <Panel title="Recently decided" icon={History}
+        sub="Approved and rejected applications, and whether the applicant was emailed">
+        {decided.length === 0 ? (
+          decidedLoading
+            ? <div className={styles.centered} style={{ minHeight: 80 }}><RefreshCw className="h-5 w-5 animate-spin text-primary" />Loading…</div>
+            : <p className="text-sm text-muted-foreground" style={{ padding: '8px 0' }}>No decisions yet.</p>
+        ) : (
+          <div className={`${q.queue} ${decidedLoading ? styles.loadingVeil : ''}`}>
+            {decided.slice(0, decidedShown).map(a => {
+              const approved = a.approval_status === 'APPROVED';
+              return (
+                <div key={a.id} className={q.item}>
+                  <span className={q.avatar}>{initials(a.full_name)}</span>
+                  <div className={q.who}>
+                    <span className={q.name}>{a.full_name}<span className={styles.muted} style={{ fontWeight: 400 }}> · {a.reference}</span></span>
+                    <span className={q.what}>
+                      {a.plan_name}{a.plan_duration ? ` · ${a.plan_duration}` : ''}
+                      {approved && a.member_code ? ` · ${a.member_code}` : ''}
+                    </span>
+                    {!approved && a.rejection_reason && (
+                      <span className="text-sm text-muted-foreground line-clamp-2" title={a.rejection_reason}>
+                        Reason: {a.rejection_reason}
+                      </span>
+                    )}
+                    <span className={q.meta}>
+                      <span>{a.email}</span>
+                      {a.branch_name && <span>{a.branch_name}</span>}
+                      {approved
+                        ? <Status kind="good"><CheckCircle size={11} />Approved</Status>
+                        : <Status kind="critical"><XCircle size={11} />Rejected</Status>}
+                      <EmailStatus a={a} />
+                      <span title={dateTime(a.decided_at)}>{a.decided_by ? `${a.decided_by} · ` : ''}{ago(a.decided_at)}</span>
+                    </span>
+                    {a.decision_email_status === 'FAILED' && a.decision_email_error && (
+                      <span className="text-xs text-destructive">{a.decision_email_error}</span>
+                    )}
+                  </div>
+                  <div className={q.actions}>
+                    {a.decision_email_status !== 'SENT' && (
+                      <Button size="sm" variant="outline" onClick={() => resend(a)} disabled={resending === a.id}>
+                        <Send className="mr-1.5 h-4 w-4" /> {resending === a.id ? 'Sending…' : 'Resend email'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {decided.length > decidedShown && (
+              <div style={{ textAlign: 'center', paddingTop: 8 }}>
+                <Button size="sm" variant="ghost" onClick={() => setDecidedShown(n => n + DECIDED_PAGE)}>Show more</Button>
+              </div>
+            )}
+          </div>
+        )}
+      </Panel>
 
       <Dialog open={!!r} onOpenChange={(o) => { if (!o) setReview(null); }}>
         <DialogContent className="max-w-lg" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
@@ -290,6 +403,7 @@ export function ApplicationsPanel({ applications, loading, onChanged, money }: {
                       activates the membership and records the {reviewPaid && r.payment_method === 'ONLINE' ? 'card' : 'cash'} payment on a receipt.
                       {!!r.family_members?.length && <> {r.full_name} becomes the family head and the {r.family_members.length === 1 ? 'other member is' : `${r.family_members.length} other members are`} added to the family, billed on the same receipt.</>}
                     </p>
+                    <EmailNotice a={r} sends={<>{r.full_name} will be emailed their member ID at <strong>{r.email}</strong>.</>} />
                   </>
                 ) : (
                   <div className="space-y-2">
@@ -299,6 +413,7 @@ export function ApplicationsPanel({ applications, loading, onChanged, money }: {
                     {reviewPaid && (
                       <p className="text-xs text-muted-foreground">The online payment will be marked refunded.</p>
                     )}
+                    <EmailNotice a={r} sends={<>This reason will be emailed to <strong>{r.email}</strong> exactly as written.</>} />
                   </div>
                 )}
               </div>
@@ -328,5 +443,25 @@ export function ApplicationsPanel({ applications, loading, onChanged, money }: {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/** Under a decision: what the applicant will be emailed, or a warning that they won't be. */
+function EmailNotice({ a, sends }: { a: MembershipApplication; sends: React.ReactNode }) {
+  if (a.email_configured && a.email) {
+    return (
+      <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+        <Mail size={13} className="mt-0.5 shrink-0" /><span>{sends}</span>
+      </p>
+    );
+  }
+  return (
+    <p className="text-xs flex items-start gap-1.5 rounded-md border border-amber-300 bg-amber-50 p-2 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+      <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+      <span>
+        Email isn't set up for this gym (GymOS › Settings › Email), so the applicant won't be notified.
+        Contact them on <strong>{a.phone}</strong>.
+      </span>
+    </p>
   );
 }

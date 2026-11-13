@@ -128,7 +128,26 @@ public class BookingService {
         return response;
     }
 
-    /** Staff booking from the web (no payment taken here — staff record it separately). */
+    /**
+     * What booking this member into the session would cost at the desk: the package that covers
+     * it (nothing to pay), or the price to take.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> deskQuote(Long sessionId, Long memberId) {
+        TrainingSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new RuntimeException("Session not found"));
+        PackageEnrolment cover = memberId != null ? packageUsage.coverFor(memberId, session) : null;
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("price", session.getPrice() != null ? session.getPrice() : BigDecimal.ZERO);
+        out.put("enrolment_id", cover != null ? cover.getId() : null);
+        out.put("package_name", cover != null ? cover.getPackageName() : null);
+        return out;
+    }
+
+    /**
+     * Staff booking from the web. A member's priced session is paid at the desk (see
+     * BookingPaymentService.chargeAtDesk) unless a package or Reward Pass covers it.
+     */
     @Transactional
     public BookingResponseDTO createBooking(BookingRequestDTO request) {
         return createBooking(request, false);
@@ -260,6 +279,9 @@ public class BookingService {
             booking.setRewardId(request.getRewardPassId());
             booking.setPrice(BigDecimal.ZERO);
             booking.setPaymentStatus("paid");
+        } else if (member != null && !waitlisted) {
+            // Staff booking a member into a priced session: the member pays at the desk now.
+            bookingPaymentService.chargeAtDesk(booking, member, session, request);
         }
         booking.setQrCode(qrCodeService.generateBookingQr(booking.getId()));
         bookingRepository.save(booking);

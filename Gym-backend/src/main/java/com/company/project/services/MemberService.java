@@ -18,6 +18,7 @@ import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.services.NotificationService;
 import com.company.project.services.mobile.push.MemberPaymentApprovalNotifier;
+import com.company.project.entities.Receipt;
 import com.company.project.entities.Member;
 import com.company.project.entities.MembershipPlan;
 import com.company.project.entities.Role;
@@ -185,6 +186,7 @@ public class MemberService {
 
         resolveFamilyHeadNames(dtos);
         applySalesInvoiceDue(dtos);
+        applyActivityCounts(dtos);
 
         PaginationDTO pagination = new PaginationDTO(
                 page, limit,
@@ -193,6 +195,73 @@ public class MemberService {
         );
 
         return new MembersPageResponseDTO(dtos, pagination);
+    }
+
+    // Optional so hand-built unit tests needn't provide them: only the list's activity badges use them.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.company.project.repositories.ReceiptRepository receiptRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.company.project.repositories.BookingRepository bookingRepository;
+
+    /**
+     * Members list activity badges: renewals, upgrades, PT sessions and classes attended
+     * (checked-in bookings) and add-ons bought — a few grouped queries per page.
+     * Renewal vs upgrade follows Renewals history (classifyRenewals): the kind stored on the
+     * receipt, else a plan change to a pricier plan than the previous New/Renewal bill.
+     * Cancelled bills (e.g. an expiry due replaced by a renewal) are not counted.
+     */
+    private void applyActivityCounts(List<MemberResponseDTO> dtos) {
+        List<Long> ids = dtos.stream().map(MemberResponseDTO::getId)
+                .filter(id -> id != null && id.matches("\\d+")).map(Long::valueOf).collect(Collectors.toList());
+        if (ids.isEmpty()) return;
+        java.util.Map<Long, int[]> renewals = new java.util.HashMap<>(); // [renewals, upgrades]
+        if (receiptRepository != null) {
+            java.util.Map<Long, Receipt> previous = new java.util.HashMap<>();
+            for (Receipt r : receiptRepository.findMembershipReceipts(ids)) {
+                if ("Cancelled".equalsIgnoreCase(r.getStatus())) continue;
+                Receipt prev = previous.put(r.getMemberDbId(), r);
+                if (!"Renewal".equalsIgnoreCase(r.getTransactionType())) continue;
+                String kind = r.getRenewalKind();
+                if (kind == null) {
+                    kind = "Renewal";
+                    if (prev != null && prev.getPlanName() != null && r.getPlanName() != null
+                            && !prev.getPlanName().equals(r.getPlanName())) {
+                        int diff = (r.getAmount() == null ? BigDecimal.ZERO : r.getAmount())
+                                .compareTo(prev.getAmount() == null ? BigDecimal.ZERO : prev.getAmount());
+                        kind = diff > 0 ? "Upgrade" : diff < 0 ? "Downgrade" : "Plan Change";
+                    }
+                }
+                int[] c = renewals.computeIfAbsent(r.getMemberDbId(), k -> new int[2]);
+                if ("Renewal".equalsIgnoreCase(kind)) c[0]++;
+                else if ("Upgrade".equalsIgnoreCase(kind)) c[1]++;
+            }
+        }
+        java.util.Map<Long, int[]> attended = new java.util.HashMap<>(); // [pt, class]
+        if (bookingRepository != null) {
+            for (Object[] row : bookingRepository.countAttendedByMemberAndType(ids)) {
+                int[] c = attended.computeIfAbsent(((Number) row[0]).longValue(), k -> new int[2]);
+                int n = ((Number) row[2]).intValue();
+                if ("pt".equals(row[1])) c[0] += n;
+                else if ("class".equals(row[1])) c[1] += n;
+            }
+        }
+        java.util.Map<Long, Integer> addons = new java.util.HashMap<>();
+        if (memberAddonRepository != null) {
+            for (Object[] row : memberAddonRepository.countPurchasedByMember(ids)) {
+                addons.put(((Number) row[0]).longValue(), ((Number) row[1]).intValue());
+            }
+        }
+        for (MemberResponseDTO dto : dtos) {
+            if (dto.getId() == null || !dto.getId().matches("\\d+")) continue;
+            Long id = Long.valueOf(dto.getId());
+            int[] r = renewals.getOrDefault(id, new int[2]);
+            int[] a = attended.getOrDefault(id, new int[2]);
+            dto.setRenewalCount(r[0]);
+            dto.setUpgradeCount(r[1]);
+            dto.setPtSessionsAttended(a[0]);
+            dto.setClassesAttended(a[1]);
+            dto.setAddonsPurchased(addons.getOrDefault(id, 0));
+        }
     }
 
     /** Fills each member's unpaid Sales Invoice balance (products sold on account) in one query. */
@@ -1383,6 +1452,13 @@ public class MemberService {
         if (member.isEffectivelyBilledToHead()) {
             throw new BusinessRuleViolationException("This member's charges are billed to their family head — "
                     + "use the family member renewal endpoint instead.");
+        }
+        // A day pass is sold again at Check In, never renewed; moving onto another plan is fine.
+        String targetPlan = request.getPlanName() != null ? request.getPlanName() : member.getMembershipPlan();
+        if (targetPlan != null && targetPlan.equals(member.getMembershipPlan())
+                && planRepository.findByName(targetPlan).map(MembershipPlan::isDayPass).orElse(false)) {
+            throw new BusinessRuleViolationException(targetPlan + " is a day pass and can't be renewed. Sell a new pass "
+                    + "from Check In › Walk-in / day pass, or move " + member.getName() + " onto a membership plan.");
         }
         if (expiryDueService != null) expiryDueService.replaceOpenDueOnRenewal(member);
         String previousPlan = member.getMembershipPlan();

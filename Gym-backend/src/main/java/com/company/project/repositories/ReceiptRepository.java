@@ -96,6 +96,8 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Long>, JpaSpec
     /** Expiry dues (V137) that renew this member's membership, in the given statuses. */
     List<Receipt> findByRenewsMemberIdAndStatusIn(Long renewsMemberId, java.util.Collection<String> statuses);
 
+    List<Receipt> findByTransactionTypeAndStatusIn(String transactionType, java.util.Collection<String> statuses);
+
     /** An expiry due (any status, incl. paid/cancelled/written off) raised for this member on or after the given date. */
     boolean existsByRenewsMemberIdAndTransactionDateGreaterThanEqual(Long renewsMemberId, java.time.LocalDateTime since);
     

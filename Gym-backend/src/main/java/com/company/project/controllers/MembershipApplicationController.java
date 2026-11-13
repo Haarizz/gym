@@ -84,6 +84,12 @@ public class MembershipApplicationController {
         return ResponseEntity.ok(applicationService.reject(id, body != null ? body.reason() : null, actor(principal)));
     }
 
+    /** POST /api/members/applications/{id}/resend-email — emails the applicant the approval / rejection again. */
+    @PostMapping("/api/members/applications/{id}/resend-email")
+    public ResponseEntity<ApplicationView> resendEmail(@PathVariable Long id) {
+        return ResponseEntity.ok(applicationService.resendDecisionEmail(id));
+    }
+
     private static String actor(UserDetailsImpl principal) {
         return principal != null ? principal.getUsername() : "Admin";
     }

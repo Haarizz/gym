@@ -170,7 +170,14 @@ public final class MembershipApplicationDTOs {
             String regDocNumber,
             String medicalConditions,
             /** The rest of the household on a Family / Couple plan; empty for one person. */
-            List<ApplicationFamilyMember> familyMembers) {}
+            List<ApplicationFamilyMember> familyMembers,
+            /** The approve / reject email to the applicant: SENT, FAILED, NOT_CONFIGURED, or null before a decision. */
+            String decisionEmailStatus,
+            /** Why the last attempt failed, in words a gym owner can act on. */
+            String decisionEmailError,
+            @JsonSerialize(using = UtcLocalDateTimeSerializer.class) LocalDateTime decisionEmailAt,
+            /** True when the gym (GymOS › Settings › Email) or the server has a mailbox to send from. */
+            boolean emailConfigured) {}
 
     /**
      * One person joining with the applicant on a Family / Couple plan. Stored on the

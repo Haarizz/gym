@@ -4,6 +4,8 @@ import com.company.project.entities.Member;
 import com.company.project.entities.MembershipFreeze;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.MembershipFreezeRepository;
+import com.company.project.repositories.MembershipPlanRepository;
+import com.company.project.entities.MembershipPlan;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,17 +37,24 @@ public class MembershipLifecycleReportService {
 
     private final MemberRepository memberRepository;
     private final MembershipFreezeRepository freezeRepository;
+    private final MembershipPlanRepository planRepository;
 
     public MembershipLifecycleReportService(MemberRepository memberRepository,
-                                            MembershipFreezeRepository freezeRepository) {
+                                            MembershipFreezeRepository freezeRepository,
+                                            MembershipPlanRepository planRepository) {
         this.memberRepository = memberRepository;
         this.freezeRepository = freezeRepository;
+        this.planRepository = planRepository;
     }
 
     /** expired | expiring | joined, for dates in [from, to] (inclusive). */
     public List<Map<String, Object>> memberReport(String type, LocalDate from, LocalDate to) {
         LocalDate today = LocalDate.now();
         List<Map<String, Object>> rows = new ArrayList<>();
+        // Day passes are flagged so renewal lists can leave them out — a pass is bought again, not renewed.
+        java.util.Set<String> dayPassPlans = planRepository.findAll().stream()
+                .filter(MembershipPlan::isDayPass).map(MembershipPlan::getName)
+                .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
         for (Member m : memberRepository.findAll()) {
             LocalDate expiry = expiryOf(m);
             LocalDate joined = m.getJoinDate() != null ? m.getJoinDate().toLocalDate() : null;
@@ -58,7 +67,11 @@ public class MembershipLifecycleReportService {
                 case "joined" -> joined != null && !joined.isBefore(from) && !joined.isAfter(to);
                 default -> throw new IllegalArgumentException("Unknown report type: " + type);
             };
-            if (include) rows.add(memberRow(m, expiry, today));
+            if (include) {
+                Map<String, Object> row = memberRow(m, expiry, today);
+                row.put("dayPass", m.getMembershipPlan() != null && dayPassPlans.contains(m.getMembershipPlan()));
+                rows.add(row);
+            }
         }
         Comparator<Map<String, Object>> order = switch (type) {
             case "joined" -> Comparator.comparing((Map<String, Object> r) -> (String) r.get("joinDate"), Comparator.nullsLast(Comparator.reverseOrder()));

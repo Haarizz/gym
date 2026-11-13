@@ -113,8 +113,9 @@ public class PackageUsageService {
     /**
      * The package a member's PT booking should use, locked for the rest of the transaction, or
      * null when none fits. With {@code requestedId} that package must fit (otherwise this says
-     * why); without it, a package with the session's trainer is preferred, then the one ending
-     * soonest.
+     * why); without it, the one ending soonest. A package only covers sessions with its own
+     * trainer — a session with anyone else is paid for separately (or the package's trainer is
+     * changed first).
      */
     public PackageEnrolment pickFor(Long memberId, TrainingSession session, Long requestedId) {
         if (memberId == null || session == null || !"pt".equalsIgnoreCase(session.getType())) {
@@ -132,11 +133,7 @@ public class PackageUsageService {
             return e;
         }
         List<PackageEnrolment> active = enrolments.findByMemberIdAndStatusOrderByEndDateAsc(memberId, PackageEnrolment.STATUS_ACTIVE);
-        Long trainerId = session.getTrainer() != null ? session.getTrainer().getId() : null;
-        List<PackageEnrolment> ordered = new ArrayList<>(active);
-        ordered.sort(Comparator.comparing((PackageEnrolment e) -> !Objects.equals(e.getTrainerId(), trainerId))
-                .thenComparing(PackageEnrolment::getEndDate));
-        for (PackageEnrolment candidate : ordered) {
+        for (PackageEnrolment candidate : active) {
             if (whyNotUsable(candidate, session) != null) continue;
             PackageEnrolment locked = enrolments.findByIdForUpdate(candidate.getId()).orElse(null);
             if (locked != null && whyNotUsable(locked, session) == null) return locked;
@@ -144,9 +141,23 @@ public class PackageUsageService {
         return null;
     }
 
+    /** The package that would cover this member's booking of the session (read only, not locked), or null. */
+    @Transactional(readOnly = true)
+    public PackageEnrolment coverFor(Long memberId, TrainingSession session) {
+        if (memberId == null || session == null || !"pt".equalsIgnoreCase(session.getType())) return null;
+        for (PackageEnrolment e : enrolments.findByMemberIdAndStatusOrderByEndDateAsc(memberId, PackageEnrolment.STATUS_ACTIVE)) {
+            if (whyNotUsable(e, session) == null) return e;
+        }
+        return null;
+    }
+
     /** Why this package can't cover the session, or null when it can. */
     String whyNotUsable(PackageEnrolment e, TrainingSession session) {
         if (!PackageEnrolment.STATUS_ACTIVE.equals(e.getStatus())) return "This package has been cancelled";
+        Long sessionTrainer = session.getTrainer() != null ? session.getTrainer().getId() : null;
+        if (sessionTrainer == null || !sessionTrainer.equals(e.getTrainerId())) {
+            return "This package is only for sessions with its own trainer";
+        }
         if (e.getMemberAddonId() != null) {
             MemberAddon addon = addons.findById(e.getMemberAddonId()).orElse(null);
             String s = addon != null && addon.getStatus() != null ? addon.getStatus().toLowerCase() : "";

@@ -951,7 +951,8 @@ public class ReceiptService {
                                        BigDecimal amount, BigDecimal paidAmount, String paymentMethod,
                                        List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
                                        String bankAccountCode, String bankAccountName,
-                                       String remarks, Long processedByStaffId) {
+                                       String remarks, Long processedByStaffId,
+                                       BigDecimal discountAmount, String discountLabel) {
         BigDecimal totalAmount = amount != null ? amount : BigDecimal.ZERO;
         BigDecimal paid = paidAmount != null ? paidAmount.max(BigDecimal.ZERO).min(totalAmount) : BigDecimal.ZERO;
 
@@ -975,6 +976,11 @@ public class ReceiptService {
         r.setProcessedBy(resolveProcessedByName(processedByStaffId));
         r.setProcessedByStaffId(resolveProcessedByStaffId(processedByStaffId));
         r.setRemarks(remarks);
+        // Amount is already the discounted price; the discount is kept so the bill reads as one.
+        if (discountAmount != null && discountAmount.signum() > 0) {
+            r.setDiscountAmount(discountAmount);
+            r.setDiscountLabel(discountLabel != null && !discountLabel.isBlank() ? discountLabel.trim() : "Staff discount");
+        }
 
         Receipt saved = receiptRepository.save(r);
         saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));

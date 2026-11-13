@@ -100,6 +100,8 @@ public class ExpiryDueService {
         MembershipPlan plan = m.getMembershipPlan() != null ? planRepository.findByName(m.getMembershipPlan()).orElse(null) : null;
         // A household on a single family invoice is renewed through the head; the head's due covers them.
         if (head != null && billsAsFamily(head)) return false;
+        // A day pass is bought again, not renewed — nothing is owed when it runs out.
+        if (plan != null && plan.isDayPass()) return false;
 
         BigDecimal amount;
         List<MinorChargeDTO> lines = null;
@@ -164,6 +166,38 @@ public class ExpiryDueService {
         memberRepository.save(m);
         log.info("Expiry due {} of {} raised for member {} (payer {})", saved.getReceiptNo(), amount, m.getId(), payer.getId());
         return true;
+    }
+
+    // ── Day passes never owe an expiry due ───────────────────────────────────
+
+    /**
+     * Cancels unpaid expiry dues raised for day-pass plans before passes were excluded,
+     * taking each off its payer's balance. Dues with any payment on them are left alone.
+     * Returns how many were cancelled.
+     */
+    public int cancelDayPassDues() {
+        Set<String> passPlans = new java.util.HashSet<>();
+        for (MembershipPlan p : planRepository.findAll()) {
+            if (p.isDayPass() && p.getName() != null) passPlans.add(p.getName());
+        }
+        if (passPlans.isEmpty()) return 0;
+        int cancelled = 0;
+        for (Receipt due : receiptRepository.findByTransactionTypeAndStatusIn(EXPIRY_DUE_TYPE, OPEN_STATUSES)) {
+            if (due.getPlanName() == null || !passPlans.contains(due.getPlanName())) continue;
+            if (nz(due.getTotalPaidToDate()).signum() > 0) continue;
+            Member payer = due.getMemberDbId() != null ? memberRepository.findById(due.getMemberDbId()).orElse(null) : null;
+            if (payer != null) {
+                BigDecimal left = nz(payer.getOutstandingBalance()).subtract(nz(due.getAmount())).max(BigDecimal.ZERO);
+                payer.setOutstandingBalance(left);
+                if (left.signum() == 0) payer.setPaymentStatus("paid");
+                memberRepository.save(payer);
+            }
+            due.setStatus("Cancelled");
+            due.setRemarks(appendRemark(due.getRemarks(), "Cancelled " + LocalDate.now() + " — a day pass is not renewed"));
+            receiptRepository.save(due);
+            cancelled++;
+        }
+        return cancelled;
     }
 
     // ── Paying a due renews the membership ───────────────────────────────────

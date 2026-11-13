@@ -14,6 +14,7 @@ import { useCurrency } from "../../utils/currency";
 import { resolveBackendImageUrl } from "../../utils/resolve-image-url";
 import { trainingService, type SessionOverview, type SessionParticipant, type TrainingSessionApi } from "../../utils/supabase/training-service";
 import { bookingService } from "../../utils/supabase/booking-service";
+import { useDeskBookingPayment, DeskBookingPaymentPanel } from "../bookings/DeskBookingPayment";
 import { membersService } from "../../utils/supabase/members-service";
 import {
   clockTime, buildRosterReport, formatSessionDate, hhmm, participantStatus, sessionDuration, sessionStatus, sessionType,
@@ -461,6 +462,9 @@ function AddParticipant({ sessionId, full, excludeIds, onClose, onBooked }: {
   const [results, setResults] = useState<PickedMember[]>([]);
   const [searching, setSearching] = useState(false);
   const [booking, setBooking] = useState<string | null>(null);
+  // The member being booked (not waitlisted): their priced session is paid here unless a package covers it.
+  const [paying, setPaying] = useState<PickedMember | null>(null);
+  const deskPay = useDeskBookingPayment(paying ? Number(sessionId) : null, paying ? Number(paying.id) : null);
   const seq = useRef(0);
 
   useEffect(() => {
@@ -486,11 +490,20 @@ function AddParticipant({ sessionId, full, excludeIds, onClose, onBooked }: {
   const shown = useMemo(() => results.filter((m) => !excludeIds.has(m.id)), [results, excludeIds]);
 
   const book = async (m: PickedMember) => {
+    if (!full && paying?.id !== m.id) { setPaying(m); return; }
+    if (!full && !deskPay.ready) {
+      toast.error(deskPay.toPay > 0 ? "Allocate the full amount (or put the rest on Credit) before booking" : "Still checking the price — try again in a moment");
+      return;
+    }
     setBooking(m.id);
     try {
-      const created = await bookingService.createBooking({ sessionId: Number(sessionId), memberId: Number(m.id), waitlist: full });
+      const created = await bookingService.createBooking({
+        sessionId: Number(sessionId), memberId: Number(m.id), waitlist: full,
+        payment: full ? undefined : deskPay.fields(),
+      });
       toast.success(created.status === "waitlisted" ? `${m.name} added to the waitlist`
         : created.packageName ? `${m.name} booked — uses a session of ${created.packageName}` : `${m.name} booked`);
+      setPaying(null);
       await onBooked();
     } catch (e: any) {
       toast.error(e?.message || "Couldn't book the member");
@@ -509,7 +522,24 @@ function AddParticipant({ sessionId, full, excludeIds, onClose, onBooked }: {
         <Search />
         <Input autoFocus placeholder="Search by name, member ID, phone or email…" value={query} onChange={(e) => setQuery(e.target.value)} />
       </div>
-      {query.trim().length >= 2 && (
+      {paying && !full ? (
+        <div className="space-y-3">
+          <div className={s.memberCell}>
+            <MemberAvatar name={paying.name} photo={paying.photo} size={34} />
+            <div>
+              <p className={s.memberName}>{paying.name}</p>
+              <p className={s.sub}>{[paying.code, paying.phone].filter(Boolean).join(" · ")}</p>
+            </div>
+          </div>
+          <DeskBookingPaymentPanel pay={deskPay} member={{ code: paying.code || paying.id, name: paying.name }} />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" disabled={booking !== null} onClick={() => setPaying(null)}>Back</Button>
+            <Button size="sm" disabled={booking !== null || !deskPay.ready} onClick={() => book(paying)}>
+              {booking ? "Booking…" : "Confirm booking"}
+            </Button>
+          </div>
+        </div>
+      ) : query.trim().length >= 2 && (
         shown.length === 0 ? (
           <p className={s.sub}>{searching ? "Searching…" : "No members found (members already on this session are hidden)."}</p>
         ) : (

@@ -67,7 +67,7 @@ class AttendanceWalkInPaymentTest {
         assertEquals("partial", savedRecord().getWalkInPaymentStatus());
         verify(receiptService).createWalkInReceipt(eq("Day Visitor"), eq("0500000000"), eq("Day Pass"),
                 eq(new BigDecimal("50")), eq(new BigDecimal("30")), eq("Mixed"), eq(legs),
-                isNull(), isNull(), any(), any());
+                isNull(), isNull(), any(), any(), any(), any());
     }
 
     @Test
@@ -83,7 +83,7 @@ class AttendanceWalkInPaymentTest {
         assertEquals("paid", savedRecord().getWalkInPaymentStatus());
         verify(receiptService).createWalkInReceipt(any(), any(), any(),
                 eq(new BigDecimal("50")), eq(new BigDecimal("50")), eq("Online Payment"), isNull(),
-                eq("1020"), eq("Emirates NBD"), any(), any());
+                eq("1020"), eq("Emirates NBD"), any(), any(), any(), any());
     }
 
     @Test
@@ -94,7 +94,7 @@ class AttendanceWalkInPaymentTest {
         attendanceService.walkInCheckIn(onCredit);
         assertEquals("pending", savedRecord().getWalkInPaymentStatus());
         verify(receiptService).createWalkInReceipt(any(), any(), any(),
-                eq(new BigDecimal("50")), eq(BigDecimal.ZERO), eq("Credit"), any(), any(), any(), any(), any());
+                eq(new BigDecimal("50")), eq(BigDecimal.ZERO), eq("Credit"), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -107,13 +107,13 @@ class AttendanceWalkInPaymentTest {
 
         assertEquals("paid", savedRecord().getWalkInPaymentStatus());
         verify(receiptService).createWalkInReceipt(any(), any(), any(),
-                eq(new BigDecimal("40")), eq(new BigDecimal("40")), eq("Cash"), any(), any(), any(), any(), any());
+                eq(new BigDecimal("40")), eq(new BigDecimal("40")), eq("Cash"), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void freeWalkInCreatesNoReceipt() {
         attendanceService.walkInCheckIn(request("0"));
-        verify(receiptService, never()).createWalkInReceipt(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(receiptService, never()).createWalkInReceipt(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -129,7 +129,7 @@ class AttendanceWalkInPaymentTest {
         attendanceService.walkInCheckIn(req);
 
         verify(receiptService).createWalkInReceipt(any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), eq(7L));
+                any(), any(), any(), eq(7L), any(), any());
         verify(walkInRegistrationService).markConfirmed(eq(pending), any());
     }
 
@@ -146,7 +146,7 @@ class AttendanceWalkInPaymentTest {
         attendanceService.walkInCheckIn(req);
 
         verify(receiptService).createWalkInReceipt(any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), eq(9L));
+                any(), any(), any(), eq(9L), any(), any());
     }
 
     @Test
@@ -160,6 +160,21 @@ class AttendanceWalkInPaymentTest {
 
         verify(attendanceRepository, never()).save(any());
         verify(receiptService, never()).createWalkInReceipt(any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void deskDiscountIsRecordedOnTheBill() {
+        WalkInCheckInRequest req = request("100");
+        req.setPaidAmount(new BigDecimal("100"));
+        req.setPaymentMethod("Cash");
+        req.setDiscountAmount(new BigDecimal("50"));
+        req.setDiscountLabel("Friend of owner");
+
+        attendanceService.walkInCheckIn(req);
+
+        verify(receiptService).createWalkInReceipt(any(), any(), any(),
+                eq(new BigDecimal("100")), eq(new BigDecimal("100")), eq("Cash"), any(), any(), any(), any(), any(),
+                eq(new BigDecimal("50")), eq("Friend of owner"));
     }
 }

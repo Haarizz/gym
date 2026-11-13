@@ -52,6 +52,22 @@ public class MembershipPlan extends BaseEntity implements BranchAware {
         return planType != null && (planType.trim().equalsIgnoreCase("family") || planType.trim().equalsIgnoreCase("couple"));
     }
 
+    /**
+     * A day pass: a Walk-In plan, or any plan that lasts a single day. A pass is bought
+     * again, never renewed — it raises no expiry due and can't be renewed onto itself
+     * (moving the person onto a real membership plan is still allowed).
+     */
+    public boolean isDayPass() {
+        if (planType != null && planType.trim().replace("-", "").replace(" ", "").equalsIgnoreCase("walkin")) return true;
+        String t = durationType == null ? "" : durationType.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!t.equals("daily") && !t.equals("days") && !t.equals("day")) return false;
+        try {
+            return durationValue == null || durationValue.isBlank() || Integer.parseInt(durationValue.trim()) <= 1;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
     @Column(name = "price_per_member", precision = 10, scale = 2)
     private BigDecimal pricePerMember;
 

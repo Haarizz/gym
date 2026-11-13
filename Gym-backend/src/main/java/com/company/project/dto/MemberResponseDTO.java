@@ -59,6 +59,12 @@ public class MemberResponseDTO {
     private java.math.BigDecimal outstandingBalance;
     /** Unpaid balance on confirmed Sales Invoices (products sold on account) — separate from outstandingBalance. */
     private java.math.BigDecimal salesInvoiceDue = java.math.BigDecimal.ZERO;
+    /** Members list activity badges (filled in the list query only). */
+    private Integer renewalCount;
+    private Integer upgradeCount;
+    private Integer ptSessionsAttended;
+    private Integer classesAttended;
+    private Integer addonsPurchased;
     private String lastPaymentDate;
     private String nextPaymentDate;
     private String paymentMethodUsed;
@@ -230,6 +236,16 @@ public class MemberResponseDTO {
     public java.math.BigDecimal getOutstandingBalance() { return outstandingBalance; }
     public java.math.BigDecimal getSalesInvoiceDue() { return salesInvoiceDue; }
     public void setSalesInvoiceDue(java.math.BigDecimal salesInvoiceDue) { this.salesInvoiceDue = salesInvoiceDue; }
+    public Integer getRenewalCount() { return renewalCount; }
+    public void setRenewalCount(Integer renewalCount) { this.renewalCount = renewalCount; }
+    public Integer getUpgradeCount() { return upgradeCount; }
+    public void setUpgradeCount(Integer upgradeCount) { this.upgradeCount = upgradeCount; }
+    public Integer getPtSessionsAttended() { return ptSessionsAttended; }
+    public void setPtSessionsAttended(Integer ptSessionsAttended) { this.ptSessionsAttended = ptSessionsAttended; }
+    public Integer getClassesAttended() { return classesAttended; }
+    public void setClassesAttended(Integer classesAttended) { this.classesAttended = classesAttended; }
+    public Integer getAddonsPurchased() { return addonsPurchased; }
+    public void setAddonsPurchased(Integer addonsPurchased) { this.addonsPurchased = addonsPurchased; }
     public String getLastPaymentDate() { return lastPaymentDate; }
     public String getNextPaymentDate() { return nextPaymentDate; }
     public String getPaymentMethodUsed() { return paymentMethodUsed; }

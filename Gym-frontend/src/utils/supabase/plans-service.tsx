@@ -66,6 +66,19 @@ export function planOfferPrice(plan: Pick<Plan, 'price' | 'effectivePrice' | 'of
   return planHasOffer(plan) ? Number(plan.effectivePrice) : Number(plan.price) || 0;
 }
 
+/**
+ * A day pass: a Walk-In plan or any plan lasting a single day. Bought again at Check In,
+ * never renewed, and it raises no expiry due. Mirrors MembershipPlan.isDayPass() on the server.
+ */
+export function isDayPassPlan(plan?: Pick<Plan, 'planType' | 'durationType' | 'durationValue'> | null): boolean {
+  if (!plan) return false;
+  if ((plan.planType || '').replace(/[-\s]/g, '').toLowerCase() === 'walkin') return true;
+  const t = (plan.durationType || '').trim().toLowerCase();
+  if (t !== 'daily' && t !== 'days' && t !== 'day') return false;
+  const v = String(plan.durationValue ?? '').trim();
+  return v === '' || Number(v) <= 1;
+}
+
 export interface PlanFormData {
   name: string;
   type: string;

@@ -43,6 +43,7 @@ class BookingPaymentServiceTest {
     @Mock private FinancialEventService financialEventService;
     @Mock private NotificationService notificationService;
     @Mock private com.company.project.services.mobile.push.BookingPaymentNotifier bookingPaymentNotifier;
+    @Mock private com.company.project.performance.attribution.StaffAttribution staffAttribution;
 
     private BookingPaymentService service;
     private Member member;
@@ -55,7 +56,7 @@ class BookingPaymentServiceTest {
         MockitoAnnotations.openMocks(this);
         service = new BookingPaymentService(rewardRedemptionService, discountCodeService, walletService,
                 receiptService, receiptRepository, memberRepository, financialEventService, notificationService,
-                bookingPaymentNotifier);
+                bookingPaymentNotifier, staffAttribution);
 
         member = new Member();
         member.setId(10L);
@@ -114,6 +115,53 @@ class BookingPaymentServiceTest {
         receipt.setAmount(new BigDecimal(amount));
         receipt.setPaidAmount(new BigDecimal(amount));
         receipt.setTotalPaidToDate(new BigDecimal(amount));
+    }
+
+    // ── Desk (staff) charging ──
+
+    @Test
+    void deskCashIsPostedWithoutApprovalAndCreditedToStaff() {
+        when(staffAttribution.currentStaffId()).thenReturn(7L);
+        when(receiptService.resolveProcessedByName(7L)).thenReturn("Riya");
+
+        service.chargeAtDesk(booking, member, session, pay("Cash", "200"));
+
+        assertEquals("confirmed", booking.getStatus());
+        assertEquals("paid", booking.getPaymentStatus());
+        assertEquals(7L, receipt.getProcessedByStaffId());
+        assertEquals("Riya", receipt.getProcessedBy());
+        verify(receiptService).postBookingReceipt(receipt);
+        verify(receiptService, never()).markPendingApproval(any());
+    }
+
+    @Test
+    void deskCreditLeavesTheRestOnTheMembersAccount() {
+        BookingRequestDTO req = pay("Mixed", "80");
+        req.getPaymentBreakdown().get(0).setMethod("Cash");
+        PaymentSplitDTO credit = new PaymentSplitDTO();
+        credit.setMethod("Credit");
+        credit.setAmount(new BigDecimal("120"));
+        req.getPaymentBreakdown().add(credit);
+
+        service.chargeAtDesk(booking, member, session, req);
+
+        assertEquals(0, new BigDecimal("80").compareTo(receipt.getPaidAmount()));
+        assertEquals(0, new BigDecimal("120").compareTo(member.getOutstandingBalance()));
+        assertEquals("partial", booking.getPaymentStatus());
+        assertEquals("confirmed", booking.getStatus());
+        verify(receiptService, never()).markPendingApproval(any());
+    }
+
+    @Test
+    void deskShortPaymentWithoutCreditIsRefused() {
+        assertThrows(BusinessRuleViolationException.class,
+                () -> service.chargeAtDesk(booking, member, session, pay("Cash", "50")));
+    }
+
+    @Test
+    void deskBookingNeedsAPaymentMethod() {
+        assertThrows(BusinessRuleViolationException.class,
+                () -> service.chargeAtDesk(booking, member, session, new BookingRequestDTO()));
     }
 
     // ── Charging ──

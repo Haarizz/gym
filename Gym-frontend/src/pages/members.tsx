@@ -73,6 +73,7 @@ import { CancelMembershipDialog } from "../components/members/CancelMembershipDi
 import { MembershipLifecycleReport, LIFECYCLE_REPORT_TYPES, countLifecycleReport, countRenewalReport, type LifecycleReportType } from "../components/members/MembershipLifecycleReport";
 import { MemberStatCards, type StatCardDef } from "../components/members/MemberStatCards";
 import { PhotoZoomViewer } from "../components/members/PhotoZoomViewer";
+import { MemberActivityBadges } from "../components/members/MemberActivityBadges";
 import type { DueFilter, DueStats } from "../components/members/DueForRenewalList";
 import type { RenewalHistoryFilter, RenewalHistoryStats } from "../components/members/RenewalTransactionHistory";
 import type { FreezeFilter, FreezeStats } from "../components/members/FreezeTransactionHistory";
@@ -80,7 +81,7 @@ import type { ReceiptStats } from "./member-receipts";
 import { FaCircleCheck, FaCircleArrowUp, FaCircleArrowDown, FaArrowsRotate, FaArrowUp, FaArrowDown, FaArrowRight } from 'react-icons/fa6';
 import { toast } from 'sonner';
 import { membersService, Member } from '../utils/supabase/members-service';
-import { plansService, Plan } from '../utils/supabase/plans-service';
+import { plansService, Plan, isDayPassPlan } from '../utils/supabase/plans-service';
 import { addonsService } from '../utils/supabase/addons-service';
 import { authService } from '../utils/supabase/auth-service';
 import { receiptsService, Receipt as ApiReceipt } from '../utils/supabase/receipts-service';
@@ -1770,6 +1771,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                   {' '}+ {planDetails.addons.map(a => a.name).join(', ')}
                                 </span>
                               )}
+                              <MemberActivityBadges member={member} />
                             </div>
                             {/* The total the member pays (plan + active add-ons / facility access); hover
                                 it for the split. */}
@@ -2509,6 +2511,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   )}
                   {apiPlans.map((plan) => {
                     const isCurrentPlan = plan.name === getMembershipPlan(selectedMemberForRenewal);
+                    // A day pass is sold again at Check In, never renewed onto itself
+                    const passNotRenewable = isCurrentPlan && isDayPassPlan(plan);
                     const isSelected = selectedNewPlan?.id === plan.id;
                     const discountedPrice = plan.discount && plan.discount > 0
                       ? plan.price * (1 - plan.discount / 100)
@@ -2517,11 +2521,15 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     return (
                       <Card
                         key={plan.id}
-                        className={`cursor-pointer transition-all hover:shadow-lg ${isSelected
-                          ? 'border-2 border-primary shadow-lg scale-105'
-                          : 'border hover:border-primary/50'
+                        className={`transition-all ${passNotRenewable
+                          ? 'border opacity-60 cursor-not-allowed'
+                          : `cursor-pointer hover:shadow-lg ${isSelected
+                            ? 'border-2 border-primary shadow-lg scale-105'
+                            : 'border hover:border-primary/50'}`
                           } ${isCurrentPlan ? 'bg-blue-50' : ''}`}
-                        onClick={() => handlePlanSelection(plan)}
+                        aria-disabled={passNotRenewable}
+                        title={passNotRenewable ? 'A day pass can’t be renewed — sell a new pass from Check In › Walk-in / day pass, or choose a membership plan.' : undefined}
+                        onClick={() => { if (!passNotRenewable) handlePlanSelection(plan); }}
                       >
                         <CardContent className="p-6">
                           <div className="flex items-start justify-between mb-4">
@@ -2530,7 +2538,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                               <p className="text-sm text-muted-foreground">{plan.duration || `${plan.durationValue} ${plan.durationType}`}</p>
                             </div>
                             {isCurrentPlan && (
-                              <Badge className="bg-blue-100 text-blue-800">Current</Badge>
+                              <Badge className="bg-blue-100 text-blue-800">{passNotRenewable ? 'Current · day pass' : 'Current'}</Badge>
                             )}
                           </div>
 
@@ -2545,6 +2553,9 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
                           {plan.description && (
                             <p className="text-sm text-muted-foreground mb-3">{plan.description}</p>
+                          )}
+                          {passNotRenewable && (
+                            <p className="text-xs text-muted-foreground">Day passes aren't renewed — sell a new pass at Check In, or pick a membership plan.</p>
                           )}
 
                           {isSelected && (

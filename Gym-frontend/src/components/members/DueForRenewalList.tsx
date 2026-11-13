@@ -26,6 +26,8 @@ interface DueRow {
   expiryDate?: string;
   daysFromToday?: number | null;
   outstandingBalance?: number;
+  /** On a day pass — left out, since a pass is bought again rather than renewed */
+  dayPass?: boolean;
 }
 
 export type DueFilter = "overdue" | "due7" | "due30";
@@ -103,7 +105,8 @@ export function DueForRenewalList({ refreshKey = 0, onSelect, filter = null, onC
       .then(([expired, expiring]) => {
         if (cancelled) return;
         const byId = new Map<number, DueRow>();
-        [...expired, ...expiring].forEach((r) => byId.set(r.memberDbId, r));
+        // Day passes are bought again at Check In, not renewed
+        [...expired, ...expiring].filter((r) => !r.dayPass).forEach((r) => byId.set(r.memberDbId, r));
         setRows([...byId.values()]);
       })
       .catch(() => { if (!cancelled) setError(true); })

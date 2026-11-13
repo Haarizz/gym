@@ -41,4 +41,10 @@ public interface MemberAddonRepository extends JpaRepository<MemberAddon, Long>,
 
     /** Add-ons paid by one receipt (a registration receipt can carry several). */
     List<MemberAddon> findByReceiptId(Long receiptId);
+
+    /** (member db id, count) of add-ons each member bought, cancelled ones left out — the Members list's add-on count. */
+    @org.springframework.data.jpa.repository.Query("select a.memberDbId, count(a) from MemberAddon a "
+            + "where a.memberDbId in :memberDbIds and (a.status is null or lower(a.status) <> 'cancelled') "
+            + "group by a.memberDbId")
+    List<Object[]> countPurchasedByMember(@org.springframework.data.repository.query.Param("memberDbIds") java.util.Collection<Long> memberDbIds);
 }

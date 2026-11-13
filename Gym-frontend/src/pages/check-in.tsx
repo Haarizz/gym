@@ -12,7 +12,7 @@ import {
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import {
-  AlertCircle, BarChart3, Briefcase, CalendarClock, Camera, CheckCircle, Clock, Coffee, DoorOpen, Footprints,
+  AlertCircle, BadgePercent, BarChart3, Briefcase, CalendarClock, Camera, CheckCircle, Clock, Coffee, DoorOpen, Footprints,
   Gauge, History, LogIn, LogOut, QrCode, RefreshCw, Search, Settings, Timer, Upload, UserCheck, UserPlus, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -196,6 +196,10 @@ export function CheckIn() {
   const [visitorPhoto, setVisitorPhoto]   = useState<string | null>(null);
   const [walkInPlans, setWalkInPlans]     = useState<Plan[]>([]);
   const [selectedPlan, setSelectedPlan]   = useState('');
+  // Desk discount on the pass: a flat amount or a percentage of the price, with an optional reason
+  const [discountValue, setDiscountValue] = useState('');
+  const [discountUnit, setDiscountUnit]   = useState<'amount' | 'percent'>('amount');
+  const [discountReason, setDiscountReason] = useState('');
   const [grantingAccess, setGrantingAccess] = useState(false);
   const [bankAccounts, setBankAccounts]   = useState<AccountHead[]>([]);
   const [staffOptions, setStaffOptions]   = useState<Staff[]>([]);
@@ -402,7 +406,13 @@ export function CheckIn() {
     : (p.status || '').toLowerCase() !== 'inactive';
 
   const selectedPlanDetails = walkInPlans.find(p => p.id.toString() === selectedPlan);
-  const walkInCharge = Number(selectedPlanDetails?.price ?? 0);
+  const walkInPrice = Number(selectedPlanDetails?.price ?? 0);
+  const walkInDiscount = (() => {
+    const v = Math.max(0, Number(discountValue) || 0);
+    const off = discountUnit === 'percent' ? (walkInPrice * Math.min(v, 100)) / 100 : v;
+    return Math.round(Math.min(off, walkInPrice) * 100) / 100;
+  })();
+  const walkInCharge = Math.round((walkInPrice - walkInDiscount) * 100) / 100;
   // Same payment flow as Renewals / Add-ons: split across methods, rest on credit
   const walkInPaymentManager = usePaymentManager({ invoiceTotal: walkInCharge });
   const walkInCredit = walkInPaymentManager.totalByType(PAYMENT_TYPES.CREDIT);
@@ -590,12 +600,17 @@ export function CheckIn() {
         session_type: selectedPlanDetails?.name || 'gym',
         amount: walkInCharge,
         paid_amount: paidAmount,
+        discount_amount: walkInDiscount > 0 ? walkInDiscount : undefined,
+        discount_label: walkInDiscount > 0
+          ? (discountReason.trim() ? `Staff discount: ${discountReason.trim()}` : 'Staff discount')
+          : undefined,
         payment_method: paymentMethod,
         payment_breakdown: paymentBreakdown,
         bank_account_code: bankAccountCode,
         bank_account_name: bankAccountName,
         device_id: 'WEB',
-        notes: `Plan: ${selectedPlanDetails?.name}, Payment: ${paymentSummary}, Amount: ${currencyCode} ${walkInCharge}`,
+        notes: `Plan: ${selectedPlanDetails?.name}, Payment: ${paymentSummary}, Amount: ${currencyCode} ${walkInCharge}`
+          + (walkInDiscount > 0 ? `, Discount: ${currencyCode} ${walkInDiscount}${discountReason.trim() ? ` (${discountReason.trim()})` : ''}` : ''),
         processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
         self_registration_id: selfRegistration?.id,
       };
@@ -619,6 +634,7 @@ export function CheckIn() {
   const resetDailyForm = () => {
     setVisitorName(''); setVisitorMobile(''); setVisitorPhoto(null);
     setSelectedPlan(''); setProcessedByStaffId(''); setSelfRegistration(null);
+    setDiscountValue(''); setDiscountUnit('amount'); setDiscountReason('');
     walkInPaymentManager.clearLines();
     if (isCameraActive && videoRef.current) {
       (videoRef.current.srcObject as MediaStream)?.getTracks().forEach(t => t.stop());
@@ -946,7 +962,10 @@ export function CheckIn() {
                     <div>
                       <div className={styles.muted} style={{ fontSize: 'var(--text-xs)' }}>To pay</div>
                       <div className={c.chargeValue}><CurrencyGlyph /> {walkInCharge}</div>
-                      <div className={styles.muted} style={{ fontSize: 'var(--text-xs)' }}>{selectedPlanDetails?.name} · valid for {selectedPlanDetails?.duration}</div>
+                      <div className={styles.muted} style={{ fontSize: 'var(--text-xs)' }}>
+                        {selectedPlanDetails?.name} · valid for {selectedPlanDetails?.duration}
+                        {walkInDiscount > 0 && <> · <s><CurrencyGlyph /> {walkInPrice}</s> − <CurrencyGlyph /> {walkInDiscount} discount</>}
+                      </div>
                     </div>
                     {walkInCharge <= 0 ? <Status kind="good">Free</Status>
                       : !walkInPaymentManager.settleable ? <Status kind="warning">Awaiting payment</Status>
@@ -954,6 +973,57 @@ export function CheckIn() {
                       : walkInCredit >= walkInCharge ? <Status kind="warning">On credit</Status>
                       : <Status kind="warning">Partly on credit</Status>}
                   </div>
+                  {walkInPrice > 0 && (
+                    <section className={c.discount} data-applied={walkInDiscount > 0} aria-labelledby="walkin-discount-title">
+                      <div className={c.discountHead}>
+                        <span className={c.discountIcon} aria-hidden><BadgePercent /></span>
+                        <div className={c.discountTitles}>
+                          <span id="walkin-discount-title" className={c.discountTitle}>Discount</span>
+                          <span className={c.discountSub}>Give this visitor a lower price — it's shown on the bill.</span>
+                        </div>
+                        {walkInDiscount > 0 && (
+                          <span className={c.discountApplied}>
+                            −<CurrencyGlyph /> {walkInDiscount} off
+                            <button type="button" className={c.discountClear} aria-label="Remove discount"
+                              onClick={() => { setDiscountValue(''); setDiscountReason(''); }}><X /></button>
+                          </span>
+                        )}
+                      </div>
+                      <div className={c.discountRow}>
+                        <div className="space-y-2">
+                          <Label htmlFor="walkin-discount">Amount</Label>
+                          <div className={c.discountInput}>
+                            <Input id="walkin-discount" type="number" inputMode="decimal" min="0"
+                              max={discountUnit === 'percent' ? 100 : walkInPrice} step="0.01" placeholder="0"
+                              value={discountValue} onChange={e => setDiscountValue(e.target.value)} />
+                            <div className={c.unitToggle} role="radiogroup" aria-label="Discount type">
+                              {(['amount', 'percent'] as const).map(u => (
+                                <button key={u} type="button" role="radio" aria-checked={discountUnit === u}
+                                  data-active={discountUnit === u} onClick={() => setDiscountUnit(u)}>
+                                  {u === 'amount' ? currencyCode : '%'}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className={c.quickChips}>
+                            {[10, 20, 50].map(pct => (
+                              <button key={pct} type="button" className={c.quickChip}
+                                data-active={discountUnit === 'percent' && Number(discountValue) === pct}
+                                onClick={() => { setDiscountUnit('percent'); setDiscountValue(String(pct)); }}>
+                                {pct}%
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="walkin-discount-reason">Reason</Label>
+                          <Input id="walkin-discount-reason" placeholder={walkInDiscount > 0 ? 'e.g. Friend of member (optional)' : 'Enter a discount first'}
+                            value={discountReason} onChange={e => setDiscountReason(e.target.value)}
+                            disabled={walkInDiscount <= 0} />
+                        </div>
+                      </div>
+                    </section>
+                  )}
                   {walkInCharge > 0 && (
                     <PaymentAllocationPanel
                       manager={walkInPaymentManager}

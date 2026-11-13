@@ -41,6 +41,14 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.getBookings(status, type, startDate, endDate, search, memberId));
     }
 
+    /** Before a staff booking: whether a package covers it, or the price to take at the desk. */
+    @PreAuthorize(NOT_A_MEMBER)
+    @GetMapping("/desk-quote")
+    public ResponseEntity<java.util.Map<String, Object>> deskQuote(@RequestParam Long sessionId,
+                                                               @RequestParam(required = false) Long memberId) {
+        return ResponseEntity.ok(bookingService.deskQuote(sessionId, memberId));
+    }
+
     @PreAuthorize(NOT_A_MEMBER)
     @PostMapping
     public ResponseEntity<BookingResponseDTO> createBooking(@RequestBody BookingRequestDTO request) {

@@ -67,6 +67,7 @@ public class BookingPaymentService {
     private final FinancialEventService financialEventService;
     private final NotificationService notificationService;
     private final BookingPaymentNotifier bookingPaymentNotifier;
+    private final com.company.project.performance.attribution.StaffAttribution staffAttribution;
 
     public BookingPaymentService(RewardRedemptionService rewardRedemptionService,
                                  DiscountCodeService discountCodeService,
@@ -76,7 +77,8 @@ public class BookingPaymentService {
                                  MemberRepository memberRepository,
                                  FinancialEventService financialEventService,
                                  NotificationService notificationService,
-                                 BookingPaymentNotifier bookingPaymentNotifier) {
+                                 BookingPaymentNotifier bookingPaymentNotifier,
+                                 com.company.project.performance.attribution.StaffAttribution staffAttribution) {
         this.rewardRedemptionService = rewardRedemptionService;
         this.discountCodeService = discountCodeService;
         this.walletService = walletService;
@@ -86,6 +88,7 @@ public class BookingPaymentService {
         this.financialEventService = financialEventService;
         this.notificationService = notificationService;
         this.bookingPaymentNotifier = bookingPaymentNotifier;
+        this.staffAttribution = staffAttribution;
     }
 
     // ── Refund window ─────────────────────────────────────────────────────────
@@ -110,6 +113,22 @@ public class BookingPaymentService {
      */
     @Transactional
     public void charge(Booking booking, Member member, TrainingSession session, BookingRequestDTO request) {
+        charge(booking, member, session, request, false);
+    }
+
+    /**
+     * Staff booking a member into a priced session at the desk: the money is taken there and then,
+     * so nothing waits for approval. Cash/Card/Online legs are received now; a Credit leg leaves
+     * that part on the member's account (an open receipt, collected later). The receipt is
+     * credited to the signed-in staff member.
+     */
+    @Transactional
+    public void chargeAtDesk(Booking booking, Member member, TrainingSession session, BookingRequestDTO request) {
+        charge(booking, member, session, request, true);
+    }
+
+    private void charge(Booking booking, Member member, TrainingSession session, BookingRequestDTO request,
+                        boolean atDesk) {
         BigDecimal gross = money(session.getPrice());
         boolean hasPass = request.getRewardPassId() != null;
         boolean hasCode = StringUtils.hasText(request.getCouponCode());
@@ -180,10 +199,19 @@ public class BookingPaymentService {
 
         BigDecimal received = BigDecimal.ZERO;
         boolean requiresApproval = false;
+        boolean onCredit = false;
         if (toPay.signum() > 0) {
-            requiresApproval = APPROVAL_REQUIRED_METHODS.contains(method.toLowerCase());
+            requiresApproval = !atDesk && APPROVAL_REQUIRED_METHODS.contains(method.toLowerCase());
             List<PaymentSplitDTO> sheetLegs = request.getPaymentBreakdown() != null
                     ? request.getPaymentBreakdown() : List.of();
+            if (atDesk) {
+                // A Credit leg is money still owed, not money received: it stays on the member's account.
+                onCredit = method.equalsIgnoreCase("credit")
+                        || sheetLegs.stream().anyMatch(l -> l.getMethod() != null && l.getMethod().equalsIgnoreCase("credit"));
+                sheetLegs = sheetLegs.stream()
+                        .filter(l -> l.getMethod() == null || !l.getMethod().equalsIgnoreCase("credit"))
+                        .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+            }
             received = sheetLegs.stream()
                     .map(PaymentSplitDTO::getAmount)
                     .filter(java.util.Objects::nonNull)
@@ -197,7 +225,10 @@ public class BookingPaymentService {
             legs.addAll(sheetLegs);
         }
         BigDecimal outstanding = toPay.subtract(received);
-        if (outstanding.signum() > 0 && !requiresApproval) {
+        if (outstanding.signum() > 0 && atDesk && !onCredit) {
+            throw new BusinessRuleViolationException("Take the full amount, or put the rest on Credit");
+        }
+        if (outstanding.signum() > 0 && !requiresApproval && !atDesk) {
             throw new BusinessRuleViolationException("Pay the full amount, or choose Cash or Credit to pay the rest at the gym");
         }
 
@@ -222,6 +253,12 @@ public class BookingPaymentService {
                 net, wallet.add(received), receiptMethod, legs,
                 request.getBankAccountCode(), request.getBankAccountName(), dueDate);
         receipt = receiptService.recordDiscount(receipt, discount, discountLabel);
+        if (atDesk) {
+            Long staffId = staffAttribution.currentStaffId();
+            receipt.setProcessedByStaffId(staffId);
+            receipt.setProcessedBy(receiptService.resolveProcessedByName(staffId));
+            receipt = receiptRepository.save(receipt);
+        }
 
         booking.setReceiptId(receipt.getId());
         booking.setWalletAmount(wallet.signum() > 0 ? wallet : null);
@@ -240,7 +277,7 @@ public class BookingPaymentService {
                     "BOOKING_PAYMENT_PENDING_" + booking.getId());
         } else {
             receiptService.postBookingReceipt(receipt);
-            booking.setPaymentStatus("paid");
+            booking.setPaymentStatus(outstanding.signum() > 0 ? (received.add(wallet).signum() > 0 ? "partial" : "pending") : "paid");
         }
     }
 

@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { membersService } from "../utils/supabase/members-service";
 import { trainingService, TrainingSessionApi } from "../utils/supabase/training-service";
 import { bookingService, BookingApi } from "../utils/supabase/booking-service";
+import { useDeskBookingPayment, DeskBookingPaymentPanel } from "../components/bookings/DeskBookingPayment";
 import { rewardService, passLabel, type ReferralReward } from "../utils/supabase/reward-service";
 import { MemberAvatar, MemberStatusPill, memberPhoto } from "../components/members/MemberAvatar";
 import bd from "../components/bookings/BookingDialog.module.css";
@@ -410,6 +411,13 @@ export function Bookings({ onNavigate }: BookingsProps) {
       .catch(() => setAvailablePasses([])); // no passes to offer — never blocks booking
   }, [selectedMember?.id, selectedClass?.id, selectedClass?.type, isGuestBooking]);
 
+  // A member's priced session is paid at the desk unless a Reward Pass or their package covers it.
+  const deskPay = useDeskBookingPayment(
+    bookingStep === 3 && selectedClass && !isGuestBooking && selectedMember && selectedPassId === 'none'
+      ? Number(selectedClass.id) : null,
+    !isGuestBooking && selectedMember ? Number(selectedMember.id) : null,
+  );
+
   const handleCreateBooking = async () => {
     if (!selectedClass) {
       toast.error("Please select a class or session");
@@ -431,6 +439,11 @@ export function Bookings({ onNavigate }: BookingsProps) {
       return;
     }
 
+    if (!deskPay.ready) {
+      toast.error(deskPay.toPay > 0 ? "Allocate the full amount (or put the rest on Credit) before booking" : "Still checking the price — try again in a moment");
+      return;
+    }
+
     try {
       const created = await bookingService.createBooking({
         sessionId: Number(selectedClass.id),
@@ -439,6 +452,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
         guestEmail: isGuestBooking ? guestDetails.email : undefined,
         guestPhone: isGuestBooking ? guestDetails.phone : undefined,
         rewardPassId: !isGuestBooking && selectedPassId !== 'none' ? Number(selectedPassId) : undefined,
+        payment: deskPay.fields(),
       });
 
       const mapped = mapBooking(created);
@@ -909,10 +923,16 @@ export function Bookings({ onNavigate }: BookingsProps) {
                       <span className={bd.total}>
                         {selectedPassId !== 'none'
                           ? <>Free<span className={bd.totalNote}>Reward Pass</span></>
-                          : selectedClass.price > 0 ? formatCurrency(selectedClass.price) : "Free"}
+                          : deskPay.quote?.enrolmentId
+                            ? <>Free<span className={bd.totalNote}>PT package</span></>
+                            : selectedClass.price > 0 ? formatCurrency(selectedClass.price) : "Free"}
                       </span>
                     </div>
                   </div>
+
+                  {selectedMember && !isGuestBooking && (
+                    <DeskBookingPaymentPanel pay={deskPay} member={{ code: selectedMember.memberCode || selectedMember.id, name: selectedMember.name }} />
+                  )}
 
                   <div className={bd.note}>
                     <QrCode />
@@ -955,7 +975,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                   </Button>
                 )}
                 {bookingStep === 3 && (
-                  <Button onClick={handleCreateBooking} disabled={!!selectedClass && sessionHasStarted(selectedClass)}>
+                  <Button onClick={handleCreateBooking} disabled={(!!selectedClass && sessionHasStarted(selectedClass)) || !deskPay.ready}>
                     <CheckCircle className="h-4 w-4 mr-1.5" /> Confirm Booking
                   </Button>
                 )}

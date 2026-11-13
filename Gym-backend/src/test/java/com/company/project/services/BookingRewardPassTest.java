@@ -36,6 +36,7 @@ class BookingRewardPassTest {
     @Mock private MemberRepository memberRepository;
     @Mock private NotificationService notificationService;
     @Mock private com.company.project.services.mobile.push.BookingPaymentNotifier bookingPaymentNotifier;
+    @Mock private com.company.project.performance.attribution.StaffAttribution staffAttribution;
     @Mock private QrCodeService qrCodeService;
     @Mock private RewardRedemptionService rewardRedemptionService;
     @Mock private DiscountCodeService discountCodeService;
@@ -57,7 +58,7 @@ class BookingRewardPassTest {
         MockitoAnnotations.openMocks(this);
         BookingPaymentService payments = new BookingPaymentService(rewardRedemptionService, discountCodeService,
                 walletService, receiptService, receiptRepository, memberRepository, financialEventService,
-                notificationService, bookingPaymentNotifier);
+                notificationService, bookingPaymentNotifier, staffAttribution);
         service = new BookingService(bookingRepository, sessionRepository, memberRepository,
                 notificationService, qrCodeService, rewardRedemptionService, payments, sessionMemberNotifier, businessDay,
                 packageUsage, enrolmentRepository);
@@ -98,11 +99,31 @@ class BookingRewardPassTest {
     }
 
     @Test
-    void bookingWithoutPassKeepsSessionPrice() {
-        BookingResponseDTO dto = service.createBooking(request(10L, null));
-
+    void staffBookingWithoutPassMustBePaidAtTheDesk() {
+        assertThrows(BusinessRuleViolationException.class, () -> service.createBooking(request(10L, null)));
         verify(rewardRedemptionService, never()).consumePass(anyLong(), any(), any(), anyLong());
+    }
+
+    @Test
+    void staffBookingWithoutPassTakesTheSessionPrice() {
+        com.company.project.entities.Receipt receipt = new com.company.project.entities.Receipt();
+        receipt.setId(900L);
+        when(receiptService.createBookingReceipt(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> { receipt.setPaidAmount(inv.getArgument(4)); return receipt; });
+        when(receiptService.recordDiscount(any(), any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(receiptRepository.save(any(com.company.project.entities.Receipt.class))).thenAnswer(inv -> inv.getArgument(0));
+        BookingRequestDTO req = request(10L, null);
+        req.setPaymentMethodUsed("Cash");
+        com.company.project.dto.PaymentSplitDTO leg = new com.company.project.dto.PaymentSplitDTO();
+        leg.setMethod("Cash");
+        leg.setAmount(new BigDecimal("150"));
+        req.setPaymentBreakdown(new java.util.ArrayList<>(java.util.List.of(leg)));
+
+        BookingResponseDTO dto = service.createBooking(req);
+
         assertEquals(0, new BigDecimal("150").compareTo(dto.getPrice()));
+        assertEquals(0, new BigDecimal("150").compareTo(receipt.getPaidAmount()));
+        verify(receiptService).postBookingReceipt(receipt);
     }
 
     @Test

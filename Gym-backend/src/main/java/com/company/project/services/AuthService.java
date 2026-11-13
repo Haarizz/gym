@@ -212,7 +212,7 @@ public class AuthService {
                     .roleName(roles.stream().findFirst().orElse(null))
                     .staffName(staffName)
                     .fullName(fullName)
-                    .gymName(staffName == null ? resolveGymNameForDisplay() : null)
+                    .gymName(resolveGymNameForDisplay())
                     .permissions(extractPermissions(userDetails))
                     .accessibleBranches(accessibleBranches)
                     .defaultBranchId(defaultBranchId)
@@ -262,7 +262,7 @@ public class AuthService {
                 .roleName(roles.stream().findFirst().orElse(null))
                 .staffName(staffName)
                 .fullName(fullName)
-                .gymName(staffName == null ? resolveGymNameForDisplay() : null)
+                .gymName(resolveGymNameForDisplay())
                 .permissions(extractPermissions(userDetails))
                 .accessibleBranches(accessibleBranches)
                 .defaultBranchId(defaultBranchId)
@@ -279,8 +279,9 @@ public class AuthService {
      * tenant routing, the request is already routed to the correct tenant database
      * at this point (TenantContextFilter/JwtAuthenticationFilter both run before
      * this), so this is already scoped to the current gym without any extra lookup.
-     * Returns null (no override) if this account isn't a gym owner at all (e.g.
-     * GYMBIOS_ADMIN, or a non-owner staff member who already has a real staffName).
+     * Sent to every staff member too (the web app titles the browser tab
+     * "GymBios - <gym name>"); their sidebar label still prefers staffName.
+     * Returns null when no single gym can be resolved.
      */
     private String resolveGymNameForDisplay() {
         try {

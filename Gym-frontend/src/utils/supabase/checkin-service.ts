@@ -77,6 +77,10 @@ export interface WalkInCheckInRequest {
   // How much of amount was received now (split/partial payments; the rest is left
   // on credit). Takes precedence over payment_status when sent.
   paid_amount?: number;
+  // Discount taken off the pass price at the desk — amount is already net of it;
+  // recorded on the bill with discount_label (the reason).
+  discount_amount?: number;
+  discount_label?: string;
   payment_method?: string;
   // Bank account a single Online payment went to
   bank_account_code?: string;

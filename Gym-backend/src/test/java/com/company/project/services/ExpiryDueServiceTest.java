@@ -21,6 +21,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.*;
 
@@ -96,6 +97,36 @@ class ExpiryDueServiceTest {
         john.setExpiryDueRaisedFor(longAgo); // stamped by the V137 back-fill
         assertTrue(service.raiseDueFor(7L));
         assertEquals(0, new BigDecimal("500").compareTo(john.getOutstandingBalance()));
+    }
+
+    @Test
+    void aDayPassRaisesNoDue() {
+        golden.setDurationType("Daily");
+        golden.setDurationValue("1");
+        assertFalse(service.raiseDueFor(7L));
+        assertEquals(0, BigDecimal.ZERO.compareTo(john.getOutstandingBalance()));
+    }
+
+    @Test
+    void unpaidDayPassDuesAlreadyRaisedAreCancelled() {
+        golden.setPlanType("Walk-In");
+        when(planRepository.findAll()).thenReturn(java.util.List.of(golden));
+        Receipt due = new Receipt();
+        due.setTransactionType(ExpiryDueService.EXPIRY_DUE_TYPE);
+        due.setPlanName("Golden");
+        due.setStatus("Pending");
+        due.setAmount(new BigDecimal("500"));
+        due.setTotalPaidToDate(BigDecimal.ZERO);
+        due.setMemberDbId(7L);
+        john.setOutstandingBalance(new BigDecimal("500"));
+        john.setPaymentStatus("pending");
+        when(receiptRepository.findByTransactionTypeAndStatusIn(eq(ExpiryDueService.EXPIRY_DUE_TYPE), any()))
+                .thenReturn(java.util.List.of(due));
+
+        assertEquals(1, service.cancelDayPassDues());
+        assertEquals("Cancelled", due.getStatus());
+        assertEquals(0, BigDecimal.ZERO.compareTo(john.getOutstandingBalance()));
+        assertEquals("paid", john.getPaymentStatus());
     }
 
     @Test

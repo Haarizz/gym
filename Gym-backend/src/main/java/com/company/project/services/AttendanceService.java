@@ -247,7 +247,9 @@ public class AttendanceService {
                     charge, paidNow,
                     req.getPaymentMethod(), req.getPaymentBreakdown(),
                     req.getBankAccountCode(), req.getBankAccountName(),
-                    req.getNotes(), processedByStaffId);
+                    req.getNotes(), processedByStaffId,
+                    req.getDiscountAmount() != null ? req.getDiscountAmount().max(java.math.BigDecimal.ZERO) : null,
+                    req.getDiscountLabel());
         }
         if (selfRegistration != null) {
             walkInRegistrationService.markConfirmed(selfRegistration, record.getId());

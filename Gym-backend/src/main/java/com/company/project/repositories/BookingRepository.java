@@ -147,4 +147,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     long countActiveBookingsByMemberId(@Param("memberId") Long memberId);
 
     java.util.Optional<Booking> findFirstByReceiptId(Long receiptId);
+
+    /** (member id, lower-case session type, count) of checked-in bookings — the Members list's attended PT/class counts. */
+    @Query("select b.member.id, lower(s.type), count(b) from Booking b join b.session s "
+            + "where b.member.id in :memberIds and lower(b.status) = 'checked-in' "
+            + "group by b.member.id, lower(s.type)")
+    List<Object[]> countAttendedByMemberAndType(@Param("memberIds") java.util.Collection<Long> memberIds);
 }

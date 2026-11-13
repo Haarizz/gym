@@ -207,7 +207,17 @@ export interface MembershipApplication {
   medical_conditions?: string;
   /** The rest of the household on a Family / Couple plan. */
   family_members?: ApplicationFamilyMember[];
+  /** The approve / reject email to the applicant; null until a decision. */
+  decision_email_status?: DecisionEmailStatus | null;
+  /** Why the last attempt failed, in words a gym owner can act on. */
+  decision_email_error?: string | null;
+  decision_email_at?: string | null;
+  /** The gym (GymOS › Settings › Email) or the server has a mailbox to send from. */
+  email_configured?: boolean;
 }
+
+/** SENT, FAILED, or NOT_CONFIGURED (no mailbox set up, so nothing was sent). */
+export type DecisionEmailStatus = 'SENT' | 'FAILED' | 'NOT_CONFIGURED';
 
 /** Staff raise an application for a walk-in (Service Portfolios → Choose Plan → New Member). Always cash at reception. */
 export interface DeskApplicationRequest {
@@ -259,6 +269,9 @@ export const servicePortfolioService = {
     (await api.post<MembershipApplication>(`/members/applications/${id}/approve`, { cash_received: cashReceived })).data,
   reject: async (id: number, reason: string): Promise<MembershipApplication> =>
     (await api.post<MembershipApplication>(`/members/applications/${id}/reject`, { reason })).data,
+  /** Emails the applicant their approval / rejection again. */
+  resendDecisionEmail: async (id: number): Promise<MembershipApplication> =>
+    (await api.post<MembershipApplication>(`/members/applications/${id}/resend-email`)).data,
 
   // Public
   getPublic: async (tenantSlug: string, branchId: string, token: string): Promise<PublicPortfolio> =>

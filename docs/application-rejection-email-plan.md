@@ -1,101 +1,61 @@
-# Rejected applications: emailing the reason to the applicant
+# Membership applications: emailing the decision to the applicant
 
-Status: plan, not implemented · 2026-11-11
+Status: **implemented 2026-11-13** (uncommitted) · approve + reject emails, one-off (no shared email layer yet)
 
 ## The problem
 
-When staff reject an online membership application (Approvals → Applications), they must type a reason. The reason is saved on the application (`membership_applications.rejection_reason`) and shown only to staff. **It never reaches the applicant.**
+When staff approved or rejected an online membership application (Approvals → Applications), the applicant was never told. The rejection reason was saved on the application and shown only to staff.
 
-- **No email is sent.** `MembershipApplicationService.reject()` saves the status, reason and refund marker, and does nothing else.
-- **The mobile app can't show it either.** An applicant isn't a member yet, so there's no member record or app account to attach the reason to. The mobile app has no screen for membership applications. Even an applicant who has the app sees nothing.
-- **The public join page can't show it.** After applying, the applicant sees a one-time confirmation with a reference number. There's no way to look up the application's status later.
+- An applicant isn't a member yet, so there's no app account to notify. The mobile app has no applications screen.
+- The public join page shows a one-time confirmation only. There's no status lookup.
 
-The only contact details we have for an applicant are the ones they typed on the form. Email is required there and checked for format, so **email is the only channel that reliably reaches every applicant.**
+Email is required on the application form (public link and desk), so **email is the one channel that reaches every applicant.**
 
-## What email support exists today
+## What already existed
 
-Email sending already exists, but there are no per-gym email settings.
+Sending is unified, and each gym can use its own mailbox:
 
-| Piece | Where | State |
+| Piece | Where | What it does |
 |---|---|---|
-| Sending | `services/EmailService.java`, `sendEmail(to, subject, html)` | Works. Uses Spring `JavaMailSender` over SMTP |
-| SMTP server | `application.properties`: `spring.mail.*` from env vars `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_AUTH`, `SMTP_STARTTLS` | **One account for the whole platform.** If `SMTP_HOST` is empty, `isConfigured()` returns false and nothing is sent |
-| From address | `messaging.email.from` = env `MESSAGE_EMAIL_FROM`, default `no-reply@gymbios.app` | One address for every gym. No sender name, no reply-to |
-| Status | GymOS → Integrations → "Email Service (SMTP)" | Shows **Connected** only when the env vars are set. It can't be configured from the UI |
-| Existing uses | Account codes, family invitations, member-app link invites, campaigns, weekly attendance report, rewards, scheduled reports | All follow the same pattern: check `isConfigured()`, send, and log the error on failure without failing the main action |
+| Gym mailbox settings | GymOS → Settings → Email (`EmailSettingsController`, `EmailSettingsService`, table `email_settings`, V129) | SMTP host/port/security, username, encrypted app password, **From address, sender name, reply-to**, and a test email. Applies to the whole gym (every branch) |
+| Choosing the mailbox | `services/email/GymMailResolver` | Reads the gym's settings from the gym's database **on every send**, through the request's tenant |
+| Sending | `EmailService.sendEmail(to, subject, html)` | Uses the gym's mailbox if one is set up, otherwise the server `SMTP_*` / `MESSAGE_EMAIL_FROM`. `isConfigured()` is true if either exists |
+| Error text | `services/email/MailErrors.explain()` | Turns SMTP exceptions into advice a gym owner can act on |
 
-I can't tell from the repo whether QA or production have the `SMTP_*` variables set. The Integrations page shows it: **Connected** means set. If they aren't set, every email above is silently skipped today, and this feature would be skipped too until they are.
+So the decision emails need no new settings. **From, sender name and reply-to all come from the gym's Settings → Email** (decision: always the gym's reply-to, not the branch email).
 
-**What's missing for gyms:** each gym can't set its own sender name, reply-to address or SMTP account. Every email comes from `no-reply@gymbios.app` with no gym name. A reply from an applicant goes nowhere.
+## What was built
 
-## Proposal
+### When emails go out
+- **Approve** → "Welcome to {Gym} · {Branch}: your membership is approved". Includes the reference, a note that the membership starts today, the **member ID**, the payment (card ending … / cash at the front desk), any household members added, and a note that the front desk can set them up on the GymBios app. It doesn't promise automatic app linking, because members are linked to app accounts by staff, not by email.
+- **Reject** → "Your membership application at {Gym} · {Branch}". Includes the reference, the **reason as staff wrote it** (escaped, line breaks kept, in a quote box), and either "The {amount} you paid (card ending …) has been refunded" or "No payment was taken".
+- Both have a gym-name header and a footer with the branch phone and email.
 
-### Phase 1: send the rejection email (small, uses existing SMTP)
+### How it's sent
+- `MembershipApplicationService.approve()` / `reject()` save the decision in its own `TransactionTemplate`. **Once it has committed**, `emailDecision()` sends on the same request thread, so the gym's mailbox is still found through the tenant.
+- **Best effort:** if email isn't set up or the send fails, the decision still stands. The outcome is recorded:
+  - migration **V142**: `membership_applications.decision_email_status` (`SENT` | `FAILED` | `NOT_CONFIGURED`), `decision_email_error`, `decision_email_at`.
+- **Resend:** `POST /api/members/applications/{id}/resend-email` sends the email again for an approved or rejected application. It refuses a pending one. Permission is MEMBERS edit.
+- The email text is built in `services/MembershipApplicationEmails` (package-private). The gym name comes from `TenantDataSources.gymName(tenant)`, the same one the public join page shows. The currency comes from `ServicePortfolioService.currencyCode(branchId)`.
+- **Refund wording:** card payments are still simulated, so "has been refunded" mirrors `payment_status = REFUNDED`. When real payments go live, it must only be said after a real refund succeeds.
 
-**1. Email on rejection.** After the rejection is saved (after commit, never inside the transaction), send one email to `application.email`:
+### What staff see (`components/approvals/ApplicationsPanel.tsx`)
+- **Review / reject dialog:** "{Name} will be emailed their member ID at {email}" or "This reason will be emailed to {email} exactly as written". If email isn't set up (`email_configured = false` on the view), an amber warning says the applicant won't be notified and to contact them on {phone}.
+- **Toasts** end with "{Name} has been emailed.", "The email … couldn't be sent…" or "Email isn't set up, so the applicant wasn't notified."
+- **New "Recently decided" panel** under the pending queues. It lists approved and rejected applications (10 at a time, up to 100) with the reason, an **Emailed / Email failed / Not emailed** badge, the failure reason, and a **Resend email** button for anything not sent. Before this, decided applications weren't shown anywhere in the web app.
 
-> **Subject:** Your membership application at {Gym} · {Branch}
->
-> Hi {Full name},
->
-> Thank you for applying for the **{Plan}** membership at **{Gym}, {Branch}** (reference **{REF}**).
->
-> Unfortunately we can't approve your application at this time.
->
-> **Reason from the gym:**
-> {rejection reason, quoted as written}
->
-> *[Only if paid online]* The {amount} you paid by card (ending {last4}) has been refunded.
-> *[Only if cash]* No payment was taken.
->
-> If you have questions or would like to apply again, contact the gym:
-> {branch phone} · {branch email}
->
-> {Gym}
+### Tests (`MembershipApplicationServiceTest`)
+- The rejection email escapes the name and reason, keeps line breaks, and has the refund line and branch contact.
+- Cash rejection says "No payment was taken".
+- The approval email has the member ID and the card payment.
+- No mailbox → `NOT_CONFIGURED`, the decision is saved and nothing is sent. A send that throws → `FAILED` with a reason, and the decision is saved.
+- Resend works for a decided application and is refused for a pending one.
 
-Rules:
-- **Best effort.** If SMTP isn't configured or the send fails, the rejection still succeeds. This matches every other email in the system.
-- **HTML-escape** the reason and the applicant's name (staff and applicants type free text). Keep the reason's line breaks.
-- **Reply-to = the branch email** (`branches.email`) when it's set, so a reply reaches the gym and not `no-reply@`. This needs a small overload: `EmailService.sendEmail(to, subject, html, replyTo, fromName)`.
-- **Sender name:** use `"{Gym name} via GymBios" <no-reply@gymbios.app>` so the inbox shows the gym. The gym name is the tenant name, the same one the public join page shows.
-- **Refund wording:** card payments are still simulated (fake Stripe test cards), so the line just mirrors what the app records (`payment_status = REFUNDED`). When real payments go live, this sentence must only appear after a real refund succeeds.
+## Not done / later
 
-**2. Record whether it went out.** Add a migration (next free number after V133) to `membership_applications`:
-
-```sql
-ALTER TABLE membership_applications
-  ADD COLUMN decision_email_status VARCHAR(20),   -- SENT | FAILED | NOT_CONFIGURED
-  ADD COLUMN decision_email_at     TIMESTAMP;
-```
-
-**3. Show it to staff.**
-- **Reject dialog:** add a line under the reason box: *"This reason will be emailed to {email} exactly as written."* Staff will then write it for the applicant, not as an internal note.
-- **If SMTP isn't configured:** the dialog warns *"Email isn't set up, so the applicant won't be notified. Contact them on {phone}."* (`ApplicationView` gets an `emailConfigured` flag.)
-- **Decided list:** each rejected application shows "Email sent" / "Email failed" / "Not emailed", with a **Resend email** action for failed or not-emailed ones. Resend uses a new endpoint `POST /api/membership-applications/{id}/resend-decision-email` that resends the stored reason.
-- **Success toast:** "…rejected, and the reason was emailed to the applicant" or "…rejected. Email isn't set up, so the applicant wasn't notified."
-
-**4. Tests.** Rejecting sends one email with the escaped reason. SMTP not configured → status `NOT_CONFIGURED` and the rejection still saved. A send that throws → `FAILED` and the rejection still saved. Paid vs cash wording.
-
-### Optional, same phase (cheap once the template exists)
-
-- **Approval email:** "You're in. Your member ID is {code}. Download the app and sign in with this email." Today an approved applicant isn't told either.
-- **"We received your application" email** on submit, with the reference and payment method. If they chose cash, it says to pay at the front desk.
-
-### Phase 2: per-gym email settings (larger, only if needed)
-
-Only needed if gyms want mail sent from their own domain or SMTP account. Phase 1 already handles the gym name and replies.
-
-- A GymOS settings page: sender name, reply-to, and optionally the gym's own SMTP (host/port/user/password, password stored encrypted), with a **Send test email** button.
-- `EmailService` picks the tenant's SMTP if it's set, otherwise the platform one.
-- Brings the deliverability issues of gyms' own domains (SPF/DKIM), so it's best left until a gym asks for it.
-
-## Decisions needed
-
-1. **Phase 1 as described** (platform SMTP, gym name in the sender, branch email as reply-to)? Or go straight to per-gym settings?
-2. **Include the approval and "received" emails** now, or only the rejection email?
-3. **Confirm SMTP is set on QA/prod.** If GymOS → Integrations shows Email as Disconnected, set the `SMTP_*` and `MESSAGE_EMAIL_FROM` env vars on the server. Otherwise nothing will be sent.
-
-## Files touched (phase 1)
-
-- Backend: `EmailService` (reply-to and sender-name overload), `MembershipApplicationService` (send after commit, status, resend), `MembershipApplication` entity and `MembershipApplicationDTOs` (status fields and `emailConfigured`), `MembershipApplicationController` (resend endpoint), new migration, tests.
-- Frontend: `components/approvals/ApplicationsPanel.tsx` (notice in the dialog, email status, resend), `utils/supabase/service-portfolio-service` (resend call, types).
+- **"We received your application" email** on submit. Not requested this round.
+- **A shared email layer.** Each email feature still writes its own "configured? send, catch, log", HTML and escaping. About 9 callers do this. Only receipts and now applications record what was sent. If more emails are added, it's worth extracting:
+  - a `GymEmailLayout` (one branded template with built-in escaping), based on `MembershipApplicationEmails.layout()` and `ReceiptEmailService.html()`;
+  - a `GymMailer` that never throws and returns SENT / FAILED / NOT_CONFIGURED;
+  - a generic `email_log` table keyed by `ref_type` + `ref_id`, instead of per-feature status columns.
+- **Each gym must fill in GymOS → Settings → Email** (or the server `SMTP_*` must be set). Until then every decision shows "Not emailed", and staff can resend once it's set up.

@@ -9,7 +9,7 @@ import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-
 import { ProtectedRoute } from "./components/shared/ProtectedRoute";
 import { NotificationBell } from "./components/shared/NotificationBell";
 import { GlobalSearch, type GlobalSearchPage } from "./components/global-search/GlobalSearch";
-import { authService, User } from "./utils/supabase/auth-service";
+import { authService, User, GYM_NAME_CHANGED_EVENT } from "./utils/supabase/auth-service";
 import { useBranch } from "./utils/branch-context";
 import {
   Sidebar,
@@ -546,6 +546,13 @@ const menuItems = [
         permission: "PRODUCTION_RECIPE_VIEW",
       },
       {
+        title: "Settings",
+        icon: Settings,
+        id: "sales-settings",
+        path: "/sales-settings",
+        permission: "SETTINGS_VIEW",
+      },
+      {
         title: "Reports",
         icon: BarChart3,
         id: "sales-reports",
@@ -558,13 +565,6 @@ const menuItems = [
         id: "sales-analytics",
         path: "/sales-analytics",
         permission: "SALES_ANALYTICS_VIEW",
-      },
-      {
-        title: "Settings",
-        icon: Settings,
-        id: "sales-settings",
-        path: "/sales-settings",
-        permission: "SETTINGS_VIEW",
       },
     ],
   },
@@ -625,20 +625,6 @@ const menuItems = [
         permission: "TAX_COMPLIANCE_VIEW",
       },
       {
-        title: "Reports",
-        icon: BarChart3,
-        id: "financial-reports",
-        path: "/financial-reports",
-        permission: "FINANCIAL_REPORTS_VIEW",
-      },
-      {
-        title: "Analytics",
-        icon: PieChart,
-        id: "financial-analytics",
-        path: "/financial-analytics",
-        permission: "FINANCIAL_ANALYTICS_VIEW",
-      },
-      {
         title: "Fiscal Periods",
         icon: CalendarClock,
         id: "fiscal-periods",
@@ -652,6 +638,20 @@ const menuItems = [
         id: "budgeting",
         path: "/budgeting",
         permission: "FINANCIALS_VIEW",
+      },
+      {
+        title: "Reports",
+        icon: BarChart3,
+        id: "financial-reports",
+        path: "/financial-reports",
+        permission: "FINANCIAL_REPORTS_VIEW",
+      },
+      {
+        title: "Analytics",
+        icon: PieChart,
+        id: "financial-analytics",
+        path: "/financial-analytics",
+        permission: "FINANCIAL_ANALYTICS_VIEW",
       },
       // Financial Settings is hidden from the menu (2026-10-23); the /financial-settings route still works.
     ],
@@ -713,6 +713,14 @@ const menuItems = [
         permission: "SALARY_ADVANCES_VIEW",
       },
       {
+        // Coming soon: preview on sample data.
+        title: "Recruitment",
+        icon: Briefcase,
+        id: "recruitment",
+        path: "/recruitment",
+        permission: "PAYROLL_VIEW",
+      },
+      {
         title: "Reports",
         icon: BarChart3,
         id: "payroll-reports",
@@ -725,14 +733,6 @@ const menuItems = [
         id: "payroll-analytics",
         path: "/payroll-analytics",
         permission: "PAYROLL_ANALYTICS_VIEW",
-      },
-      {
-        // Coming soon: preview on sample data.
-        title: "Recruitment",
-        icon: Briefcase,
-        id: "recruitment",
-        path: "/recruitment",
-        permission: "PAYROLL_VIEW",
       },
     ],
   },
@@ -1017,6 +1017,25 @@ export default function App() {
   const rolesRaw = sessionStorage.getItem('roles');
   const roles = rolesRaw ? (JSON.parse(rolesRaw) as string[]) : [];
   const isGymbiosAdmin = roles.some(r => r.toLowerCase().replace('role_', '') === 'gymbios_admin') || sessionStorage.getItem('gymbios_role_name')?.toLowerCase().replace('role_', '') === 'gymbios_admin';
+  // Browser tab: "GymBios - <gym name>" for a signed-in gym user, plain "GymBios" on the
+  // login screen and for the platform super admin. The name comes from the login response
+  // (auth-service stores it as gymbios_gym_name), so it survives refreshes; re-applied on
+  // every navigation in case anything else changed the title. Public pages (/join, walk-in,
+  // referral, lead form) render outside App and keep their own titles.
+  const readGymName = () => sessionStorage.getItem('gymbios_gym_name')?.trim() || '';
+  const [gymName, setGymName] = useState(readGymName);
+  useEffect(() => {
+    const sync = () => setGymName(readGymName());
+    sync(); // sign-in / sign-out changes sessionStorage without an event
+    // An older session fetches the name after load (see authService.initialize).
+    window.addEventListener(GYM_NAME_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(GYM_NAME_CHANGED_EVENT, sync);
+  }, [isAuthenticated]);
+  const shownGymName = isAuthenticated && !isGymbiosAdmin ? gymName : '';
+  const brandTitle = shownGymName ? `GymBios - ${shownGymName}` : 'GymBios';
+  useEffect(() => {
+    if (document.title !== brandTitle) document.title = brandTitle;
+  }, [brandTitle, location.pathname]);
   // ADMIN (a gym owner) can view "All Branches" — aggregated across their own
   // gym's branches only, never other gyms'. See branch-context.tsx's matching
   // canUseAllBranches() and BranchContextFilter.java on the backend.

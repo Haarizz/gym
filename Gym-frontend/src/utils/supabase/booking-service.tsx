@@ -54,6 +54,22 @@ export interface BookingRequest {
   // A member's PT booking uses their PT package automatically; skipPackage books it on its own.
   enrolmentId?: number;
   skipPackage?: boolean;
+  // Staff taking payment at the desk for a priced session (see DeskBookingPayment).
+  payment?: DeskBookingPaymentFields;
+}
+
+/** Desk payment for a staff booking. Legs use snake_case keys (the backend's Jackson strategy). */
+export interface DeskBookingPaymentFields {
+  payment_method_used: string;
+  payment_breakdown: Record<string, any>[];
+  expected_amount: number;
+}
+
+/** What a staff booking would cost: covered by a package (nothing to pay), or the price to take. */
+export interface DeskQuote {
+  price: number;
+  enrolmentId: number | null;
+  packageName: string | null;
 }
 
 class BookingService {
@@ -129,6 +145,7 @@ class BookingService {
       waitlist: payload.waitlist ?? null,
       enrolment_id: payload.enrolmentId ?? null,
       skip_package: payload.skipPackage ?? null,
+      ...(payload.payment ?? {}),
     };
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/bookings`,
@@ -178,6 +195,19 @@ class BookingService {
     if (!response.ok) throw new Error(await this.errorMessage(response, `Failed to fetch booking approvals: ${response.status}`));
     const data = await response.json();
     return (Array.isArray(data) ? data : []).map((raw: any) => this.normalizeBooking(raw));
+  }
+
+  async deskQuote(sessionId: number, memberId: number): Promise<DeskQuote> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/bookings/desk-quote?sessionId=${sessionId}&memberId=${memberId}`
+    );
+    if (!response.ok) throw new Error(await this.errorMessage(response, `Failed to price the booking: ${response.status}`));
+    const raw = await response.json();
+    return {
+      price: Number(raw.price ?? 0),
+      enrolmentId: raw.enrolment_id ?? raw.enrolmentId ?? null,
+      packageName: raw.package_name ?? raw.packageName ?? null,
+    };
   }
 
   /** Confirms the seat and posts the payment to the ledger. */

@@ -1,9 +1,11 @@
 package com.company.project.services;
 
+import com.company.project.community.global.identity.TenantDataSources;
 import com.company.project.dto.MemberRequestDTO;
 import com.company.project.dto.MemberResponseDTO;
 import com.company.project.dto.MembershipApplicationDTOs.ApplicationView;
 import com.company.project.dto.PaymentSplitDTO;
+import com.company.project.entities.Branch;
 import com.company.project.entities.Member;
 import com.company.project.entities.MembershipApplication;
 import com.company.project.entities.MembershipPlan;
@@ -15,6 +17,7 @@ import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.MembershipApplicationRepository;
 import com.company.project.repositories.MembershipPlanRepository;
 import com.company.project.security.BranchContextHolder;
+import com.company.project.security.TenantContextHolder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +34,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,6 +46,9 @@ class MembershipApplicationServiceTest {
     @Mock private BranchService branchService;
     @Mock private MemberService memberService;
     @Mock private MemberRepository memberRepository;
+    @Mock private EmailService emailService;
+    @Mock private TenantDataSources tenantDataSources;
+    @Mock private ServicePortfolioService portfolioService;
     @Mock private PlatformTransactionManager transactionManager;
 
     private MembershipApplicationService service;
@@ -49,13 +56,15 @@ class MembershipApplicationServiceTest {
     @BeforeEach
     void setUp() {
         service = new MembershipApplicationService(applicationRepository, planRepository, branchRepository,
-                branchService, memberService, memberRepository, transactionManager);
+                branchService, memberService, memberRepository, emailService, tenantDataSources, portfolioService,
+                transactionManager);
         BranchContextHolder.setActiveBranchId(1L);
     }
 
     @AfterEach
     void clear() {
         BranchContextHolder.clear();
+        TenantContextHolder.clear();
     }
 
     private MembershipApplication application(String method, String paymentStatus) {
@@ -81,7 +90,7 @@ class MembershipApplicationServiceTest {
             a.setPaidAt(LocalDateTime.now());
         }
         when(applicationRepository.findById(10L)).thenReturn(Optional.of(a));
-        when(applicationRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(a));
+        lenient().when(applicationRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(a));
         return a;
     }
 
@@ -280,5 +289,124 @@ class MembershipApplicationServiceTest {
 
         verify(branchService).resolveBranchForCreate(1L);
         assertNull(BranchContextHolder.getActiveBranchId());
+    }
+
+    // ── Decision email ──────────────────────────────────────────────────────────
+
+    private void mailReady() {
+        when(emailService.isConfigured()).thenReturn(true);
+        TenantContextHolder.setCurrentTenant("fitzone");
+        when(tenantDataSources.gymName("fitzone")).thenReturn(Optional.of("Fitzone"));
+        when(portfolioService.currencyCode(1L)).thenReturn("AED");
+        Branch b = new Branch();
+        b.setId(1L);
+        b.setBranchName("Main Branch");
+        b.setPhone("+97140000000");
+        b.setEmail("main@fitzone.example");
+        when(branchRepository.findById(1L)).thenReturn(Optional.of(b));
+        when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    void rejectionEmailsTheEscapedReasonAndRefund() {
+        MembershipApplication a = application(MembershipApplication.METHOD_ONLINE, MembershipApplication.PAYMENT_PAID);
+        a.setFullName("Sara <b>Ahmed</b>");
+        mailReady();
+
+        ApplicationView view = service.reject(10L, "Gym is full this month.\n<script>x</script>", "admin");
+
+        ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> html = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendEmail(eq("sara@example.com"), subject.capture(), html.capture());
+        assertEquals("Your membership application at Fitzone · Main Branch", subject.getValue());
+        String body = html.getValue();
+        assertTrue(body.contains("Gym is full this month.<br>&lt;script&gt;x&lt;/script&gt;"), body);
+        assertTrue(body.contains("Sara &lt;b&gt;Ahmed&lt;/b&gt;"), body);
+        assertFalse(body.contains("<script>"), body);
+        assertTrue(body.contains("AED 300.00 you paid (card ending 4242) has been refunded"), body);
+        assertTrue(body.contains("main@fitzone.example"), body);
+        assertEquals(MembershipApplication.EMAIL_SENT, view.decisionEmailStatus());
+        assertTrue(view.emailConfigured());
+        assertEquals(MembershipApplication.EMAIL_SENT, a.getDecisionEmailStatus());
+    }
+
+    @Test
+    void rejectingCashApplicationSaysNoPaymentWasTaken() {
+        application(MembershipApplication.METHOD_CASH, MembershipApplication.PAYMENT_PENDING);
+        mailReady();
+
+        service.reject(10L, "Incomplete details", "admin");
+
+        ArgumentCaptor<String> html = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendEmail(any(), any(), html.capture());
+        assertTrue(html.getValue().contains("No payment was taken."), html.getValue());
+        assertFalse(html.getValue().contains("refunded"), html.getValue());
+    }
+
+    @Test
+    void approvalEmailsTheMemberId() {
+        MembershipApplication a = application(MembershipApplication.METHOD_ONLINE, MembershipApplication.PAYMENT_PAID);
+        activePlanAndMember();
+        mailReady();
+
+        service.approve(10L, false, "admin");
+
+        ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> html = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendEmail(eq("sara@example.com"), subject.capture(), html.capture());
+        assertEquals("Welcome to Fitzone · Main Branch: your membership is approved", subject.getValue());
+        assertTrue(html.getValue().contains("MBR-0000000077"), html.getValue());
+        assertTrue(html.getValue().contains("AED 300.00, paid by card (card ending 4242)"), html.getValue());
+        assertEquals(MembershipApplication.EMAIL_SENT, a.getDecisionEmailStatus());
+    }
+
+    @Test
+    void noMailboxStillRejectsAndRecordsNotConfigured() {
+        MembershipApplication a = application(MembershipApplication.METHOD_ONLINE, MembershipApplication.PAYMENT_PAID);
+        when(applicationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ApplicationView view = service.reject(10L, "Duplicate", "admin");
+
+        verify(emailService, never()).sendEmail(any(), any(), any());
+        assertEquals(MembershipApplication.APPROVAL_REJECTED, view.approvalStatus());
+        assertEquals(MembershipApplication.EMAIL_NOT_CONFIGURED, view.decisionEmailStatus());
+        assertFalse(view.emailConfigured());
+        assertEquals(MembershipApplication.EMAIL_NOT_CONFIGURED, a.getDecisionEmailStatus());
+    }
+
+    @Test
+    void failedSendStillRejectsAndRecordsTheReason() {
+        MembershipApplication a = application(MembershipApplication.METHOD_ONLINE, MembershipApplication.PAYMENT_PAID);
+        mailReady();
+        doThrow(new RuntimeException("Failed to send email", new java.net.ConnectException("refused")))
+                .when(emailService).sendEmail(any(), any(), any());
+
+        ApplicationView view = service.reject(10L, "Duplicate", "admin");
+
+        assertEquals(MembershipApplication.APPROVAL_REJECTED, a.getApprovalStatus());
+        assertEquals(MembershipApplication.EMAIL_FAILED, view.decisionEmailStatus());
+        assertNotNull(view.decisionEmailError());
+    }
+
+    @Test
+    void resendEmailsADecidedApplicationAgain() {
+        MembershipApplication a = application(MembershipApplication.METHOD_CASH, MembershipApplication.PAYMENT_VOID);
+        a.setApprovalStatus(MembershipApplication.APPROVAL_REJECTED);
+        a.setRejectionReason("Duplicate");
+        a.setDecisionEmailStatus(MembershipApplication.EMAIL_NOT_CONFIGURED);
+        mailReady();
+
+        ApplicationView view = service.resendDecisionEmail(10L);
+
+        verify(emailService).sendEmail(eq("sara@example.com"), any(), any());
+        assertEquals(MembershipApplication.EMAIL_SENT, view.decisionEmailStatus());
+    }
+
+    @Test
+    void pendingApplicationCannotBeResent() {
+        application(MembershipApplication.METHOD_CASH, MembershipApplication.PAYMENT_PENDING);
+
+        assertThrows(BusinessRuleViolationException.class, () -> service.resendDecisionEmail(10L));
+        verify(emailService, never()).sendEmail(any(), any(), any());
     }
 }
