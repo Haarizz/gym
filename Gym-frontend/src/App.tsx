@@ -1039,7 +1039,7 @@ export default function App() {
     ).map((item: any) => (
       // The gym owner gets everyone's targets there (Staff Targets board); other roles their own.
       isGymOwner && item.id === "my-profile" && item.subItems
-        ? { ...item, subItems: item.subItems.map((sub: any) => sub.id === "my-targets" ? { ...sub, title: "Staff Targets" } : sub) }
+        ? { ...item, subItems: item.subItems.map((sub: any) => sub.id === "my-targets" ? { ...sub, title: "Staff Targets" } : sub.id === "my-performance" ? { ...sub, title: "Staff Performance" } : sub) }
         : item
     )),
     [permissions, isGymbiosAdmin, isGymOwner], // eslint-disable-line react-hooks/exhaustive-deps

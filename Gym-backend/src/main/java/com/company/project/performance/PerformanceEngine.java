@@ -190,6 +190,55 @@ public class PerformanceEngine {
         return total == 0 ? 0 : (int) Math.round(done * 100.0 / total);
     }
 
+    /**
+     * Staff Performance extras for many people in three queries, same rules as leadCount /
+     * followUpCompletion / My Performance's rating: {leadsAssigned, leadsConverted,
+     * followUpsTotal, followUpsCompleted, ratingCount} and the average rating (0 = none).
+     */
+    public record PersonStats(long leadsAssigned, long leadsConverted, long followUpsTotal, long followUpsCompleted,
+                              double rating, long ratingCount) {}
+
+    public Map<Long, PersonStats> personStats(Collection<Long> staffIds) {
+        Map<Long, long[]> n = new HashMap<>();
+        Map<Long, double[]> rating = new HashMap<>();
+        if (staffIds.isEmpty()) return Map.of();
+        for (Object r : em.createNativeQuery(
+                        "SELECT assigned_staff_id, COUNT(*), SUM(CASE WHEN LOWER(status) = 'converted' THEN 1 ELSE 0 END) " +
+                        "FROM leads WHERE assigned_staff_id IN (:ids) GROUP BY assigned_staff_id")
+                .setParameter("ids", staffIds).getResultList()) {
+            Object[] row = (Object[]) r;
+            long[] v = n.computeIfAbsent(((Number) row[0]).longValue(), k -> new long[4]);
+            v[0] = ((Number) row[1]).longValue();
+            v[1] = row[2] != null ? ((Number) row[2]).longValue() : 0;
+        }
+        for (Object r : em.createNativeQuery(
+                        "SELECT assigned_staff_id, COUNT(*), SUM(CASE WHEN LOWER(status) = 'completed' THEN 1 ELSE 0 END) " +
+                        "FROM follow_ups WHERE assigned_staff_id IN (:ids) GROUP BY assigned_staff_id")
+                .setParameter("ids", staffIds).getResultList()) {
+            Object[] row = (Object[]) r;
+            long[] v = n.computeIfAbsent(((Number) row[0]).longValue(), k -> new long[4]);
+            v[2] = ((Number) row[1]).longValue();
+            v[3] = row[2] != null ? ((Number) row[2]).longValue() : 0;
+        }
+        // Members' ratings of the sessions the person trained (trainer rating, else overall satisfaction).
+        // Same JPQL as WorkoutFeedbackRepository.averageRatingByTrainerIds.
+        for (Object r : em.createQuery(
+                        "SELECT s.trainer.id, AVG(COALESCE(f.trainerRating, f.overallSatisfaction)), COUNT(f) " +
+                        "FROM WorkoutFeedback f JOIN f.attendance a JOIN a.booking b JOIN b.session s " +
+                        "WHERE s.trainer.id IN :ids AND COALESCE(f.trainerRating, f.overallSatisfaction) > 0 GROUP BY s.trainer.id")
+                .setParameter("ids", staffIds).getResultList()) {
+            Object[] row = (Object[]) r;
+            rating.put(((Number) row[0]).longValue(), new double[] { ((Number) row[1]).doubleValue(), ((Number) row[2]).doubleValue() });
+        }
+        Map<Long, PersonStats> out = new HashMap<>();
+        for (Long id : staffIds) {
+            long[] v = n.getOrDefault(id, new long[4]);
+            double[] rt = rating.getOrDefault(id, new double[2]);
+            out.put(id, new PersonStats(v[0], v[1], v[2], v[3], Math.round(rt[0] * 10) / 10.0, (long) rt[1]));
+        }
+        return out;
+    }
+
     /** Each person's plan for the month (absent = no incentive plan), in one plan query. */
     public Map<Long, IncentivePlan> plansFor(Collection<Long> staffIds, YearMonth period) {
         Map<Long, IncentivePlan> out = new HashMap<>();

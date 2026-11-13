@@ -131,6 +131,33 @@ public class PerformanceController {
         return out;
     }
 
+    /**
+     * Staff Performance (owner's view of /my-performance): per person, what the monthly overview
+     * doesn't carry — leads assigned / converted (all time), follow-ups assigned / completed and
+     * members' average rating of the sessions they trained. Same people as /overview.
+     */
+    @GetMapping("/staff-extras")
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> staffExtras() {
+        List<Staff> staff = attendance.workforce();
+        Map<Long, PerformanceEngine.PersonStats> stats = engine.personStats(staff.stream().map(Staff::getId).toList());
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Staff s : staff) {
+            PerformanceEngine.PersonStats p = stats.get(s.getId());
+            if (p == null) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("staff_id", s.getId());
+            row.put("leads_assigned", p.leadsAssigned());
+            row.put("leads_converted", p.leadsConverted());
+            row.put("follow_ups_total", p.followUpsTotal());
+            row.put("follow_ups_completed", p.followUpsCompleted());
+            row.put("rating", p.rating());
+            row.put("rating_count", p.ratingCount());
+            out.add(row);
+        }
+        return out;
+    }
+
     @GetMapping("/branch")
     public Map<String, Object> branch(@RequestParam String period) {
         return PerformanceViews.branch(engine.evaluateBranch(BranchContextHolder.getActiveBranchId(), YearMonth.parse(period)));
