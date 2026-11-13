@@ -1028,11 +1028,12 @@ public final class LegacyGymTransformer {
         for (CreditNote c : creditNotes) {
             cnRows.add(new Object[] { c.id, c.voucherNo, c.date != null ? c.date : today, c.member.id, c.member.name,
                     c.bill != null ? c.bill.id : null, c.reason, c.amount, ZERO, c.amount, c.method, "DRAFT", branch,
-                    c.at != null ? c.at : now, MARK });
+                    c.at != null ? c.at : now, MARK, false });
         }
+        // cancelled_plan written explicitly: on a new gym it is NOT NULL with no default (see V139)
         out.add(new TableRows("credit_notes", List.of("id", "voucher_no", "date", "member_db_id", "member_name",
                 "linked_receipt_id", "reason", "subtotal", "tax_amount", "total_amount", "refund_method", "status",
-                "branch_id", "created_at", "created_by"), cnRows));
+                "branch_id", "created_at", "created_by", "cancelled_plan"), cnRows));
 
         List<Object[]> addonRows = new ArrayList<>();
         for (Addon a : addons) {

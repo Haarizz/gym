@@ -111,7 +111,9 @@ public class CreditNote extends BaseEntity implements BranchAware {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
-    @Column(name = "cancelled_plan", nullable = false)
+    // Default in the DDL too: a new gym gets this table from Hibernate before V136 runs,
+    // and inserts that leave the column out (Import Gym) must still work. See V139.
+    @Column(name = "cancelled_plan", nullable = false, columnDefinition = "boolean not null default false")
     private boolean cancelledPlan = false;
 
     @Column(name = "due_cleared", precision = 12, scale = 2)
