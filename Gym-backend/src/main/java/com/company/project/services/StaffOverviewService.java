@@ -5,6 +5,8 @@ import com.company.project.dto.StaffSummaryDTO;
 import com.company.project.entities.Staff;
 import com.company.project.entities.StaffAttendance;
 import com.company.project.entities.StaffScheduleSlot;
+import com.company.project.performance.api.PerformanceViews;
+import com.company.project.performance.metric.Metric;
 import com.company.project.repositories.StaffAttendanceRepository;
 import com.company.project.repositories.StaffBranchRepository;
 import com.company.project.repositories.StaffRepository;
@@ -74,18 +76,33 @@ public class StaffOverviewService {
     }
 
     public List<StaffPerformanceMetricsDTO> getPerformance(Collection<Long> staffIds) {
+        return getPerformance(staffIds, null);
+    }
+
+    /**
+     * Performance snapshot for {@code period} (null or a future month = the current month).
+     * For a past month, attendance covers the whole month and pace is judged on a full month.
+     */
+    public List<StaffPerformanceMetricsDTO> getPerformance(Collection<Long> staffIds, java.time.YearMonth period) {
         if (staffIds == null || staffIds.isEmpty()) return List.of();
         List<Staff> staffList = staffRepository.findAllById(staffIds);
         if (staffList.isEmpty()) return List.of();
         Set<Long> ids = staffList.stream().map(Staff::getId).collect(Collectors.toSet());
 
-        LocalDate today = LocalDate.now();
-        LocalDate monthStart = today.withDayOfMonth(1);
+        LocalDate realToday = LocalDate.now();
+        java.time.YearMonth currentMonth = java.time.YearMonth.from(realToday);
+        java.time.YearMonth month = period == null || period.isAfter(currentMonth) ? currentMonth : period;
+        boolean isCurrent = month.equals(currentMonth);
+        LocalDate monthStart = month.atDay(1);
+        LocalDate monthEnd = month.atEndOfMonth();
+        // "As of" day: today for the current month, or the day after a past month ends (so every
+        // day of that month counts as expected and nothing counts as "today").
+        LocalDate today = isCurrent ? realToday : monthEnd.plusDays(1);
         LocalDateTime startOfMonth = monthStart.atStartOfDay();
         LocalDateTime startOfNextMonth = startOfMonth.plusMonths(1);
 
         Map<Long, Integer> ptSessions = new HashMap<>();
-        for (Object[] row : trainingSessionRepository.countPtSessionsByTrainerBetween(ids, monthStart, today.withDayOfMonth(today.lengthOfMonth()))) {
+        for (Object[] row : trainingSessionRepository.countPtSessionsByTrainerBetween(ids, monthStart, monthEnd)) {
             ptSessions.put((Long) row[0], ((Number) row[1]).intValue());
         }
 
@@ -103,9 +120,8 @@ public class StaffOverviewService {
         }
 
         // Fraction of the month elapsed, used to judge whether revenue is pacing to target.
-        double monthElapsed = (double) today.getDayOfMonth() / today.lengthOfMonth();
+        double monthElapsed = isCurrent ? (double) today.getDayOfMonth() / today.lengthOfMonth() : 1.0;
 
-        java.time.YearMonth month = java.time.YearMonth.from(today);
         Map<Long, com.company.project.performance.PeriodResult> results = performanceEngine.evaluate(ids, month);
         Map<Long, Integer> conversionRates = performanceEngine.leadConversionRates(ids);
 
@@ -113,8 +129,22 @@ public class StaffOverviewService {
         for (Staff s : staffList) {
             StaffPerformanceMetricsDTO dto = new StaffPerformanceMetricsDTO();
             dto.setStaffId(String.valueOf(s.getId()));
+            dto.setPeriod(month.toString());
 
             com.company.project.performance.PeriodResult r = results.get(s.getId());
+            if (r != null) {
+                dto.setAdmissions(r.count(Metric.MEMBER_ADMISSION));
+                dto.setAdmissionsAmount(r.amount(Metric.MEMBER_ADMISSION));
+                dto.setLeadConversions(r.count(Metric.LEAD_CONVERSION));
+                dto.setPosSales(r.count(Metric.POS_SALE));
+                dto.setPosSalesAmount(r.amount(Metric.POS_SALE));
+                dto.setPtSales(r.count(Metric.PT_SALE));
+                dto.setPtSalesAmount(r.amount(Metric.PT_SALE));
+                dto.setPtSessionsDelivered(r.count(Metric.PT_SESSION_DELIVERED));
+                dto.setClassesTaught(r.count(Metric.CLASS_TAUGHT));
+                dto.setClassAttendees(r.count(Metric.CLASS_ATTENDEE));
+                dto.setGoals(PerformanceViews.goals(r.goals(), r.achieved()));
+            }
             BigDecimal achieved = r != null ? r.revenue() : BigDecimal.ZERO;
             dto.setCommissionEarned(r != null ? r.commission() : BigDecimal.ZERO);
             BigDecimal target = r != null ? r.goal(com.company.project.performance.metric.Metric.REVENUE_TOTAL,

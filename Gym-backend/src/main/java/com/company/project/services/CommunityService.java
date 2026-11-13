@@ -648,6 +648,7 @@ public class CommunityService {
         switch (MemberAccessState.of(member)) {
             case ACTIVE -> { }
             case SUSPENDED -> throw new CommunityMembershipRequiredException(MEMBERSHIP_SUSPENDED);
+            case CANCELLED -> throw new CommunityMembershipRequiredException(POST_REQUIRES_MEMBERSHIP);
             default -> throw new CommunityMembershipRequiredException(AWAITING_APPROVAL);
         }
         if (!GlobalMembershipService.isActive(member)) {

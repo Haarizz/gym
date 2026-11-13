@@ -186,6 +186,8 @@ const centers = {
       manage: "Verwalten",
       manageA11y: "Dein Abo bei {{name}} verwalten",
       manageMine: "Mein Abo verwalten",
+      cancelledTitle: "Deine Mitgliedschaft hier wurde gekündigt",
+      cancelledBody: "Deine Mitgliedschaft bei {{gym}} wurde gekündigt. Um wieder Mitglied zu werden, wende dich an die Rezeption — sie reaktiviert sie auf deinem bestehenden Konto, mit deinem Verlauf.",
       alreadyTitle: "Du hast hier bereits ein Abo",
       alreadyBody: "Du hast bereits ein Abo bei {{gym}}. Um es zu verlängern oder den Tarif zu wechseln, öffne es unter Abos.",
       otherBranchTitle: "Du hast ein Abo in einer anderen Filiale",

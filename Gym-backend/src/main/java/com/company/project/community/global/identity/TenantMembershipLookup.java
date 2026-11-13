@@ -52,13 +52,14 @@ public class TenantMembershipLookup {
     private Lookup find(TenantDb db, String column, long id) {
         JdbcTemplate jdbc = new JdbcTemplate(db.dataSource());
         List<Membership> rows = jdbc.query(
-                "SELECT m.id, m.branch_id, b.branch_name, m.membership_suspended, m.approval_status, m.name, m.photo_url "
+                "SELECT m.id, m.branch_id, b.branch_name, m.membership_suspended, m.approval_status, m.name, m.photo_url, "
+                        + "m.membership_status "
                         + "FROM members m LEFT JOIN branches b ON b.id = m.branch_id WHERE m." + column + " = ?",
                 (rs, i) -> new Membership(
                         rs.getLong(1),
                         (Long) rs.getObject(2),
                         rs.getString(3),
-                        MemberAccessState.of(rs.getBoolean(4), rs.getString(5)),
+                        MemberAccessState.of(rs.getBoolean(4), rs.getString(5), rs.getString(8)),
                         rs.getString(6),
                         rs.getString(7)),
                 id);

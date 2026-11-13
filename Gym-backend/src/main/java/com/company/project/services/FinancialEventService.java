@@ -1255,6 +1255,22 @@ public class FinancialEventService {
     }
 
     /**
+     * MEMBERS — a membership cancelled without a refund: the unearned part of the fee is
+     * kept, so it is recognised now instead of month by month.
+     * DR  Deferred Revenue / CR Membership Revenue
+     */
+    public void onCancellationRevenueKept(Long receiptId, String memberName, BigDecimal amount) {
+        if (receiptId == null || amount == null || amount.signum() <= 0) return;
+        if (alreadyJournaled("MembershipCancellation", receiptId)) return;
+        String who = memberName == null ? "" : " — " + memberName;
+        List<JvLine> lines = new ArrayList<>();
+        lines.add(dr(ACC_DEFERRED_REVENUE, "Deferred Revenue", amount, "Membership cancelled — fee kept" + who));
+        lines.add(cr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", amount, "Cancelled membership — revenue recognised now"));
+        JournalVoucher jv = createAndPost("Membership Cancelled" + who, LocalDate.now(), lines, "DEFERRED_REVENUE");
+        registerSource("MembershipCancellation", receiptId, "DEFERRED_REVENUE", jv.getId());
+    }
+
+    /**
      * BOOKINGS — a cancelled class booking's payment refunded to the member's wallet.
      * Reverses the revenue onMemberPaymentReceived booked for it; the money stays
      * with the gym as wallet credit the member can spend later.

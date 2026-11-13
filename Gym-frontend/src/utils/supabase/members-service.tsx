@@ -82,6 +82,12 @@ export interface Member {
   access_state?: 'ACTIVE' | 'SUSPENDED' | 'PENDING_APPROVAL' | 'PAYMENT_REJECTED';
   membership_suspended?: boolean;
   suspended_reason?: string | null;
+  // Membership cancellation (MembershipCancellationService, V139)
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  cancellation_reason?: string | null;
+  cancellation_hold_at?: string | null;
+  cancellation_hold_refund?: boolean | null;
   suspended_by?: string | null;
   suspended_at?: string | null;
   // Which staff member actually handled this sale — credited toward their revenue

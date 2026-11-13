@@ -24,6 +24,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { SetTargets } from "./set-targets";
 import { TargetsOverview } from "./targets-overview";
@@ -258,6 +260,7 @@ function GymOSWorkspace({ onNavigate, showSettings, showBranches }: GymOSProps &
     allow_deactivation: 'true',
     allow_refund: 'true',
     refund_method: 'prorated',
+    cancellation_fee: '0',
     approval_required: 'true',
   });
 
@@ -2523,11 +2526,10 @@ function GymOSWorkspace({ onNavigate, showSettings, showBranches }: GymOSProps &
                     <div>
                       <CardTitle>Member Deactivation Policy</CardTitle>
                       <CardDescription>
-                        Control conditions for membership deactivation and refunds. Saved, but not applied to deactivations yet.
+                        Rules for Members › Cancel membership: whether it's allowed and the most that can be refunded.
                       </CardDescription>
                     </div>
                   </div>
-                  <ComingSoon />
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -2572,13 +2574,32 @@ function GymOSWorkspace({ onNavigate, showSettings, showBranches }: GymOSProps &
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="flat">Flat Amount</SelectItem>
                       <SelectItem value="prorated">Pro-Rated (Days Remaining)</SelectItem>
+                      <SelectItem value="flat">Flat Fee (unused bills less a fixed fee)</SelectItem>
                       <SelectItem value="none">No Refund</SelectItem>
                     </SelectContent>
                   </Select>
+                  {deactivationPolicyDraft.refund_method === 'flat' && (
+                    <div className="space-y-1">
+                      <Label htmlFor="cancellation-fee" className="text-sm">Cancellation fee</Label>
+                      <Input
+                        id="cancellation-fee"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={deactivationPolicyDraft.cancellation_fee ?? '0'}
+                        onChange={(e) => setDeactivationPolicyDraft(prev => ({ ...prev, cancellation_fee: e.target.value }))}
+                        className="bg-white max-w-[12rem]"
+                      />
+                    </div>
+                  )}
                   <p className="text-xs text-gray-500 mt-2">
-                    <strong>Pro-Rated:</strong> Refund = (Days Remaining / Total Days) × Amount Paid
+                    {deactivationPolicyDraft.refund_method === 'flat'
+                      ? <><strong>Flat Fee:</strong> Refund = what was paid for current and future periods − the cancellation fee</>
+                      : deactivationPolicyDraft.refund_method === 'none'
+                        ? <><strong>No Refund:</strong> memberships can only be cancelled without a refund</>
+                        : <><strong>Pro-Rated:</strong> Refund = (Days Remaining / Total Days) × Amount Paid</>}
+                    . Staff can refund 100%, 75%, 50% or 25% of this, never more.
                   </p>
                 </div>
 
@@ -2586,7 +2607,7 @@ function GymOSWorkspace({ onNavigate, showSettings, showBranches }: GymOSProps &
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div className="flex-1">
                     <h4 className="font-semibold text-gray-900">Approval Required</h4>
-                    <p className="text-sm text-gray-600">Require manager approval for deactivation</p>
+                    <p className="text-sm text-gray-600">Cancellations by staff other than Admins and Managers wait in Approvals › Cancellations</p>
                   </div>
                   <Switch
                     checked={deactivationPolicyDraft.approval_required === 'true'}

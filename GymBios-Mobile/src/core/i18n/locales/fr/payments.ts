@@ -28,6 +28,18 @@ const payments = {
     rejectedInfo: 'Veuillez contacter l’accueil de la salle pour régulariser le paiement, ou acheter à nouveau une formule.',
     browseGyms: 'Parcourir les salles',
 
+    cancelledTitle: "Abonnement résilié",
+
+    cancelledAtGym: "Ton abonnement à {{gym}} a été résilié par la salle.",
+
+    cancelledGeneric: "Ton abonnement a été résilié par la salle.",
+
+    cancelledInfo: "Ton compte GymBios t'appartient et reste actif : tu peux parcourir la Communauté et trouver des salles. Ton historique de paiements dans cette salle reste ci-dessous. Pour revenir, contacte la salle — elle réactivera ton abonnement sur ce même compte.",
+
+    cancelledHistory: "Tes paiements ici",
+
+    cancelledNoHistory: "Aucun paiement enregistré.",
+
     suspendedTitle: "Adhésion suspendue",
     suspendedAtGym: "Votre adhésion à {{gym}} a été suspendue par la salle.",
     suspendedGeneric: "Votre adhésion a été suspendue par la salle.",

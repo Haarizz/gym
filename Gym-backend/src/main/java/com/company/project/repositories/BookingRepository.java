@@ -145,4 +145,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     @Query("SELECT COUNT(b) FROM Booking b WHERE b.member.id = :memberId AND b.status <> 'cancelled'")
     long countActiveBookingsByMemberId(@Param("memberId") Long memberId);
+
+    java.util.Optional<Booking> findFirstByReceiptId(Long receiptId);
 }

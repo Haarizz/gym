@@ -186,6 +186,8 @@ const centers = {
       manage: "管理",
       manageA11y: "管理你在 {{name}} 的订阅",
       manageMine: "管理我的订阅",
+      cancelledTitle: "你在这里的会籍已取消",
+      cancelledBody: "你在 {{gym}} 的会籍已取消。如需重新加入，请联系前台——他们会在你现有的账户上恢复会籍，并保留你的记录。",
       alreadyTitle: "你已在此订阅",
       alreadyBody: "你已在 {{gym}} 有订阅。如需续订或更换方案，请在“订阅”中打开。",
       otherBranchTitle: "你在另一家分店有订阅",

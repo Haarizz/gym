@@ -1356,11 +1356,30 @@ public class MemberService {
         memberRepository.deleteById(id);
     }
 
+    /**
+     * Renewing a cancelled member is how they rejoin: the same record (history, app link,
+     * wallet) becomes active again. The cancellation itself stays in member_cancellations.
+     */
+    private boolean rejoinIfCancelled(Member m) {
+        if (m == null || !"cancelled".equalsIgnoreCase(m.getMembershipStatus())) return false;
+        m.setMembershipStatus("active");
+        m.setCancelledAt(null);
+        m.setCancelledBy(null);
+        m.setCancellationReason(null);
+        m.setCancellationNotes(null);
+        memberRepository.save(m);
+        if (memberNoteRepository != null) {
+            memberNoteRepository.save(new com.company.project.entities.MemberNote(m.getId(), "Rejoined after a cancelled membership."));
+        }
+        return true;
+    }
+
     public MemberResponseDTO renewMember(Long id, RenewalRequestDTO request) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
         MemberSuspension.requireUsable(member, "renewing or upgrading");
         requireApproved(member, "Renewal");
+        rejoinIfCancelled(member);
         if (member.isEffectivelyBilledToHead()) {
             throw new BusinessRuleViolationException("This member's charges are billed to their family head — "
                     + "use the family member renewal endpoint instead.");
@@ -1575,6 +1594,7 @@ public class MemberService {
         Member minor = memberRepository.findById(minorId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + minorId));
         MemberSuspension.requireUsable(minor, "renewing");
+        rejoinIfCancelled(minor);
         if (!minor.isEffectivelyBilledToHead()) {
             throw new BusinessRuleViolationException("This member is not billed to a family head — use the standard renew endpoint.");
         }
@@ -1663,6 +1683,10 @@ public class MemberService {
         MemberSuspension.requireUsable(head, "renewing the family");
         if (!Boolean.TRUE.equals(head.getIsFamilyHead())) {
             throw new BusinessRuleViolationException("This member is not a family head.");
+        }
+        if (rejoinIfCancelled(head) && head.getMemberId() != null) {
+            // The household was cancelled together, so it comes back together.
+            for (Member dep : memberRepository.findByFamilyHeadId(head.getMemberId())) rejoinIfCancelled(dep);
         }
 
         String planName = request.getPlanName() != null ? request.getPlanName() : head.getMembershipPlan();
@@ -2155,9 +2179,15 @@ public class MemberService {
             // A purchase awaiting reception approval isn't a member yet either —
             // it's only listed when the pending_approval filter is asked for.
             if (status == null || status.isBlank()) {
+                // Cancelled members are archived: left out of the plain directory (and its
+                // counts), but a name / ID / phone search still finds them — so they can be
+                // renewed (rejoined) or refunded.
+                boolean searching = search != null && !search.isBlank();
                 predicates.add(cb.or(
                         cb.isNull(root.get("membershipStatus")),
-                        cb.notEqual(cb.lower(root.get("membershipStatus")), "pending_approval")));
+                        searching
+                                ? cb.notEqual(cb.lower(root.get("membershipStatus")), "pending_approval")
+                                : cb.not(cb.lower(root.get("membershipStatus")).in("pending_approval", "cancelled"))));
             }
 
             if (search != null && !search.isBlank()) {
@@ -2184,6 +2214,7 @@ public class MemberService {
                         cb.notEqual(cb.lower(root.get("membershipStatus")), "pending_approval"),
                         cb.notEqual(cb.lower(root.get("membershipStatus")), "frozen"),
                         cb.notEqual(cb.lower(root.get("membershipStatus")), "suspended"),
+                        cb.notEqual(cb.lower(root.get("membershipStatus")), "cancelled"),
                         cb.isNotNull(effectiveEndDate),
                         cb.lessThan(effectiveEndDate, startOfToday)
                 );
@@ -2191,7 +2222,9 @@ public class MemberService {
                 // was, and that flag wins over every other status (MemberEffectiveStatus). So
                 // "suspended" matches the flag, and every other status leaves flagged members out.
                 Predicate suspendedFlag = cb.isTrue(root.get("membershipSuspended"));
-                if ("suspended".equalsIgnoreCase(status)) {
+                if ("cancelled".equalsIgnoreCase(status)) {
+                    predicates.add(cb.equal(cb.lower(root.get("membershipStatus")), "cancelled"));
+                } else if ("suspended".equalsIgnoreCase(status)) {
                     predicates.add(cb.or(suspendedFlag, cb.equal(cb.lower(root.get("membershipStatus")), "suspended")));
                 } else if ("expired".equalsIgnoreCase(status)) {
                     predicates.add(cb.not(suspendedFlag));

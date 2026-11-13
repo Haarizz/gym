@@ -388,6 +388,29 @@ public class BookingService {
         return toResponse(booking);
     }
 
+    /**
+     * The member's membership is being cancelled: every booking that hasn't started yet is
+     * cancelled (seats freed, waitlists moved up). Money is settled by the cancellation.
+     * Returns how many were cancelled.
+     */
+    @Transactional
+    public int cancelUpcomingForMembershipCancellation(Long memberId) {
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        List<Booking> upcoming = bookingRepository.findUpcomingBookings(memberId, now.toLocalDate(), now.toLocalTime());
+        int count = 0;
+        for (Booking booking : upcoming) {
+            if ("cancelled".equalsIgnoreCase(booking.getStatus())) continue;
+            boolean heldSeat = !NO_SEAT_STATUSES.contains(String.valueOf(booking.getStatus()).toLowerCase());
+            bookingPaymentService.settleMembershipCancellation(booking);
+            booking.setStatus("cancelled");
+            booking.setCheckedInAt(null);
+            bookingRepository.save(booking);
+            if (heldSeat) promoteFromWaitlist(booking.getSession());
+            count++;
+        }
+        return count;
+    }
+
     @Transactional
     public void deleteBooking(Long id) {
         TrainingSession[] freedSeat = { null };

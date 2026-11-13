@@ -105,6 +105,34 @@
 
 	<build>
 		<plugins>
+			<!--
+				Wipe the compiled migrations before resources are copied, on every build
+				(compile, spring-boot:run, package). Without this, a migration renamed or
+				renumbered in src (e.g. by a merge from main) leaves its old copy in
+				target/classes, Flyway sees two files for one version, and every tenant's
+				startup migration catch-up fails, so no new migration ever applies.
+			-->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-clean-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>clean-stale-migrations</id>
+						<phase>initialize</phase>
+						<goals>
+							<goal>clean</goal>
+						</goals>
+						<configuration>
+							<excludeDefaultDirectories>true</excludeDefaultDirectories>
+							<filesets>
+								<fileset>
+									<directory>${project.build.outputDirectory}/db/migration</directory>
+								</fileset>
+							</filesets>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>

@@ -185,6 +185,8 @@ const centers = {
       manage: "Gérer",
       manageA11y: "Gérer votre abonnement chez {{name}}",
       manageMine: "Gérer mon abonnement",
+      cancelledTitle: "Ton abonnement ici a été résilié",
+      cancelledBody: "Ton abonnement à {{gym}} a été résilié. Pour revenir, contacte l'accueil — il sera réactivé sur ton compte actuel, avec ton historique.",
       alreadyTitle: "Vous êtes déjà abonné ici",
       alreadyBody: "Vous avez déjà un abonnement chez {{gym}}. Pour le renouveler ou changer de formule, ouvrez-le dans Abonnements.",
       otherBranchTitle: "Vous êtes abonné dans une autre agence",

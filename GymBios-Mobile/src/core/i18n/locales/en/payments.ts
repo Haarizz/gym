@@ -26,6 +26,18 @@ const payments = {
     rejectedInfo: "Please contact the gym's reception to sort out the payment, or purchase a plan again.",
     browseGyms: 'Browse Gyms',
 
+    cancelledTitle: "Membership Cancelled",
+
+    cancelledAtGym: "Your membership at {{gym}} has been cancelled by the gym.",
+
+    cancelledGeneric: "Your membership has been cancelled by the gym.",
+
+    cancelledInfo: "Your GymBios account is yours and keeps working: you can browse the Community and find gyms. Your payment history at this gym stays below. To rejoin, contact the gym — they'll restart your membership on this same account.",
+
+    cancelledHistory: "Your payments here",
+
+    cancelledNoHistory: "No payments recorded.",
+
     suspendedTitle: "Membership Suspended",
     suspendedAtGym: "Your membership at {{gym}} has been suspended by the gym.",
     suspendedGeneric: "Your membership has been suspended by the gym.",

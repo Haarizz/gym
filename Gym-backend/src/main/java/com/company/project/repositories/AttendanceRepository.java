@@ -97,4 +97,10 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     @Query("SELECT a.checkInTime FROM Attendance a WHERE a.checkInTime >= :start AND a.checkInTime < :end")
     List<LocalDateTime> findCheckInTimesBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    long countByMember_Id(Long memberId);
+
+    long countByMember_IdAndCheckInTimeGreaterThanEqual(Long memberId, java.time.LocalDateTime since);
+
+    Optional<Attendance> findFirstByMember_IdOrderByCheckInTimeDesc(Long memberId);
 }

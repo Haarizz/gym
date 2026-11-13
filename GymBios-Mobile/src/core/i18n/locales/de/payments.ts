@@ -28,6 +28,18 @@ const payments = {
     rejectedInfo: 'Bitte kläre die Zahlung am Empfang deines Studios oder kaufe erneut einen Tarif.',
     browseGyms: 'Studios durchsuchen',
 
+    cancelledTitle: "Mitgliedschaft gekündigt",
+
+    cancelledAtGym: "Deine Mitgliedschaft bei {{gym}} wurde vom Studio gekündigt.",
+
+    cancelledGeneric: "Deine Mitgliedschaft wurde vom Studio gekündigt.",
+
+    cancelledInfo: "Dein GymBios-Konto gehört dir und funktioniert weiter: Du kannst die Community durchsuchen und Studios finden. Deine Zahlungen bei diesem Studio siehst du unten. Um wieder Mitglied zu werden, wende dich an das Studio — es reaktiviert deine Mitgliedschaft auf diesem Konto.",
+
+    cancelledHistory: "Deine Zahlungen hier",
+
+    cancelledNoHistory: "Keine Zahlungen erfasst.",
+
     suspendedTitle: "Mitgliedschaft ausgesetzt",
     suspendedAtGym: "Deine Mitgliedschaft bei {{gym}} wurde vom Studio ausgesetzt.",
     suspendedGeneric: "Deine Mitgliedschaft wurde vom Studio ausgesetzt.",

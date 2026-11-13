@@ -13,6 +13,8 @@ import { bookingService, type BookingApi } from '../utils/supabase/booking-servi
 import { addonsService, type MemberAddon } from '../utils/supabase/addons-service';
 import { servicePortfolioService, type MembershipApplication } from '../utils/supabase/service-portfolio-service';
 import { ApplicationsPanel } from '../components/approvals/ApplicationsPanel';
+import { CancellationRequestsPanel } from '../components/approvals/CancellationRequestsPanel';
+import { cancellationService, type CancelRequestRow } from '../utils/supabase/cancellation-service';
 import { useCurrency } from '../utils/currency';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
@@ -38,6 +40,7 @@ import {
   PackagePlus,
   RefreshCw,
   UserCheck,
+  UserX,
   Wallet,
   XCircle,
 } from 'lucide-react';
@@ -50,7 +53,7 @@ const PAGE_SIZE = 20;
 const LATE_HOURS = 24;
 
 type ActionType = 'approve' | 'reject';
-type Tab = 'members' | 'bookings' | 'addons' | 'applications';
+type Tab = 'members' | 'bookings' | 'addons' | 'applications' | 'cancellations';
 
 type ActionTarget =
   | { kind: 'member'; type: ActionType; member: Member }
@@ -117,7 +120,20 @@ export function Approvals() {
 
   // ?tab=applications comes from the "New membership application" notification.
   const [searchParams] = useSearchParams();
-  const linkedTab = searchParams.get('tab') === 'applications' ? 'applications' : null;
+  const linkedParam = searchParams.get('tab');
+  const linkedTab = linkedParam === 'applications' || linkedParam === 'cancellations' ? linkedParam : null;
+
+  // Membership cancellations waiting for an Admin / Manager (GymOS "Approval Required").
+  const [cancelRequests, setCancelRequests] = useState<CancelRequestRow[]>([]);
+  const [loadingCancels, setLoadingCancels] = useState(false);
+  const [canApproveCancels, setCanApproveCancels] = useState(false);
+  const loadCancels = useCallback(() => {
+    setLoadingCancels(true);
+    cancellationService.requests('PENDING').then(setCancelRequests).catch(() => setCancelRequests([]))
+      .finally(() => setLoadingCancels(false));
+    cancellationService.canApprove().then(setCanApproveCancels).catch(() => setCanApproveCancels(false));
+  }, []);
+  useEffect(() => { loadCancels(); }, [loadCancels]);
   const [tab, setTab] = useState<Tab>(linkedTab ?? 'members');
   const tabChosen = useRef(!!linkedTab);
 
@@ -197,7 +213,8 @@ export function Approvals() {
     else if (applications.length > 0) setTab('applications');
     else if (bookingApprovals.length > 0) setTab('bookings');
     else if (addonApprovals.length > 0) setTab('addons');
-  }, [anyLoading, totalItems, applications.length, bookingApprovals.length, addonApprovals.length]);
+    else if (cancelRequests.length > 0) setTab('cancellations');
+  }, [anyLoading, totalItems, applications.length, bookingApprovals.length, addonApprovals.length, cancelRequests.length]);
 
   const chooseTab = (t: Tab) => {
     tabChosen.current = true;
@@ -209,6 +226,7 @@ export function Approvals() {
     loadBookings();
     loadAddons();
     loadApplications();
+    loadCancels();
   };
 
   const onApplicationsChanged = () => {
@@ -337,7 +355,7 @@ export function Approvals() {
   })), [addonApprovals]);
 
   const all = [...memberRequests, ...bookingRequests, ...addonRequests];
-  const waiting = totalItems + bookingApprovals.length + addonApprovals.length + applications.length;
+  const waiting = totalItems + bookingApprovals.length + addonApprovals.length + applications.length + cancelRequests.length;
   const received = all.reduce((s, r) => s + r.received, 0);
   const owed = all.reduce((s, r) => s + Math.max(0, r.total - r.received), 0);
   const oldest = all.map(r => ageOf(r.since)).filter(Boolean).sort((a, b) => b!.hours - a!.hours)[0];
@@ -349,6 +367,7 @@ export function Approvals() {
     { id: 'applications', label: 'Applications', icon: FileText, count: applications.length },
     { id: 'bookings', label: 'Bookings', icon: CalendarCheck, count: bookingApprovals.length },
     { id: 'addons', label: 'Add-ons', icon: PackagePlus, count: addonApprovals.length },
+    { id: 'cancellations', label: 'Cancellations', icon: UserX, count: cancelRequests.length },
   ];
 
   const dialogName = !actionDialog ? ''
@@ -498,6 +517,11 @@ export function Approvals() {
         <Panel title="Add-on purchases" icon={PackagePlus} sub="The add-on starts from the day you approve it">
           {renderQueue(addonRequests, loadingAddons, 'No add-ons waiting', 'Add-ons bought in the app with Cash, Credit or Mixed payment will appear here.')}
         </Panel>
+      )}
+
+      {tab === 'cancellations' && (
+        <CancellationRequestsPanel rows={cancelRequests} loading={loadingCancels} canApprove={canApproveCancels}
+          onChanged={loadCancels} money={money} />
       )}
 
       {/* Approve / Reject confirmation dialog */}

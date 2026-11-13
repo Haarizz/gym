@@ -17,7 +17,8 @@ import {
   Cell,
   LineChart,
   Line,
-  Legend
+  Legend,
+  Text
 } from 'recharts';
 import {
   TrendingUp,
@@ -73,6 +74,27 @@ const formatAmount = (v: unknown) =>
 
 function Money({ value }: { value: unknown }) {
   return <><CurrencyGlyph />{formatAmount(value)}</>;
+}
+
+/**
+ * Category-axis tick that wraps long names to the bar's width, so every label can be
+ * shown (interval={0}) without Recharts silently dropping ones that would overlap.
+ */
+function WrappedTick({ x, y, payload, width, visibleTicksCount }: any) {
+  const band = visibleTicksCount ? width / visibleTicksCount : 80;
+  return (
+    <Text
+      x={x}
+      y={y}
+      width={Math.max(40, band - 8)}
+      textAnchor="middle"
+      verticalAnchor="start"
+      fontSize={12}
+      fill="#666"
+    >
+      {payload?.value}
+    </Text>
+  );
 }
 
 const cardShell = "border-0 shadow-md hover:shadow-lg transition-shadow";
@@ -347,7 +369,7 @@ export function RevenueDashboard({ period }: RevenueDashboardProps) {
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartRows}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" />
+          <XAxis dataKey="name" interval={0} tick={<WrappedTick />} height={48} />
           <YAxis />
           <Tooltip content={<CustomTooltip />} />
           <Bar dataKey="amount" name="Amount" fill={color} radius={[4, 4, 0, 0]} />

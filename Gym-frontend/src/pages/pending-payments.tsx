@@ -187,7 +187,8 @@ export function PendingPayments() {
   }, [activeBranchId, refreshKey, monthRange]);
 
   // ── Pending payments tab ──────────────────────────────────────────────────
-  const [search, setSearch] = useState('');
+  // ?search= pre-fills the box (e.g. "Collect now" from Cancel membership).
+  const [search, setSearch] = useState(() => params.get('search') ?? '');
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const [filter, setFilter] = useState<DueFilter>('all');
   const [dueSort, setDueSort] = useState<'due_date' | 'amount'>('due_date');

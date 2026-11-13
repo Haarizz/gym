@@ -78,6 +78,7 @@ import { useBranch } from "../utils/branch-context";
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
 import { EmployeeForm } from "../components/workforce/EmployeeForm";
 import { StaffRatingsPanel } from "../components/staff/staff-ratings-panel";
+import { StaffPerformancePanel } from "../components/staff/staff-performance-panel";
 
 
 interface StaffsTrainersProps {
@@ -266,8 +267,8 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
           bVal = b.name;
           break;
         case 'target':
-          aVal = a.monthly_target;
-          bVal = b.monthly_target;
+          aVal = perfById[String(a.id)]?.achievement_percentage ?? 0;
+          bVal = perfById[String(b.id)]?.achievement_percentage ?? 0;
           break;
         case 'joinDate':
           aVal = new Date(a.join_date);
@@ -296,8 +297,6 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
         return filteredStaff.filter(s => s.role.toLowerCase().includes('trainer'));
       case 'sales-reception':
         return filteredStaff.filter(s => s.role.toLowerCase().includes('reception') || s.role.toLowerCase().includes('sales'));
-      case 'performance':
-        return [...filteredStaff].sort((a, b) => b.monthly_target - a.monthly_target);
       case 'certifications':
         return filteredStaff.filter(s => s.certifications.length > 0);
       default:
@@ -608,6 +607,8 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
         <div className="lg:col-span-3">
           {activeTab === 'ratings' ? (
             <StaffRatingsPanel staff={filteredStaff} isLoading={isLoading} />
+          ) : activeTab === 'performance' ? (
+            <StaffPerformancePanel staff={filteredStaff} isLoading={isLoading} />
           ) : (
           <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardContent className="p-0">

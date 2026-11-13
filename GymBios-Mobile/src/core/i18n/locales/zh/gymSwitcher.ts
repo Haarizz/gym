@@ -21,6 +21,7 @@ const gymSwitcher = {
       EXPIRED: "已过期",
       INACTIVE: "未生效",
       SUSPENDED: "已暂停",
+      CANCELLED: "已取消",
       PENDING_APPROVAL: "等待审批",
       PAYMENT_REJECTED: "付款被拒",
       UNAVAILABLE: "不可用",

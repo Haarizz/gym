@@ -56,6 +56,7 @@ import {
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { MemberAppAccountCard } from "../components/members/MemberAppAccountCard";
+import { CancelMembershipDialog } from "../components/members/CancelMembershipDialog";
 import { Calendar as CalendarComponent } from "../components/ui/calendar";
 import { format, differenceInCalendarDays, parseISO } from "date-fns";
 import {
@@ -239,7 +240,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
   // ── Dialogs ──────────────────────────────────────────────────────────────
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
-  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [isFreezeDialogOpen, setIsFreezeDialogOpen] = useState(false);
   // Suspension closes this gym's member features and check-in; the member's app
   // account is never blocked (they keep Community and gym browsing).
@@ -252,10 +253,6 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   });
   const [savingTransfer, setSavingTransfer] = useState(false);
 
-  const [deactivateForm, setDeactivateForm] = useState({
-    effectiveDate: new Date().toISOString().split('T')[0], reason: '', confirmDeactivation: false,
-  });
-  const [savingDeactivate, setSavingDeactivate] = useState(false);
 
   // ── Load everything for this member ─────────────────────────────────────
   const loadAll = useCallback(async () => {
@@ -548,26 +545,6 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     }
   };
 
-  const handleDeactivate = async () => {
-    if (!memberId || !deactivateForm.confirmDeactivation) return;
-    setSavingDeactivate(true);
-    try {
-      await membersService.updateMember(String(memberId), { membership_status: 'inactive' } as Partial<Member>);
-      if (deactivateForm.reason.trim()) {
-        await membersService.addNote(String(memberId),
-          `Deactivated on ${deactivateForm.effectiveDate}: ${deactivateForm.reason.trim()}`);
-      }
-      toast.success('Membership deactivated successfully');
-      setIsDeactivateModalOpen(false);
-      setDeactivateForm({ effectiveDate: new Date().toISOString().split('T')[0], reason: '', confirmDeactivation: false });
-      loadAll();
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to deactivate membership');
-    } finally {
-      setSavingDeactivate(false);
-    }
-  };
-
   const handleAddNote = async () => {
     if (!memberId || !newNote.trim()) return;
     setSavingNote(true);
@@ -665,6 +642,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   // A suspended member is blocked from everything (payments, renewals, add-ons, bookings,
   // freezes, check-in) until resumed — the backend refuses it too (MemberSuspension).
   const isSuspended = !!member.membership_suspended;
+  // Cancelled = archived (MembershipCancellationService); on hold = waiting for dues, suspended meanwhile.
+  const isCancelled = (member.membership_status || '').toLowerCase() === 'cancelled';
+  const isOnCancelHold = !!member.cancellation_hold_at;
   // A frozen membership is locked the same way until it's unfrozen (MemberSuspension.requireUsable);
   // only Unfreeze stays available.
   const pendingApprovalHint = isPendingApproval
@@ -675,14 +655,14 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   // deactivate) — nothing flips it to "expired" when the expiry date passes,
   // so derive that here from expiry_date rather than trusting the stored value.
   const isExpiredByDate = !isFrozen && daysRemaining !== null && daysRemaining < 0;
-  const displayStatus = isExpiredByDate ? 'expired' : member.membership_status;
+  const displayStatus = isCancelled ? 'cancelled' : isExpiredByDate ? 'expired' : member.membership_status;
 
-  const statusTone = isExpiredByDate ? 'red'
+  const statusTone = isCancelled ? 'red' : isExpiredByDate ? 'red'
     : isActive ? 'green'
       : isFrozen ? 'blue'
         : isPendingApproval ? 'amber'
           : 'gray';
-  const StatusIcon = isExpiredByDate ? XCircle
+  const StatusIcon = isCancelled ? UserX : isExpiredByDate ? XCircle
     : isActive ? CheckCircle
       : isFrozen ? Snowflake
         : isPendingApproval ? Clock
@@ -747,6 +727,24 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
           )}
         </div>
       </div>
+
+      {(isCancelled || isOnCancelHold) && (
+        <div className={`mb-4 flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${isCancelled
+          ? 'border-red-200 bg-red-50 text-red-900 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200'
+          : 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200'}`}>
+          {isCancelled ? <UserX className="h-4 w-4 mt-0.5 shrink-0" /> : <PauseCircle className="h-4 w-4 mt-0.5 shrink-0" />}
+          <div className="flex-1">
+            {isCancelled ? (
+              <><strong>Membership cancelled</strong>{member.cancelled_at ? ` on ${fmtDate(member.cancelled_at)}` : ''}{member.cancelled_by ? ` by ${member.cancelled_by}` : ''}.
+                {member.cancellation_reason ? ` Reason: ${member.cancellation_reason}.` : ''} Their history is kept; renewing signs them up again.</>
+            ) : (
+              <><strong>Cancellation on hold</strong> since {fmtDate(member.cancellation_hold_at)} — the membership is suspended until the dues are cleared.
+                {member.cancellation_hold_refund ? ' A refund is due when it finishes — open Finish cancellation once the dues are paid.' : ' It finishes by itself once nothing is owed.'}</>
+            )}
+          </div>
+          {isOnCancelHold && <Button size="sm" variant="outline" onClick={() => setIsCancelOpen(true)}>Open</Button>}
+        </div>
+      )}
 
       {/* Profile header: identity, contacts, membership actions and current term */}
       <section className={`${s.card} ${s.hero}`}>
@@ -823,7 +821,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               variant="outline"
               className="border-[#2B7A78] text-[#2B7A78] hover:bg-[#DFF5F4]"
               onClick={() => setIsFreezeDialogOpen(true)}
-              disabled={isPendingApproval || (isSuspended && !isFrozen)}
+              disabled={isPendingApproval || isCancelled || (isSuspended && !isFrozen)}
             >
               <Snowflake className="h-4 w-4 mr-2" />
               {isFrozen ? 'Unfreeze' : 'Freeze'}
@@ -833,21 +831,23 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               variant="outline"
               className="border-primary/20"
               onClick={() => setIsTransferModalOpen(true)}
-              disabled={isPendingApproval || isSuspended || isFrozen}
+              disabled={isPendingApproval || isSuspended || isFrozen || isCancelled}
             >
               <Share2 className="h-4 w-4 mr-2" />
               Transfer
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-red-300 text-red-600 hover:bg-red-50"
-              onClick={() => setIsDeactivateModalOpen(true)}
-              disabled={!isActive && !isFrozen}
-            >
-              <UserX className="h-4 w-4 mr-2" />
-              Deactivate
-            </Button>
+            {!isCancelled && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-red-300 text-red-600 hover:bg-red-50"
+                onClick={() => setIsCancelOpen(true)}
+                disabled={isPendingApproval}
+              >
+                <UserX className="h-4 w-4 mr-2" />
+                {isOnCancelHold ? 'Finish cancellation' : 'Cancel membership'}
+              </Button>
+            )}
             {member.membership_suspended ? (
               <Button
                 size="sm"
@@ -865,6 +865,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 variant="outline"
                 className="border-orange-300 text-orange-700 hover:bg-orange-50"
                 onClick={() => setIsSuspendModalOpen(true)}
+                disabled={isCancelled}
               >
                 <PauseCircle className="h-4 w-4 mr-2" />
                 Suspend
@@ -2168,7 +2169,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
         </DialogContent>
       </Dialog>
 
-      {/* Deactivate Membership Modal */}
+      {/* Suspend Membership Modal */}
       <Dialog open={isSuspendModalOpen} onOpenChange={setIsSuspendModalOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -2206,100 +2207,12 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isDeactivateModalOpen} onOpenChange={setIsDeactivateModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2 text-red-600">
-              <UserX className="h-5 w-5" />
-              <span>Deactivate Membership</span>
-            </DialogTitle>
-            <DialogDescription>Mark this member's plan as inactive</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="effectiveDate" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-500" />
-                <span>Effective Date</span>
-              </Label>
-              <Input
-                id="effectiveDate"
-                type="date"
-                value={deactivateForm.effectiveDate}
-                onChange={(e) => setDeactivateForm({ ...deactivateForm, effectiveDate: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="reason" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                <FileText className="h-4 w-4 text-gray-500" />
-                <span>Reason for Deactivation (optional, saved as a note)</span>
-              </Label>
-              <Textarea
-                id="reason"
-                placeholder="Enter reason for deactivation..."
-                rows={3}
-                value={deactivateForm.reason}
-                onChange={(e) => setDeactivateForm({ ...deactivateForm, reason: e.target.value })}
-              />
-            </div>
-
-            <Card className="overflow-hidden border-primary/20 bg-gradient-light">
-              <CardContent className="p-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Current Membership Summary</h4>
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <p className="text-gray-600">Plan</p>
-                    <p className="font-semibold">{member.membership_plan || member.membership_type || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600">Days Remaining</p>
-                    <p className="font-semibold text-orange-600">{daysRemaining !== null ? `${daysRemaining} days` : '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600">Total Paid</p>
-                    <p className="font-semibold text-green-600"><CurrencyGlyph /> {totalPaid.toLocaleString()}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="flex items-start space-x-3 p-4 bg-red-50 rounded-lg border border-red-200">
-              <input
-                type="checkbox"
-                id="confirmDeactivation"
-                checked={deactivateForm.confirmDeactivation}
-                onChange={(e) => setDeactivateForm({ ...deactivateForm, confirmDeactivation: e.target.checked })}
-                className="mt-1"
-              />
-              <Label htmlFor="confirmDeactivation" className="text-sm text-red-900 cursor-pointer flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 mt-0.5" />
-                <span>Confirm deactivation of this member's plan. This action will mark the membership as inactive.</span>
-              </Label>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsDeactivateModalOpen(false);
-                setDeactivateForm({ effectiveDate: new Date().toISOString().split('T')[0], reason: '', confirmDeactivation: false });
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="bg-red-600 hover:bg-red-700 text-white"
-              disabled={!deactivateForm.confirmDeactivation || savingDeactivate}
-              onClick={handleDeactivate}
-            >
-              {savingDeactivate ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserX className="h-4 w-4 mr-2" />}
-              Deactivate Membership
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CancelMembershipDialog
+        memberId={memberId ?? member.id}
+        open={isCancelOpen}
+        onClose={() => setIsCancelOpen(false)}
+        onChanged={loadAll}
+      />
 
       <MemberFreezeDialog
         open={isFreezeDialogOpen}

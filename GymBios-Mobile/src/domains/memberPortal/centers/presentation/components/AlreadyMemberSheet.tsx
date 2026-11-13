@@ -4,7 +4,8 @@ import type { GymMembership } from '@/domains/gymSwitcher/gymMembershipsApi';
 import { openMembershipAt } from '@/domains/gymSwitcher/openMembership';
 import { MembershipNoticeSheet } from './MembershipNoticeSheet';
 
-export type ExistingMembership = Pick<GymMembership, 'tenantSlug' | 'branchId' | 'gymName' | 'branchName'>;
+export type ExistingMembership = Pick<GymMembership, 'tenantSlug' | 'branchId' | 'gymName' | 'branchName'>
+  & Partial<Pick<GymMembership, 'status'>>;
 
 interface AlreadyMemberSheetProps {
   visible: boolean;
@@ -35,9 +36,13 @@ export function AlreadyMemberSheet({
   const [opening, setOpening] = useState(false);
   if (!membership) return null;
 
-  const otherBranch = membership.branchId != null && membership.branchId !== centerBranchId;
+  // A cancelled member rejoins at the desk on their old record — no second membership here.
+  const cancelled = membership.status === 'CANCELLED';
+  const otherBranch = !cancelled && membership.branchId != null && membership.branchId !== centerBranchId;
   const gym = membership.gymName;
-  let body = otherBranch
+  let body = cancelled
+    ? t('centers.membership.cancelledBody', { gym })
+    : otherBranch
     ? t('centers.membership.otherBranchBody', {
         gym,
         branch: membership.branchName || gym,
@@ -60,7 +65,8 @@ export function AlreadyMemberSheet({
     <MembershipNoticeSheet
       visible={visible}
       icon="user-check"
-      title={otherBranch ? t('centers.membership.otherBranchTitle') : t('centers.membership.alreadyTitle')}
+      title={cancelled ? t('centers.membership.cancelledTitle')
+        : otherBranch ? t('centers.membership.otherBranchTitle') : t('centers.membership.alreadyTitle')}
       body={body}
       primaryLabel={t('centers.membership.openSubscription')}
       onPrimary={open}

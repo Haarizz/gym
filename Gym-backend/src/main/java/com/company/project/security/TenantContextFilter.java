@@ -136,6 +136,16 @@ public class TenantContextFilter extends OncePerRequestFilter {
             uriStartsWith("/api/mobile/member/push-tokens")
     );
 
+    /**
+     * A cancelled member keeps their app account and may still read their own history at the
+     * gym (membership summary, payments, receipts) — nothing they could act on.
+     */
+    private static final RequestMatcher CANCELLED_READ_PATH = request ->
+            "GET".equalsIgnoreCase(request.getMethod())
+                    && (uriEquals("/api/mobile/member/membership").matches(request)
+                        || uriStartsWith("/api/mobile/member/membership/payments").matches(request)
+                        || uriStartsWith("/api/mobile/member/receipts").matches(request));
+
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private static final RequestMatcher LEGACY_EXEMPT_PATH = new OrRequestMatcher(
@@ -214,7 +224,8 @@ public class TenantContextFilter extends OncePerRequestFilter {
                                 // /api/members/me stays reachable so the app can show the state
                                 // and notice when it's lifted.
                                 MemberAccessState state = MemberAccessState.of(member);
-                                if (!state.allowsMemberFeatures() && !PENDING_APPROVAL_ALLOWED_PATH.matches(request)) {
+                                if (!state.allowsMemberFeatures() && !PENDING_APPROVAL_ALLOWED_PATH.matches(request)
+                                        && !(state == MemberAccessState.CANCELLED && CANCELLED_READ_PATH.matches(request))) {
                                     TenantContextHolder.clear();
                                     writeAccessRefusal(response, state);
                                     return;

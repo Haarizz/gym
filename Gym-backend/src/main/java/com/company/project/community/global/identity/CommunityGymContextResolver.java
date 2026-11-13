@@ -120,6 +120,8 @@ public class CommunityGymContextResolver {
             case ACTIVE -> { }
             case SUSPENDED -> throw CommunityException.forbidden("MEMBERSHIP_SUSPENDED",
                     "Your membership at this gym is suspended");
+            case CANCELLED -> throw CommunityException.forbidden("MEMBERSHIP_CANCELLED",
+                    "Your membership at this gym has been cancelled");
             default -> throw CommunityException.forbidden("APP_ACCESS_PENDING", "Your membership is awaiting approval");
         }
     }

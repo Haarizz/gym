@@ -92,6 +92,12 @@ public class MemberResponseDTO {
     private String accessState;
     private Boolean membershipSuspended;
     private String suspendedReason;
+    // Membership cancellation (V140)
+    private java.time.LocalDateTime cancelledAt;
+    private String cancelledBy;
+    private String cancellationReason;
+    private java.time.LocalDateTime cancellationHoldAt;
+    private Boolean cancellationHoldRefund;
     private String suspendedBy;
     private String suspendedAt;
     // Only on /api/members/me: the gym this membership is at, for the app's status screens.
@@ -167,6 +173,11 @@ public class MemberResponseDTO {
         dto.accessState         = MemberAccessState.of(m).name();
         dto.membershipSuspended = m.isMembershipSuspended();
         dto.suspendedReason     = m.getSuspendedReason();
+        dto.cancelledAt         = m.getCancelledAt();
+        dto.cancelledBy         = m.getCancelledBy();
+        dto.cancellationReason  = m.getCancellationReason();
+        dto.cancellationHoldAt  = m.getCancellationHoldAt();
+        dto.cancellationHoldRefund = m.isCancellationHoldRefund();
         dto.suspendedBy         = m.getSuspendedBy();
         dto.suspendedAt         = m.getSuspendedAt()         != null ? m.getSuspendedAt().format(ISO) + "Z"         : null;
         return dto;
@@ -250,6 +261,12 @@ public class MemberResponseDTO {
     public void setSuperseded(Boolean superseded) { this.superseded = superseded; }
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+    public java.time.LocalDateTime getCancelledAt() { return cancelledAt; }
+    public String getCancelledBy() { return cancelledBy; }
+    public String getCancellationReason() { return cancellationReason; }
+    public java.time.LocalDateTime getCancellationHoldAt() { return cancellationHoldAt; }
+    public Boolean getCancellationHoldRefund() { return cancellationHoldRefund; }
+
     public String getAccessState() { return accessState; }
     public void setAccessState(String accessState) { this.accessState = accessState; }
     public Boolean getMembershipSuspended() { return membershipSuspended; }

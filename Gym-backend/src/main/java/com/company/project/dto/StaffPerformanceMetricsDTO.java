@@ -1,6 +1,8 @@
 package com.company.project.dto;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Current-month performance snapshot for one staff member, shown on the admin
@@ -27,6 +29,46 @@ public class StaffPerformanceMetricsDTO {
     private int ratingCount;
     private boolean presentToday;
     private String performanceStatus;
+
+    // Performance engine figures for the month (see performance.metric.Metric).
+    private String period;
+    private long admissions;
+    private BigDecimal admissionsAmount = BigDecimal.ZERO;
+    private long leadConversions;
+    private long posSales;
+    private BigDecimal posSalesAmount = BigDecimal.ZERO;
+    private long ptSales;
+    private BigDecimal ptSalesAmount = BigDecimal.ZERO;
+    private long ptSessionsDelivered;
+    private long classesTaught;
+    private long classAttendees;
+    /** Every goal that applies this month (staff, role or branch target), with progress. Keys are snake_case. */
+    private List<Map<String, Object>> goals = List.of();
+
+    public String getPeriod() { return period; }
+    public void setPeriod(String period) { this.period = period; }
+    public long getAdmissions() { return admissions; }
+    public void setAdmissions(long admissions) { this.admissions = admissions; }
+    public BigDecimal getAdmissionsAmount() { return admissionsAmount; }
+    public void setAdmissionsAmount(BigDecimal admissionsAmount) { this.admissionsAmount = admissionsAmount; }
+    public long getLeadConversions() { return leadConversions; }
+    public void setLeadConversions(long leadConversions) { this.leadConversions = leadConversions; }
+    public long getPosSales() { return posSales; }
+    public void setPosSales(long posSales) { this.posSales = posSales; }
+    public BigDecimal getPosSalesAmount() { return posSalesAmount; }
+    public void setPosSalesAmount(BigDecimal posSalesAmount) { this.posSalesAmount = posSalesAmount; }
+    public long getPtSales() { return ptSales; }
+    public void setPtSales(long ptSales) { this.ptSales = ptSales; }
+    public BigDecimal getPtSalesAmount() { return ptSalesAmount; }
+    public void setPtSalesAmount(BigDecimal ptSalesAmount) { this.ptSalesAmount = ptSalesAmount; }
+    public long getPtSessionsDelivered() { return ptSessionsDelivered; }
+    public void setPtSessionsDelivered(long ptSessionsDelivered) { this.ptSessionsDelivered = ptSessionsDelivered; }
+    public long getClassesTaught() { return classesTaught; }
+    public void setClassesTaught(long classesTaught) { this.classesTaught = classesTaught; }
+    public long getClassAttendees() { return classAttendees; }
+    public void setClassAttendees(long classAttendees) { this.classAttendees = classAttendees; }
+    public List<Map<String, Object>> getGoals() { return goals; }
+    public void setGoals(List<Map<String, Object>> goals) { this.goals = goals; }
 
     public String getStaffId() { return staffId; }
     public void setStaffId(String staffId) { this.staffId = staffId; }

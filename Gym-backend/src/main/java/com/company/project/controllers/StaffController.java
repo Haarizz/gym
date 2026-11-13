@@ -104,17 +104,28 @@ public class StaffController {
     }
 
     /**
-     * GET /api/staff/performance?ids=1,2,3
-     * Current-month performance snapshot (target achievement, conversion, PT sessions,
+     * GET /api/staff/performance?ids=1,2,3[&period=yyyy-MM]
+     * Monthly performance snapshot (target achievement, per-metric figures and goals,
      * attendance, rating) for the given staff — typically the page shown in the list.
+     * Defaults to the current month; future months fall back to the current one.
      */
     @GetMapping("/performance")
     @PreAuthorize("hasAuthority('STAFF_VIEW')")
-    public ResponseEntity<List<StaffPerformanceMetricsDTO>> getStaffPerformance(@RequestParam List<Long> ids) {
+    public ResponseEntity<List<StaffPerformanceMetricsDTO>> getStaffPerformance(
+            @RequestParam List<Long> ids,
+            @RequestParam(required = false) String period) {
         if (ids.size() > MAX_PERFORMANCE_IDS) {
             ids = ids.subList(0, MAX_PERFORMANCE_IDS);
         }
-        return ResponseEntity.ok(staffOverviewService.getPerformance(ids));
+        java.time.YearMonth month = null;
+        if (period != null && !period.isBlank()) {
+            try {
+                month = java.time.YearMonth.parse(period.trim());
+            } catch (java.time.format.DateTimeParseException e) {
+                return ResponseEntity.badRequest().build();
+            }
+        }
+        return ResponseEntity.ok(staffOverviewService.getPerformance(ids, month));
     }
 
     @GetMapping("/{id}")

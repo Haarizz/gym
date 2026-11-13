@@ -20,7 +20,7 @@ import { trainingStreamsService, TrainingStreamApi } from "../utils/supabase/tra
 import { catalogDisplaySectionService } from "../utils/supabase/catalog-display-section-service";
 import { facilitiesService } from "../utils/supabase/facilities-service";
 import { leadService } from "../utils/supabase/lead-service";
-import { servicePortfolioService, apiErrorMessage, type ShareLink } from "../utils/supabase/service-portfolio-service";
+import { servicePortfolioService, apiErrorMessage, type ShareLink, type PortfolioHousehold } from "../utils/supabase/service-portfolio-service";
 import { useBranch } from "../utils/branch-context";
 import {
   Search,
@@ -55,6 +55,7 @@ import {
   ChevronRight,
   Loader2,
   AlertCircle,
+  HelpCircle,
   Video,
   Radio,
   ExternalLink,
@@ -96,7 +97,7 @@ export function ServicePortfolios() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [showPlanDetails, setShowPlanDetails] = useState(false);
-  const [showChoosePlan, setShowChoosePlan] = useState(false);
+  const [showGetInTouch, setShowGetInTouch] = useState(false);
   const [inquiryData, setInquiryData] = useState({
     name: "",
     phone: "",
@@ -422,9 +423,29 @@ export function ServicePortfolios() {
     }
   };
 
-  // Family / Couple plans are set up with the whole household through Member On-board.
-  const isHouseholdPlan = (plan: Plan) =>
-    [plan.planType, plan.type].some(t => ['family', 'couple'].includes((t || '').trim().toLowerCase()));
+  const isGroupType = (t?: string | null) => ['family', 'couple'].includes((t || '').trim().toLowerCase());
+  // Family / Couple by either type field.
+  const isHouseholdPlan = (plan: Plan) => [plan.planType, plan.type].some(isGroupType);
+  // A household plan can be requested here (with its household) only when its own plan type is
+  // Family / Couple — that's what approval keys the household on. Mirrors the server's isJoinable.
+  const isRequestable = (plan: Plan) => !isHouseholdPlan(plan) || isGroupType(plan.planType);
+
+  /** Who the plan covers and how it's priced. Mirrors ServicePortfolioService.toPublicHousehold. */
+  const toHousehold = (plan: Plan): PortfolioHousehold | null => {
+    if (!isHouseholdPlan(plan) || !isGroupType(plan.planType)) return null;
+    const positive = (v: number | null | undefined) => (v != null && v > 0 ? v : null);
+    const perMember = plan.autoCalculateTotal !== false && !!plan.pricePerMember && plan.pricePerMember > 0;
+    const couple = plan.planType.trim().toLowerCase() === 'couple';
+    return {
+      kind: couple ? 'couple' : 'family',
+      max_adults: couple ? 2 : positive(plan.maxAdultMembers),
+      max_children: couple ? 0 : positive(plan.maxChildMembers),
+      max_members: positive(plan.maxFamilyMembers),
+      allow_additional_members: !couple && plan.allowAdditionalMembers !== false,
+      price_per_member: perMember ? plan.pricePerMember : null,
+      additional_member_price: perMember ? plan.additionalMemberPrice : null,
+    };
+  };
 
   const toDraftPlan = (plan: Plan): DraftPlanOption => ({
     id: plan.id.toString(),
@@ -434,7 +455,20 @@ export function ServicePortfolios() {
     benefits: getPlanFeatures(plan),
     effectivePrice: planOfferPrice(plan),
     offerLabel: planHasOffer(plan) ? plan.offerLabel : null,
+    household: toHousehold(plan),
   });
+
+  // Choose Plan goes straight to new-member registration with the plan preselected
+  // (Family / Couple plans with a section for the household).
+  const choosePlan = (plan: Plan) => {
+    setSelectedPlan(plan);
+    if (!isRequestable(plan)) {
+      toast.info(`${plan.name} is set up at reception. Please see our front desk team.`);
+      return;
+    }
+    setDraftWithPlan(true);
+    setShowDraftModal(true);
+  };
 
   const handleClassInterest = (session: TrainingSessionApi) => {
     setInquiryData({
@@ -618,6 +652,15 @@ export function ServicePortfolios() {
             <UserPlus className="h-4 w-4 mr-2" />
             Member On-board
           </Button>
+
+          <Button
+            variant="outline"
+            className="border-[#2B7A78] text-[#2B7A78] hover:bg-[#2B7A78]/10"
+            onClick={() => setShowGetInTouch(true)}
+          >
+            <HelpCircle className="h-4 w-4 mr-2" />
+            Have Questions?
+          </Button>
         </div>
       )}
 
@@ -732,10 +775,7 @@ export function ServicePortfolios() {
                       <div className="space-y-3">
                         <Button
                           className="w-full bg-[#2B7A78] hover:bg-[#236360] text-white"
-                          onClick={() => {
-                            setSelectedPlan(plan);
-                            setShowChoosePlan(true);
-                          }}
+                          onClick={() => choosePlan(plan)}
                         >
                           <Gift className="h-4 w-4 mr-2" />
                           Choose Plan
@@ -1031,6 +1071,15 @@ export function ServicePortfolios() {
             <QrCode className="h-5 w-5 mr-2" />
             QR Code
           </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            className="bg-white shadow-lg"
+            onClick={() => setShowGetInTouch(true)}
+          >
+            <HelpCircle className="h-5 w-5 mr-2" />
+            Have Questions?
+          </Button>
 
         </div>
       )}
@@ -1110,7 +1159,7 @@ export function ServicePortfolios() {
                   className="flex-1 bg-[#2B7A78] hover:bg-[#236360] text-white"
                   onClick={() => {
                     setShowPlanDetails(false);
-                    setShowChoosePlan(true);
+                    choosePlan(selectedPlan);
                   }}
                 >
                   <Gift className="h-4 w-4 mr-2" />
@@ -1129,137 +1178,56 @@ export function ServicePortfolios() {
         </DialogContent>
       </Dialog>
 
-      {/* Choose Plan Dialog */}
-      <Dialog open={showChoosePlan} onOpenChange={setShowChoosePlan}>
-        <DialogContent className="sm:max-w-[600px]" style={{ maxHeight: '90vh', overflow: 'auto' }}>
-          {selectedPlan && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Choose {selectedPlan.name}</DialogTitle>
-                <DialogDescription>
-                  Select how you want to proceed with this membership plan
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-6 py-6">
-                {/* Selected Plan Summary */}
-                <div className={`bg-gradient-to-r ${getPlanColor(Math.max(0, plans.findIndex(p => p.id === selectedPlan.id)))} text-white p-6 rounded-lg`}>
-                  <h3 className="text-xl font-bold mb-2">{selectedPlan.name}</h3>
-                  <div className="flex items-baseline space-x-2 mb-3">
-                    <span className="text-3xl font-bold"><CurrencyGlyph /> {selectedPlan.price.toLocaleString()}</span>
-                    <span className="text-sm opacity-75">for {selectedPlan.duration}</span>
-                  </div>
-                </div>
-
-                {/* Action Options */}
-                <div className="space-y-4">
-                  <h4 className="font-semibold">Choose Your Action:</h4>
-                  
-                  {/* Option 1: Existing Member */}
-                  <Card className={`${cardShell} border-2 border-transparent hover:border-[#2B7A78] transition-all cursor-pointer`}>
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h5 className="font-semibold text-lg mb-2">I'm an Existing Member</h5>
-                          <p className="text-sm text-gray-600 mb-4">
-                            Add this plan to your current membership or upgrade your existing plan
-                          </p>
-                          <Button
-                            className="bg-[#2B7A78] hover:bg-[#236360] text-white"
-                            onClick={() => {
-                              setShowChoosePlan(false);
-                              // Honest gap: there is no member self-service portal in this app —
-                              // every plan/addon change goes through staff via the Members section.
-                              // Kiosk visitors can't add a plan to their own account from here yet.
-                              toast.info(`To add ${selectedPlan.name} to an existing membership, please see our front desk team.`);
-                            }}
-                          >
-                            <Users className="h-4 w-4 mr-2" />
-                            Add to My Account
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Option 2: New Member */}
-                  <Card className={`${cardShell} border-2 border-transparent hover:border-[#2B7A78] transition-all cursor-pointer`}>
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h5 className="font-semibold text-lg mb-2">I'm a New Member</h5>
-                          <p className="text-sm text-gray-600 mb-4">
-                            {isHouseholdPlan(selectedPlan)
-                              ? 'Family and couple plans are set up at reception with the whole household.'
-                              : 'Fill in the member’s details. The request waits in Approvals until payment is taken at reception.'}
-                          </p>
-                          <Button
-                            className="bg-[#2B7A78] hover:bg-[#236360] text-white"
-                            disabled={isHouseholdPlan(selectedPlan)}
-                            onClick={() => {
-                              setShowChoosePlan(false);
-                              setDraftWithPlan(true);
-                              setShowDraftModal(true);
-                            }}
-                          >
-                            <UserPlus className="h-4 w-4 mr-2" />
-                            Register as New Member
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Option 3: Inquiry */}
-                  <Card className={`${cardShell} border-2 border-transparent hover:border-[#2B7A78] transition-all cursor-pointer`}>
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h5 className="font-semibold text-lg mb-2">I Have Questions</h5>
-                          <p className="text-sm text-gray-600 mb-4">
-                            Get in touch with our team to learn more about this plan
-                          </p>
-                          <div className="flex space-x-2">
-                            <Button 
-                              variant="outline"
-                              className="border-[#2B7A78] text-[#2B7A78] hover:bg-[#2B7A78]/10"
-                              onClick={() => {
-                                setShowChoosePlan(false);
-                                setInquiryData({ ...inquiryData, interest: 'membership' });
-                                setShowInquiryForm(true);
-                              }}
-                            >
-                              <Mail className="h-4 w-4 mr-2" />
-                              Send Inquiry
-                            </Button>
-                            <Button 
-                              variant="outline"
-                              className="border-[#2B7A78] text-[#2B7A78] hover:bg-[#2B7A78]/10"
-                              onClick={() => {
-                                window.location.href = 'tel:+971501234567';
-                              }}
-                            >
-                              <Phone className="h-4 w-4 mr-2" />
-                              Call Us
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+      {/* Get in Touch Dialog */}
+      <Dialog open={showGetInTouch} onOpenChange={setShowGetInTouch}>
+        {/* Inline width: arbitrary sm:max-w-[...] classes aren't generated for this dialog */}
+        <DialogContent style={{ maxWidth: 'min(400px, calc(100% - 2rem))', padding: 0, gap: 0, overflow: 'hidden' }}>
+          <div
+            className="flex flex-col items-center text-center text-white"
+            style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #3AAFA9 100%)', padding: '28px 24px 24px' }}
+          >
+            <div className="rounded-full bg-white/20 p-3 mb-3 ring-4 ring-white/10">
+              <HelpCircle className="h-7 w-7 text-white" />
+            </div>
+            <DialogHeader className="space-y-1">
+              <DialogTitle className="text-xl text-white text-center">Get in Touch</DialogTitle>
+              <DialogDescription className="text-white/85 text-center">
+                Questions about plans, training or classes? We're happy to help.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="space-y-3" style={{ padding: 20 }}>
+            <button
+              type="button"
+              className="group w-full flex items-center gap-3 rounded-xl border bg-card p-3 text-left shadow-sm transition-all hover:shadow-md hover:border-[#2B7A78]"
+              onClick={() => {
+                setShowGetInTouch(false);
+                setShowInquiryForm(true);
+              }}
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                <Mail className="h-5 w-5 text-blue-600" />
               </div>
-
-              <div className="flex justify-end space-x-2 pt-4 border-t">
-                <Button 
-                  variant="outline"
-                  onClick={() => setShowChoosePlan(false)}
-                >
-                  Back
-                </Button>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm">Send Inquiry</p>
+                <p className="text-xs text-muted-foreground">Leave your details and we'll contact you soon</p>
               </div>
-            </>
-          )}
+              <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            </button>
+            <a
+              href="tel:+971501234567"
+              className="group w-full flex items-center gap-3 rounded-xl border bg-card p-3 text-left shadow-sm transition-all hover:shadow-md hover:border-[#2B7A78]"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+                <Phone className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm">Call Us</p>
+                <p className="text-xs text-muted-foreground">+971 50 123 4567</p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            </a>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -1368,7 +1336,7 @@ export function ServicePortfolios() {
         open={showDraftModal}
         onOpenChange={setShowDraftModal}
         selectedPlan={draftWithPlan && selectedPlan ? toDraftPlan(selectedPlan) : null}
-        planOptions={plans.filter(p => !isHouseholdPlan(p) && (p.planType || '').toLowerCase() !== 'walk-in').map(toDraftPlan)}
+        planOptions={plans.filter(p => isRequestable(p) && (p.planType || '').toLowerCase() !== 'walk-in').map(toDraftPlan)}
       />
     </div>
   );
