@@ -1,0 +1,213 @@
+/* Super admin › Database Console. Theme tokens only (--gb-*, --card, --border …) so Graphite
+   and every other theme apply; Tailwind is a frozen snapshot, so layout lives here. */
+
+.center { display: grid; place-items: center; padding: 3rem 0; color: var(--muted-foreground); }
+.spin { width: 1.15rem; height: 1.15rem; animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8125rem; }
+.muted { color: var(--muted-foreground); }
+.warnText { color: #b45309; }
+.empty { padding: 1.25rem; text-align: center; color: var(--muted-foreground); font-size: var(--text-sm); }
+
+.hostKey {
+  display: inline-flex; align-items: center; gap: 0.35rem; max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.72rem;
+  color: var(--muted-foreground); background: var(--muted); border-radius: 999px; padding: 0.3rem 0.65rem;
+}
+.hostKey svg { width: 0.85rem; height: 0.85rem; color: #15803d; flex-shrink: 0; }
+
+/* ── Connect ─────────────────────────────────────────────────────────────── */
+.connectWrap { display: grid; place-items: center; padding: 2rem 0 3rem; }
+.connectCard {
+  width: 100%; max-width: 26rem; background: var(--card); border: 1px solid var(--border); border-radius: 1rem;
+  padding: 1.75rem; display: flex; flex-direction: column; gap: 0.75rem;
+  box-shadow: 0 10px 30px -18px color-mix(in srgb, var(--gb-primary-darkest, #000) 60%, transparent);
+}
+.connectIcon {
+  width: 3rem; height: 3rem; border-radius: 0.875rem; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, var(--gb-primary) 0%, var(--gb-primary-darkest) 100%);
+}
+.connectIcon svg { width: 1.4rem; height: 1.4rem; }
+.connectTitle { margin: 0.25rem 0 0; font-size: var(--text-lg); font-weight: 700; color: var(--foreground); }
+.connectSub { margin: 0; color: var(--muted-foreground); }
+.pwLabel { font-size: var(--text-sm); font-weight: 600; margin-top: 0.5rem; color: var(--foreground); }
+.pwField { position: relative; }
+.pwField input {
+  width: 100%; height: 2.75rem; padding: 0 2.75rem 0 0.875rem; border-radius: 0.625rem; border: 1px solid var(--border);
+  background: var(--background); color: var(--foreground); font: inherit; outline: none;
+}
+.pwField input:focus { border-color: var(--gb-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gb-primary) 18%, transparent); }
+.pwField button {
+  position: absolute; right: 0.35rem; top: 50%; transform: translateY(-50%); width: 2.1rem; height: 2.1rem;
+  border: 0; background: transparent; color: var(--muted-foreground); display: grid; place-items: center; cursor: pointer; border-radius: 0.5rem;
+}
+.pwField button:hover { background: var(--muted); }
+.pwField button svg { width: 1.05rem; height: 1.05rem; }
+.connectBtn { width: 100%; height: 2.75rem; margin-top: 0.25rem; }
+.note { margin: 0; font-size: var(--text-xs); color: var(--muted-foreground); }
+.errorBox {
+  display: flex; gap: 0.5rem; align-items: flex-start; font-size: var(--text-sm); line-height: 1.4;
+  color: var(--destructive); background: color-mix(in srgb, var(--destructive) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--destructive) 30%, transparent); border-radius: 0.625rem; padding: 0.6rem 0.75rem;
+}
+.errorBox svg { width: 1rem; height: 1rem; flex-shrink: 0; margin-top: 0.1rem; }
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+.layout { display: grid; grid-template-columns: 19rem minmax(0, 1fr); gap: 1rem; align-items: start; }
+@media (max-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+.dbPanel {
+  background: var(--card); border: 1px solid var(--border); border-radius: 0.875rem; padding: 0.875rem;
+  display: flex; flex-direction: column; gap: 0.625rem; position: sticky; top: 1rem; max-height: calc(100vh - 8rem);
+}
+@media (max-width: 960px) { .dbPanel { position: static; max-height: 20rem; } }
+.dbHead { display: flex; align-items: center; justify-content: space-between; }
+.dbTitle { display: inline-flex; align-items: center; gap: 0.45rem; font-weight: 700; font-size: var(--text-sm); color: var(--foreground); }
+.dbTitle svg { width: 1rem; height: 1rem; color: var(--gb-primary); }
+.count { font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); background: var(--muted); border-radius: 999px; padding: 0.1rem 0.5rem; }
+.iconBtn {
+  width: 2rem; height: 2rem; border-radius: 0.5rem; border: 1px solid var(--border); background: var(--card);
+  display: grid; place-items: center; cursor: pointer; color: var(--muted-foreground);
+}
+.iconBtn:hover:not(:disabled) { background: var(--muted); color: var(--foreground); }
+.iconBtn svg { width: 0.95rem; height: 0.95rem; }
+.search { position: relative; }
+.search svg { position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); width: 0.95rem; height: 0.95rem; color: var(--muted-foreground); pointer-events: none; }
+.search input {
+  width: 100%; height: 2.25rem; padding: 0 0.75rem 0 2.05rem; border-radius: 0.55rem; border: 1px solid var(--border);
+  background: var(--background); color: var(--foreground); font: inherit; font-size: var(--text-sm); outline: none;
+}
+.search input:focus { border-color: var(--gb-primary); }
+.dbList { overflow-y: auto; margin: 0 -0.375rem; padding: 0 0.375rem; min-height: 0; }
+.groupLabel {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--muted-foreground); padding: 0.6rem 0.5rem 0.3rem;
+}
+.dbItem {
+  width: 100%; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 0.55rem;
+  padding: 0.5rem 0.6rem; cursor: pointer; display: flex; flex-direction: column; gap: 0.1rem; color: var(--foreground);
+}
+.dbItem:hover { background: var(--muted); }
+.dbItem[data-active="true"] {
+  background: color-mix(in srgb, var(--gb-primary) 10%, transparent);
+  border-color: color-mix(in srgb, var(--gb-primary) 35%, transparent);
+}
+.dbName { font-weight: 600; font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dbMeta { display: flex; flex-wrap: wrap; gap: 0.15rem 0.5rem; font-size: 0.72rem; color: var(--muted-foreground); }
+.dbMeta .mono { font-size: 0.7rem; }
+.size { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+/* ── Editor ──────────────────────────────────────────────────────────────── */
+.main { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.editorCard {
+  background: var(--card); border: 1px solid var(--border); border-radius: 0.875rem; overflow: hidden;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.editorCard[data-writes="true"] {
+  border-color: color-mix(in srgb, var(--destructive) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--destructive) 12%, transparent);
+}
+.editorBar {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;
+  padding: 0.65rem 0.875rem; border-bottom: 1px solid var(--border);
+}
+.target { display: inline-flex; align-items: center; gap: 0.45rem; font-size: var(--text-sm); min-width: 0; color: var(--foreground); }
+.target svg { width: 1rem; height: 1rem; color: var(--gb-primary); flex-shrink: 0; }
+.target b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.barActions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.ghostBtn {
+  display: inline-flex; align-items: center; gap: 0.35rem; height: 2rem; padding: 0 0.6rem; border-radius: 0.5rem;
+  border: 1px solid transparent; background: transparent; cursor: pointer; font: inherit; font-size: var(--text-sm); color: var(--muted-foreground);
+}
+.ghostBtn:hover, .ghostBtn[data-on="true"] { background: var(--muted); color: var(--foreground); }
+.ghostBtn svg { width: 0.95rem; height: 0.95rem; }
+.writes { display: inline-flex; align-items: center; gap: 0.45rem; font-size: var(--text-sm); font-weight: 600; color: var(--muted-foreground); cursor: pointer; }
+.writes[data-on="true"] { color: var(--destructive); }
+.downloads {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.5rem 0.875rem;
+  border-bottom: 1px solid var(--border); font-size: var(--text-sm);
+}
+.downloadsLabel { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted-foreground); margin-right: 0.15rem; }
+.dlBtn {
+  display: inline-flex; align-items: center; gap: 0.4rem; height: 2rem; padding: 0 0.7rem; border-radius: 0.5rem;
+  border: 1px solid var(--border); background: var(--card); color: var(--foreground); cursor: pointer;
+  font: inherit; font-size: var(--text-sm); font-weight: 500; font-variant-numeric: tabular-nums;
+}
+.dlBtn:hover:not(:disabled) { border-color: var(--gb-primary); color: var(--gb-primary); }
+.dlBtn:disabled { opacity: 0.6; cursor: default; }
+.dlBtn svg { width: 0.95rem; height: 0.95rem; }
+.writeWarn {
+  display: flex; align-items: center; gap: 0.5rem; font-size: var(--text-sm); padding: 0.55rem 0.875rem;
+  color: var(--destructive); background: color-mix(in srgb, var(--destructive) 8%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--destructive) 25%, transparent);
+}
+.writeWarn svg { width: 1rem; height: 1rem; flex-shrink: 0; }
+.editor {
+  display: block; width: 100%; min-height: 13rem; resize: vertical; border: 0; outline: none; padding: 0.875rem 1rem;
+  background: color-mix(in srgb, var(--muted) 35%, var(--card)); color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85rem; line-height: 1.55; tab-size: 2;
+}
+.hint {
+  display: flex; justify-content: space-between; gap: 0.5rem 1rem; flex-wrap: wrap;
+  padding: 0.5rem 0.875rem; font-size: 0.72rem; color: var(--muted-foreground); border-top: 1px solid var(--border);
+}
+
+/* ── History ─────────────────────────────────────────────────────────────── */
+.history { display: flex; flex-direction: column; max-height: 18rem; overflow-y: auto; margin: 0 -0.5rem; }
+.historyItem {
+  text-align: left; border: 0; background: transparent; border-radius: 0.5rem; padding: 0.55rem 0.5rem; cursor: pointer;
+  display: flex; flex-direction: column; gap: 0.2rem; color: var(--foreground);
+}
+.historyItem:hover { background: var(--muted); }
+.historySql {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.78rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.historyMeta { display: flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; color: var(--muted-foreground); }
+
+/* ── Results ─────────────────────────────────────────────────────────────── */
+.results { display: flex; flex-direction: column; gap: 0.75rem; transition: opacity 150ms ease; }
+.results[data-stale="true"] { opacity: 0.55; }
+.resultHead { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; font-size: var(--text-sm); }
+.sqlError {
+  display: flex; gap: 0.6rem; align-items: flex-start; border-radius: 0.75rem; padding: 0.75rem 0.9rem;
+  color: var(--destructive); background: color-mix(in srgb, var(--destructive) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--destructive) 28%, transparent);
+}
+.sqlError svg { width: 1.05rem; height: 1.05rem; flex-shrink: 0; margin-top: 0.1rem; }
+.sqlError pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8rem; }
+.notices {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.78rem; color: var(--muted-foreground);
+  background: var(--card); border: 1px dashed var(--border); border-radius: 0.625rem; padding: 0.6rem 0.8rem;
+}
+.command {
+  font-size: var(--text-sm); background: var(--card); border: 1px solid var(--border); border-radius: 0.625rem; padding: 0.6rem 0.85rem;
+  color: var(--foreground);
+}
+.block { background: var(--card); border: 1px solid var(--border); border-radius: 0.875rem; overflow: hidden; }
+.blockHead {
+  display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+  padding: 0.5rem 0.875rem; font-size: var(--text-sm); border-bottom: 1px solid var(--border); color: var(--foreground);
+}
+.gridWrap { overflow: auto; max-height: 32rem; }
+.grid { border-collapse: separate; border-spacing: 0; font-size: 0.8rem; min-width: 100%; }
+.grid th {
+  position: sticky; top: 0; z-index: 1; text-align: left; white-space: nowrap; font-weight: 600;
+  background: color-mix(in srgb, var(--muted) 85%, var(--card)); color: var(--foreground);
+  padding: 0.45rem 0.75rem; border-bottom: 1px solid var(--border); border-right: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.colType { display: block; font-weight: 400; font-size: 0.66rem; color: var(--muted-foreground); }
+.grid td {
+  padding: 0.38rem 0.75rem; white-space: nowrap; max-width: 28rem; overflow: hidden; text-overflow: ellipsis;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--foreground);
+}
+.grid td[data-null="true"] { color: var(--muted-foreground); font-style: italic; }
+.grid tbody tr:hover td { background: color-mix(in srgb, var(--gb-primary) 5%, transparent); }
+.rowNum { color: var(--muted-foreground) !important; text-align: right !important; font-variant-numeric: tabular-nums; width: 1%; }
+.confirmSql {
+  margin: 0.75rem 0 0; max-height: 12rem; overflow: auto; white-space: pre-wrap; word-break: break-word; text-align: left;
+  background: var(--muted); border-radius: 0.5rem; padding: 0.6rem 0.75rem; color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.78rem;
+}

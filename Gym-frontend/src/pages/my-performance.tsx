@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { isGymAdminRole } from "../utils/permissions";
+import { StaffPerformance as StaffPerformanceBoard } from "./staff-performance";
 import { useNavigate } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
@@ -57,7 +58,15 @@ function Goal({ name, achieved, target, fmt, pace, fill }: { name: string; achie
  * (Admin, owner) are measured by their login and have no targets or leaderboard.
  * The gym owner (ADMIN) never has targets — they set them for staff in Staff Targets.
  */
-export function MyPerformance(_props: MyPerformanceProps) {
+/**
+ * /my-performance: the gym owner (ADMIN / SUPER_ADMIN) sees Staff Performance — every staff
+ * member ranked — and every other role sees their own figures.
+ */
+export function MyPerformance(props: MyPerformanceProps) {
+  return isGymAdminRole() ? <StaffPerformanceBoard /> : <OwnPerformance {...props} />;
+}
+
+function OwnPerformance(_props: MyPerformanceProps) {
   const navigate = useNavigate();
   const { formatCurrency } = useCurrency();
   const palette = usePalette();

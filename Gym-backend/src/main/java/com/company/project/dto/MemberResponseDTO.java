@@ -92,7 +92,7 @@ public class MemberResponseDTO {
     private String accessState;
     private Boolean membershipSuspended;
     private String suspendedReason;
-    // Membership cancellation (V139)
+    // Membership cancellation (V140)
     private java.time.LocalDateTime cancelledAt;
     private String cancelledBy;
     private String cancellationReason;

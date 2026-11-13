@@ -469,7 +469,7 @@ public class Member extends BaseEntity implements BranchAware {
     public Long getGlobalUserId() { return globalUserId; }
     public void setGlobalUserId(Long globalUserId) { this.globalUserId = globalUserId; }
 
-    // ── Membership cancellation (V139) ──────────────────────────────────────
+    // ── Membership cancellation (V140) ──────────────────────────────────────
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
 

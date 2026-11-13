@@ -282,9 +282,22 @@ const del: RequestInit = { method: 'DELETE' };
 
 export type SettlementAction = 'approve' | 'reject' | 'pay' | 'reset';
 
+/** Per person, what the monthly overview doesn't carry (GET /performance/staff-extras). */
+export interface StaffExtra {
+  staff_id: number;
+  leads_assigned: number;
+  leads_converted: number;
+  follow_ups_total: number;
+  follow_ups_completed: number;
+  /** Members' average rating of the sessions they trained, 0 = none. */
+  rating: number;
+  rating_count: number;
+}
+
 export const performanceService = {
   overview: (from: string, to: string, staffId?: number) =>
     request<PerformanceOverview>(`/overview?from=${from}&to=${to}${staffId ? `&staff_id=${staffId}` : ''}`, 'Failed to load performance'),
+  staffExtras: () => request<StaffExtra[]>('/staff-extras', 'Failed to load staff figures'),
   me: (period?: string) => request<MyPerformance>(`/me${period ? `?period=${period}` : ''}`, 'Failed to load your performance'),
   decide: (action: SettlementAction, body: { staff_id: number; period: string; note?: string; adjustment?: number }) =>
     request<Settlement>(`/settlements/${action}`, `Failed to ${action} commission`, post(body)),

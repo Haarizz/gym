@@ -1,6 +1,6 @@
 # Membership Cancellation
 
-Status: built 2026-11-13 on `changes_anandu` (not committed). Migrations V139 and V140.
+Status: built 2026-11-13 on `changes_anandu` (shipped to main). Migrations V140 and V141.
 The wallet question (section 7) is still open.
 
 This document records what was asked for, the questions raised along the way, what was
@@ -206,8 +206,8 @@ When GymOS › Member Deactivation Policy › **Approval Required** is on:
 - `MemberAccessState.CANCELLED`, plus `TenantContextFilter` read-only paths for cancelled members.
 - `MemberSuspension.requireCanPayDues`: members on hold can pay their dues.
 - `MemberService.rejoinIfCancelled`: renewal reactivates the record.
-- V139: cancellation fields on `members`, the `member_cancellations` table, the `cancellation_fee` setting.
-- V140: the `member_cancellation_requests` table; drops the no-longer-used `cancelled_global_user_id`.
+- V140: cancellation fields on `members`, the `member_cancellations` table, the `cancellation_fee` setting.
+- V141: the `member_cancellation_requests` table; drops the no-longer-used `cancelled_global_user_id`.
 
 **Web:** `CancelMembershipDialog`, the cancellation refund modal in `refunds.tsx`,
 `CancellationRequestsPanel` (Approvals), the GymOS policy card, the Members list

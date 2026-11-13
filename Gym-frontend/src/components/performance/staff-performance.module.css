@@ -1,0 +1,77 @@
+/* Staff Performance (owner's /my-performance): podium, leaderboard extras and the person sheet.
+   Built on the overview kit (community-analytics.module.css); theme tokens only. */
+
+/* ── Podium ──────────────────────────────────────────────────────────────── */
+.podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.875rem; }
+@media (max-width: 900px) { .podium { grid-template-columns: minmax(0, 1fr); } }
+.place {
+  position: relative; display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem 1.1rem; border-radius: 1rem; text-align: left;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--medal) 13%, var(--card)) 0%, var(--card) 62%);
+  border: 1px solid color-mix(in srgb, var(--medal) 35%, var(--border)); color: var(--foreground); font: inherit; cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+.place:hover { transform: translateY(-1px); box-shadow: 0 12px 26px -20px color-mix(in srgb, var(--medal) 90%, transparent); }
+.place[data-rank="1"] { --medal: #d4a017; }
+.place[data-rank="2"] { --medal: #8b9bb0; }
+.place[data-rank="3"] { --medal: #c0713a; }
+.placeTop { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+.medal {
+  position: absolute; top: 0.85rem; right: 0.9rem; width: 2rem; height: 2rem; border-radius: 999px; display: grid; place-items: center;
+  font-weight: 800; font-size: 0.9rem; color: #fff; background: var(--medal); box-shadow: 0 4px 10px -4px var(--medal);
+}
+.placeName { font-weight: 700; font-size: var(--text-base); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 2.5rem; }
+.placeRole { font-size: var(--text-xs); color: var(--muted-foreground); }
+.placeScore { display: flex; align-items: baseline; gap: 0.4rem; }
+.placeScore b { font-size: 1.9rem; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; }
+.placeScore span { font-size: var(--text-xs); color: var(--muted-foreground); }
+.placeStats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; padding-top: 0.7rem; border-top: 1px dashed color-mix(in srgb, var(--medal) 35%, var(--border)); }
+.placeStat { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.placeStat span { font-size: 0.68rem; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+.placeStat b { font-size: var(--text-sm); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── People ──────────────────────────────────────────────────────────────── */
+.person { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.photo { width: 2.1rem; height: 2.1rem; border-radius: 999px; object-fit: cover; flex-shrink: 0; background: var(--muted); }
+.photoLg { width: 3rem; height: 3rem; }
+.initials {
+  width: 2.1rem; height: 2.1rem; border-radius: 999px; display: grid; place-items: center; flex-shrink: 0; font-size: 0.72rem; font-weight: 700;
+  color: var(--tone); background: color-mix(in srgb, var(--tone) 14%, transparent);
+}
+.initialsLg { width: 3rem; height: 3rem; font-size: 0.95rem; }
+.name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 13rem; }
+.sub { font-size: var(--text-xs); color: var(--muted-foreground); white-space: nowrap; }
+.rank { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--muted-foreground); width: 1.75rem; text-align: center; }
+.rank[data-top="true"] { color: var(--foreground); }
+.clickRow { cursor: pointer; }
+.selectedRow td { background: color-mix(in srgb, var(--gb-primary) 7%, transparent); }
+
+/* Score meter */
+.score { display: flex; align-items: center; gap: 0.5rem; min-width: 8.5rem; }
+.scoreBar { flex: 1; height: 7px; border-radius: 999px; background: var(--muted); overflow: hidden; }
+.scoreFill { height: 100%; border-radius: 999px; background: var(--fill, var(--gb-primary)); }
+.scoreNum { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 1.8rem; text-align: right; }
+.change { font-size: 0.7rem; font-weight: 600; white-space: nowrap; }
+.change[data-tone="good"] { color: var(--good-ink); }
+.change[data-tone="bad"] { color: var(--bad-ink); }
+
+.select {
+  height: 2.25rem; padding: 0 2rem 0 0.75rem; border-radius: 0.6rem; border: 1px solid var(--border); background: var(--background);
+  color: var(--foreground); font: inherit; font-size: var(--text-sm); cursor: pointer; outline: none;
+}
+.select:focus { border-color: var(--gb-primary); }
+.note { font-size: var(--text-xs); color: var(--muted-foreground); line-height: 1.5; }
+
+/* ── Person sheet ───────────────────────────────────────────────────────── */
+/* Portalled outside the page's .root, so it carries the kit's colour tokens itself. */
+.sheet {
+  --good-ink: #006300; --bad-ink: #b42318;
+  --status-good: #0ca30c; --status-warning: #c98a00; --status-critical: #d03b3b; --status-info: #2a78d6;
+}
+:global(.dark) .sheet { --good-ink: #4ade80; --bad-ink: #f87171; --status-info: #60a5fa; }
+.sheetBody { display: flex; flex-direction: column; gap: 1.25rem; padding: 0 1rem 1.5rem; }
+.sheetTitle { font-size: var(--text-lg); font-weight: 700; color: var(--foreground); }
+.sectionTitle { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted-foreground); }
+.goal { display: flex; flex-direction: column; gap: 0.3rem; }
+.goal + .goal { margin-top: 0.6rem; }
+.goalHead { display: flex; justify-content: space-between; gap: 0.5rem; font-size: var(--text-sm); }
+.goalHead b { font-variant-numeric: tabular-nums; }
